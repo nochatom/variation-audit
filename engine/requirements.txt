@@ -1,3 +1,0 @@
-# Variation Audit — detection engine (reused from changeorder-recovery)
-anthropic>=0.69        # Claude SDK (claude-opus-4-8, structured outputs, adaptive thinking)
-pydantic>=2.9
