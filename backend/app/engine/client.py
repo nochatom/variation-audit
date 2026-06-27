@@ -41,10 +41,11 @@ class IdempotencyConflict(EngineError):
 
 class EngineClient:
     def __init__(self, base_url: str, *, api_key: str | None = None,
-                 http_timeout: float = HTTP_TIMEOUT_SECONDS):
+                 http_timeout: float = HTTP_TIMEOUT_SECONDS,
+                 transport: httpx.BaseTransport | None = None):
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._client = httpx.Client(base_url=base_url.rstrip("/"), headers=headers,
-                                    timeout=http_timeout)
+                                    timeout=http_timeout, transport=transport)
 
     def close(self) -> None:
         self._client.close()
