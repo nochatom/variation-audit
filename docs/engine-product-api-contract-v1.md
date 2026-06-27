@@ -1,5 +1,7 @@
 # Engine ↔ Product API Contract (v1)
 
+> ⚠️ **SUPERSEDED by [v1.1](engine-product-api-contract-v1.1.md)** (2026-06-27), which inlines decisions `.21.1`–`.21.4`. Kept for history; build against v1.1.
+
 > Owner task: `variation-audit-z3x.21` (Integrate existing detection engine).
 > Status: v1 draft. Engine reused from `changeorder-recovery`; product layer built on top (Beads-orchestrated).
 
