@@ -37,7 +37,7 @@ def downgrade() -> None:
             variations, analysis_jobs, documents, projects, memberships, users,
             organizations CASCADE;
         DROP FUNCTION IF EXISTS set_updated_at() CASCADE;
-        DROP TYPE IF EXISTS review_status, confidence_band, variation_engine_status,
+        DROP TYPE IF EXISTS basis_quality, review_status, confidence_band, variation_engine_status,
             engine_stage, job_status, source_type, project_status, membership_role;
         """
     )

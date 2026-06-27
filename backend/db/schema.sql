@@ -19,6 +19,7 @@ CREATE TYPE engine_stage           AS ENUM ('ingest', 'baseline', 'classify', 'q
 CREATE TYPE variation_engine_status AS ENUM ('detected', 'confirmed', 'uncertain');
 CREATE TYPE confidence_band        AS ENUM ('low', 'medium', 'high');
 CREATE TYPE review_status          AS ENUM ('pending', 'confirmed', 'rejected');
+CREATE TYPE basis_quality          AS ENUM ('boq', 'rate_card', 'inferred', 'none');
 
 -- ---------------------------------------------------------------------------
 -- updated_at trigger
@@ -71,6 +72,9 @@ CREATE TABLE projects (
     project_type  text NOT NULL DEFAULT 'construction_trade',
     country       char(2) NOT NULL DEFAULT 'AU' CHECK (country = 'AU'),  -- MVP: AU only
     status        project_status NOT NULL DEFAULT 'in_progress',
+    contract_text text,                                          -- engine baseline input (contract v1.2)
+    scope_text    text,                                          -- scope / BOQ
+    state         varchar(8),                                    -- AU state/territory (SoP regime hint)
     created_by    uuid REFERENCES users(id) ON DELETE SET NULL,
     created_at    timestamptz NOT NULL DEFAULT now(),
     updated_at    timestamptz NOT NULL DEFAULT now()
@@ -101,8 +105,11 @@ CREATE TABLE analysis_jobs (
     company_id       uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     project_id       uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     request_id       uuid NOT NULL UNIQUE,                        -- contract §3.1 idempotency
-    contract_version text NOT NULL DEFAULT 'v1.1',
+    contract_version text NOT NULL DEFAULT 'v1.2',
     created_by       uuid REFERENCES users(id) ON DELETE SET NULL,  -- who triggered (for notifications)
+    baseline         jsonb,                                       -- engine baseline rollup (notice/time_bar/sop/counts)
+    recoverable_total numeric(14,2),
+    time_bar_at_risk integer,
     engine_job_id    text,                                        -- id returned by engine POST
     engine_version   text,                                        -- from engine result
     status           job_status NOT NULL DEFAULT 'queued',
@@ -137,6 +144,8 @@ CREATE TABLE variations (
     engine_status    variation_engine_status NOT NULL DEFAULT 'detected',
     confidence_score numeric(4,3) NOT NULL CHECK (confidence_score BETWEEN 0 AND 1),
     confidence_band  confidence_band NOT NULL,                    -- engine-derived (low<0.5<=med<0.8<=high)
+    confidence_factors jsonb,                                     -- engine deterministic breakdown
+    time_bar_risk    boolean NOT NULL DEFAULT false,              -- AU SoP entitlement may be time-barred
     review_status    review_status NOT NULL DEFAULT 'pending',    -- human confirm/reject
     reviewed_by      uuid REFERENCES users(id) ON DELETE SET NULL,
     reviewed_at      timestamptz,
@@ -163,7 +172,10 @@ CREATE TABLE value_estimates (
     id                        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     variation_id              uuid NOT NULL UNIQUE REFERENCES variations(id) ON DELETE CASCADE,
     amount                    numeric(14,2),
+    estimate_low              numeric(14,2),
+    estimate_high             numeric(14,2),
     currency                  char(3) NOT NULL DEFAULT 'AUD' CHECK (currency = 'AUD'),
+    basis_quality             basis_quality NOT NULL DEFAULT 'none',
     valuation_confidence_score numeric(4,3) CHECK (valuation_confidence_score BETWEEN 0 AND 1),
     confidence                confidence_band NOT NULL,          -- low/medium/high (same band map)
     created_at                timestamptz NOT NULL DEFAULT now()

@@ -16,6 +16,7 @@ from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -83,6 +84,13 @@ class ReviewStatus(str, enum.Enum):
     pending = "pending"
     confirmed = "confirmed"
     rejected = "rejected"
+
+
+class BasisQuality(str, enum.Enum):
+    boq = "boq"
+    rate_card = "rate_card"
+    inferred = "inferred"
+    none = "none"
 
 
 # --------------------------------------------------------------------------
@@ -163,6 +171,10 @@ class Project(Base):
     project_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="construction_trade")
     country: Mapped[str] = mapped_column(String(2), nullable=False, server_default="AU")
     status: Mapped[ProjectStatus] = mapped_column(nullable=False, default=ProjectStatus.in_progress)
+    # Engine baseline inputs (contract v1.2) — required to drive run_recovery.
+    contract_text: Mapped[str | None] = mapped_column(Text)
+    scope_text: Mapped[str | None] = mapped_column(Text)
+    state: Mapped[str | None] = mapped_column(String(8))   # AU state/territory (SoP regime hint)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
@@ -207,10 +219,14 @@ class AnalysisJob(Base):
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )
     request_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, unique=True)
-    contract_version: Mapped[str] = mapped_column(Text, nullable=False, server_default="v1.1")
+    contract_version: Mapped[str] = mapped_column(Text, nullable=False, server_default="v1.2")
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
+    # Engine result rollups (contract v1.2)
+    baseline: Mapped[dict | None] = mapped_column(JSONB)            # notice_clause/time_bar_days/sop_regime/counts
+    recoverable_total: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    time_bar_at_risk: Mapped[int | None] = mapped_column(Integer)
     engine_job_id: Mapped[str | None] = mapped_column(Text)
     engine_version: Mapped[str | None] = mapped_column(Text)
     status: Mapped[JobStatus] = mapped_column(nullable=False, default=JobStatus.queued)
@@ -252,6 +268,8 @@ class Variation(Base):
     )
     confidence_score: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False)
     confidence_band: Mapped[ConfidenceBand] = mapped_column(nullable=False)
+    confidence_factors: Mapped[dict | None] = mapped_column(JSONB)   # engine deterministic breakdown
+    time_bar_risk: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")  # AU SoP
     review_status: Mapped[ReviewStatus] = mapped_column(
         nullable=False, default=ReviewStatus.pending, index=True
     )
@@ -298,7 +316,10 @@ class ValueEstimate(Base):
         UUID(as_uuid=True), ForeignKey("variations.id", ondelete="CASCADE"), nullable=False, unique=True
     )
     amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    estimate_low: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    estimate_high: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="AUD")
+    basis_quality: Mapped[BasisQuality] = mapped_column(nullable=False, default=BasisQuality.none)
     valuation_confidence_score: Mapped[Decimal | None] = mapped_column(Numeric(4, 3))
     confidence: Mapped[ConfidenceBand] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = _created()

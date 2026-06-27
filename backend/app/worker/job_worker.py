@@ -21,11 +21,13 @@ from app.engine.client import EngineClient, EngineError, EngineTimeout
 from app.engine.schemas import AnalysisRequest, AnalysisResult, DocumentIn, JobPoll
 from app.models import (
     AnalysisJob,
+    BasisQuality,
     ConfidenceBand,
     Document,
     Evidence,
     JobStatus,
     Notification,
+    Project,
     ValueEstimate,
     Variation,
 )
@@ -80,6 +82,7 @@ def claim_one(session: Session) -> AnalysisJob | None:
 # Request building
 # --------------------------------------------------------------------------
 def build_request(session: Session, job: AnalysisJob, loader: DocumentLoader) -> AnalysisRequest:
+    project = session.get(Project, job.project_id)
     docs = session.execute(
         select(Document).where(Document.project_id == job.project_id)
     ).scalars().all()
@@ -87,6 +90,9 @@ def build_request(session: Session, job: AnalysisJob, loader: DocumentLoader) ->
         request_id=job.request_id,
         project_id=str(job.project_id),
         company_id=str(job.company_id),
+        contract_text=(project.contract_text if project else None) or "",
+        scope_text=(project.scope_text if project else None) or "",
+        state=(project.state if project else None),
         documents=[
             DocumentIn(
                 document_id=str(d.id),
@@ -124,6 +130,8 @@ def ingest_result(session: Session, job: AnalysisJob, poll: JobPoll) -> None:
                 engine_status=v.status,
                 confidence_score=Decimal(str(v.confidence_score)),
                 confidence_band=band,
+                confidence_factors=v.confidence_factors or None,
+                time_bar_risk=bool(v.time_bar_risk),
             )
             session.add(variation)
             session.flush()  # assign variation.id for FKs
@@ -149,12 +157,21 @@ def ingest_result(session: Session, job: AnalysisJob, poll: JobPoll) -> None:
                     ValueEstimate(
                         variation_id=variation.id,
                         amount=ev.amount,
+                        estimate_low=ev.estimate_low,
+                        estimate_high=ev.estimate_high,
                         currency=ev.currency or "AUD",
+                        basis_quality=ev.basis_quality or BasisQuality.none,
                         valuation_confidence_score=ev.valuation_confidence_score,
                         confidence=ev.confidence or band_for_score(ev.valuation_confidence_score)
                         or ConfidenceBand.low,
                     )
                 )
+
+        # Job-level rollups from the contract v1.2 baseline + totals.
+        if result.baseline is not None:
+            job.baseline = result.baseline.model_dump()
+        job.recoverable_total = result.recoverable_total
+        job.time_bar_at_risk = result.time_bar_at_risk
 
     job.status = JobStatus.succeeded
     job.finished_at = _now()

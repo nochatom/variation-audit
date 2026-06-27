@@ -21,6 +21,7 @@ def _request() -> AnalysisRequest:
         request_id=uuid.uuid4(),
         project_id="p1",
         company_id="c1",
+        contract_text="The contractor shall install the switchboard.",
         documents=[DocumentIn(type=SourceType.email, content="we did extra works")],
     )
 

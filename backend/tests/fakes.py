@@ -32,18 +32,22 @@ class FakeResult:
 class FakeSession:
     """Records writes; returns queued results for successive execute() calls."""
 
-    def __init__(self, results=None):
+    def __init__(self, results=None, get_obj=None):
         self.added: list = []
         self.commits = 0
         self.flushes = 0
         self.refreshes = 0
         self._results = list(results or [])
+        self._get_obj = get_obj            # returned by session.get(...)
 
     # -- query side --------------------------------------------------------
     def execute(self, _stmt):
         if self._results:
             return self._results.pop(0)
         return FakeResult()
+
+    def get(self, _cls, _pk):
+        return self._get_obj
 
     # -- write side --------------------------------------------------------
     def add(self, obj):

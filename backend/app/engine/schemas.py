@@ -1,7 +1,10 @@
-"""Pydantic schemas for the Engine <-> Product API contract v1.1.
+"""Pydantic schemas for the Engine <-> Product API contract v1.2.
 
-These mirror docs/engine-product-api-contract-v1.1.md exactly. Enums are reused
-from app.models so the product DB and the wire format share one vocabulary.
+These mirror docs/engine-product-api-contract-v1.2.md. Enums are reused from
+app.models so the product DB and the wire format share one vocabulary.
+
+v1.2 (post engine-reconciliation) adds: contract_text/scope_text/state input,
+and time_bar_risk + estimate range + basis_quality + a baseline on output.
 """
 from __future__ import annotations
 
@@ -12,6 +15,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from app.models import (
+    BasisQuality,
     ConfidenceBand,
     EngineStage,
     JobStatus,
@@ -19,7 +23,7 @@ from app.models import (
     VariationEngineStatus,
 )
 
-CONTRACT_VERSION = "v1.1"
+CONTRACT_VERSION = "v1.2"
 
 
 # --------------------------------------------------------------------------
@@ -37,8 +41,11 @@ class AnalysisRequest(BaseModel):
     request_id: uuid.UUID                    # idempotency key (contract §3.1)
     project_id: str
     company_id: str
+    contract_text: str                       # REQUIRED — engine can't run without it
     documents: list[DocumentIn]
     contract_version: str = CONTRACT_VERSION
+    scope_text: str = ""
+    state: str | None = None                 # AU state/territory (SoP regime hint)
     project_type: str = "construction_trade"
     country: str = "AU"
     callback_url: str | None = None          # MVP: always None (polling-only)
@@ -71,7 +78,10 @@ class EvidenceOut(BaseModel):
 
 class EstimatedValueOut(BaseModel):
     amount: Decimal | None = None
+    estimate_low: Decimal | None = None
+    estimate_high: Decimal | None = None
     currency: str = "AUD"
+    basis_quality: BasisQuality | None = None
     valuation_confidence_score: float | None = None
     confidence: ConfidenceBand | None = None
 
@@ -83,13 +93,26 @@ class VariationOut(BaseModel):
     status: VariationEngineStatus = VariationEngineStatus.detected
     confidence_score: float
     confidence_band: ConfidenceBand | None = None   # engine-derived; product backfills if missing
+    confidence_factors: dict = Field(default_factory=dict)
+    time_bar_risk: bool = False                       # AU SoP — entitlement may be time-barred
     evidence: list[EvidenceOut] = Field(default_factory=list)
     estimated_value: EstimatedValueOut | None = None
+
+
+class BaselineOut(BaseModel):
+    inclusions_count: int = 0
+    exclusions_count: int = 0
+    notice_clause: str | None = None
+    time_bar_days: int | None = None
+    sop_regime: str | None = None
 
 
 class AnalysisResult(BaseModel):
     project_id: str
     engine_version: str
+    baseline: BaselineOut | None = None
+    recoverable_total: Decimal | None = None
+    time_bar_at_risk: int | None = None
     variations: list[VariationOut] = Field(default_factory=list)
 
 
