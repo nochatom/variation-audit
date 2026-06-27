@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "variation_audit",
+  "project_id": "be35b1c9-7fda-46b6-bc50-0002bdedaa45"
+}
