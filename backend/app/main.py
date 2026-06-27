@@ -12,6 +12,7 @@ from fastapi import FastAPI
 
 from app.auth.router import router as auth_router
 from app.config import get_settings
+from app.routers.projects import router as projects_router
 
 app = FastAPI(
     title="Variation Audit API",
@@ -20,6 +21,7 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
+app.include_router(projects_router)
 
 
 @app.get("/health")

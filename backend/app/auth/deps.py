@@ -42,3 +42,15 @@ def get_memberships(
     return list(session.execute(
         select(Membership).where(Membership.user_id == user.id)
     ).scalars().all())
+
+
+def ensure_member(session: Session, user: User, company_id: uuid.UUID) -> Membership:
+    """Org isolation guard — 403 unless `user` belongs to `company_id`."""
+    m = session.execute(
+        select(Membership).where(
+            Membership.user_id == user.id, Membership.company_id == company_id
+        )
+    ).scalar_one_or_none()
+    if m is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "not a member of this organization")
+    return m

@@ -22,6 +22,11 @@ class S3DocumentLoader:
         obj = self._s3.get_object(Bucket=self.bucket, Key=storage_key)
         return obj["Body"].read().decode("utf-8", errors="replace")
 
+    def put(self, storage_key: str, data: bytes | str) -> str:
+        body = data.encode("utf-8") if isinstance(data, str) else data
+        self._s3.put_object(Bucket=self.bucket, Key=storage_key, Body=body)
+        return storage_key
+
 
 class LocalDocumentLoader:
     """Reads document content from a local directory. For dev/tests only."""
@@ -33,6 +38,14 @@ class LocalDocumentLoader:
         path = os.path.join(self.base_dir, storage_key)
         with open(path, encoding="utf-8", errors="replace") as fh:
             return fh.read()
+
+    def put(self, storage_key: str, data: bytes | str) -> str:
+        path = os.path.join(self.base_dir, storage_key)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        body = data if isinstance(data, bytes) else data.encode("utf-8")
+        with open(path, "wb") as fh:
+            fh.write(body)
+        return storage_key
 
 
 def build_loader():
