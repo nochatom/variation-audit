@@ -12,6 +12,7 @@ from fastapi import FastAPI
 
 from app.auth.router import router as auth_router
 from app.config import get_settings
+from app.routers.orgs import router as orgs_router
 from app.routers.projects import router as projects_router
 from app.routers.review import router as review_router
 
@@ -24,6 +25,7 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(review_router)
+app.include_router(orgs_router)
 
 
 @app.get("/health")

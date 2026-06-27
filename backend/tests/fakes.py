@@ -34,6 +34,7 @@ class FakeSession:
 
     def __init__(self, results=None, get_obj=None):
         self.added: list = []
+        self.deleted: list = []
         self.commits = 0
         self.flushes = 0
         self.refreshes = 0
@@ -52,6 +53,9 @@ class FakeSession:
     # -- write side --------------------------------------------------------
     def add(self, obj):
         self.added.append(obj)
+
+    def delete(self, obj):
+        self.deleted.append(obj)
 
     def flush(self):
         self.flushes += 1

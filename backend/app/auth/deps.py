@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.tokens import TokenError, decode_token
 from app.db import session_factory
-from app.models import Membership, User
+from app.models import Membership, MembershipRole, User
 
 _bearer = HTTPBearer(auto_error=True)
 
@@ -53,4 +53,12 @@ def ensure_member(session: Session, user: User, company_id: uuid.UUID) -> Member
     ).scalar_one_or_none()
     if m is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not a member of this organization")
+    return m
+
+
+def require_admin(session: Session, user: User, company_id: uuid.UUID) -> Membership:
+    """RBAC guard — 403 unless `user` is an admin of `company_id`."""
+    m = ensure_member(session, user, company_id)
+    if m.role != MembershipRole.admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin role required")
     return m
