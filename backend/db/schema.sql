@@ -199,6 +199,16 @@ CREATE INDEX idx_audit_company ON audit_log(company_id);
 CREATE INDEX idx_audit_entity ON audit_log(entity_type, entity_id);
 -- Immutability is enforced by app policy + restricted grants (no UPDATE/DELETE for app role).
 
+CREATE TABLE review_comments (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id     uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    variation_id   uuid NOT NULL REFERENCES variations(id) ON DELETE CASCADE,
+    author_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    body           text NOT NULL,
+    created_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_review_comments_variation ON review_comments(variation_id, created_at);
+
 CREATE TABLE notifications (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id  uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,

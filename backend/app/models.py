@@ -360,3 +360,21 @@ class Notification(Base):
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     read_at: Mapped[datetime | None] = mapped_column()
     created_at: Mapped[datetime] = _created()
+
+
+class ReviewComment(Base):
+    """Commercial-team comment on a variation during review (.14)."""
+
+    __tablename__ = "review_comments"
+    __table_args__ = (Index("idx_review_comments_variation", "variation_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = _pk()
+    company_id: Mapped[uuid.UUID] = _company_fk()
+    variation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("variations.id", ondelete="CASCADE"), nullable=False
+    )
+    author_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = _created()

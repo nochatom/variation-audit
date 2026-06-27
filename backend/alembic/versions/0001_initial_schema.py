@@ -33,7 +33,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute(
         """
-        DROP TABLE IF EXISTS notifications, audit_log, value_estimates, evidence,
+        DROP TABLE IF EXISTS review_comments, notifications, audit_log, value_estimates, evidence,
             variations, analysis_jobs, documents, projects, memberships, users,
             organizations CASCADE;
         DROP FUNCTION IF EXISTS set_updated_at() CASCADE;
