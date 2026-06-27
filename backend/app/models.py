@@ -208,6 +208,9 @@ class AnalysisJob(Base):
     )
     request_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, unique=True)
     contract_version: Mapped[str] = mapped_column(Text, nullable=False, server_default="v1.1")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
     engine_job_id: Mapped[str | None] = mapped_column(Text)
     engine_version: Mapped[str | None] = mapped_column(Text)
     status: Mapped[JobStatus] = mapped_column(nullable=False, default=JobStatus.queued)

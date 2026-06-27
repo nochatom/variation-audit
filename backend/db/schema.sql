@@ -102,6 +102,7 @@ CREATE TABLE analysis_jobs (
     project_id       uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     request_id       uuid NOT NULL UNIQUE,                        -- contract §3.1 idempotency
     contract_version text NOT NULL DEFAULT 'v1.1',
+    created_by       uuid REFERENCES users(id) ON DELETE SET NULL,  -- who triggered (for notifications)
     engine_job_id    text,                                        -- id returned by engine POST
     engine_version   text,                                        -- from engine result
     status           job_status NOT NULL DEFAULT 'queued',
