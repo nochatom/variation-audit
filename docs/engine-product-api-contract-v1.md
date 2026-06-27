@@ -108,3 +108,16 @@ All outputs must include:
 - streaming mode (real-time ingestion)
 - incremental updates (delta analysis)
 - multi-project batching
+
+---
+
+## 8. Decision Log (v1 refinements — all accepted 2026-06-27)
+
+These ratified decisions amend v1 and should be folded into a consolidated **v1.1**:
+
+| Task | Decision | Doc |
+|------|----------|-----|
+| `.21.2` | **Async job model** — `POST /v1/analyses`→`202 job_id`; poll `GET`; polling-only; 15-min `ENGINE_TIMEOUT`; no cancellation. | [21.2](decisions/21.2-execution-model.md) |
+| `.21.4` | **`request_id`** (UUIDv4 idempotency key, 7-day dedup) + **`contract_version`** envelope; distinct from `engine_version`. | [21.4](decisions/21.4-request-id-and-contract-version.md) |
+| `.21.1` | **One `source_type` enum** for input docs + output evidence (`email\|rfi\|site_instruction\|meeting_note\|sms\|document`); `source_document_id` traceability. | [21.1](decisions/21.1-evidence-type-vocabulary.md) |
+| `.21.3` | **Two confidence axes** (detection `confidence_score` vs valuation); canonical band map (low<0.5≤med<0.8≤high); engine-derived `confidence_band`; `status` orthogonal. | [21.3](decisions/21.3-confidence-system.md) |
