@@ -9,3 +9,6 @@ psycopg[binary]>=3.2        # PostgreSQL driver
 alembic>=1.13              # migrations (schema.sql baseline)
 httpx>=0.27                # engine client
 python-dotenv>=1.0
+bcrypt>=4.2                # password hashing (.2 auth)
+PyJWT>=2.9                 # access tokens (.2 auth)
+email-validator>=2.2       # pydantic EmailStr

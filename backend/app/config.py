@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     idempotency_window_days: int = 7                          # decision .21.4
     worker_idle_sleep: float = 2.0
 
+    # Auth (.2) — override jwt_secret in every non-dev environment
+    jwt_secret: str = Field(default="dev-only-change-me")
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24               # 24h
+
 
 @lru_cache
 def get_settings() -> Settings:
