@@ -1,5 +1,7 @@
 # Engine ↔ Product API Contract (v1.1)
 
+> ⚠️ **SUPERSEDED by [v1.2](engine-product-api-contract-v1.2.md)** (2026-06-27) after engine reconciliation — v1.1's input couldn't drive the real engine (no contract/scope/state) and dropped the AU time-bar/baseline. Build against v1.2.
+>
 > Owner task: `variation-audit-z3x.21` (Integrate existing detection engine).
 > Supersedes [v1](engine-product-api-contract-v1.md). Consolidates the four ratified decisions (`.21.1`–`.21.4`, accepted 2026-06-27) into one authoritative spec.
 > Market scope: **Australia only**, all construction trades. Engine reused from `changeorder-recovery`; product layer built on top, Beads-orchestrated.
