@@ -1,6 +1,6 @@
 # Architecture & System Design (MVP)
 
-> Task: `variation-audit-z3x.1` · Status: **draft for review**.
+> Task: `variation-audit-z3x.1` · Status: **accepted** (2026-06-27, founder-approved). Decisions locked in §9.
 > Scope: **Australia only**, all construction trades. Hybrid build — reuse the `changeorder-recovery` AI engine, build a new Beads-orchestrated product layer on top. Interface = [Engine↔Product API Contract v1.1](engine-product-api-contract-v1.1.md).
 
 ## 1. Goals & Constraints
@@ -41,9 +41,9 @@ Rationale: one founder, one product codebase to reason about; the engine is alre
                          │ FastAPI       │    │ outputs      │
                          └───┬───────────┘    └──────────────┘
                              │
-                     ┌───────▼────────┐   ┌───────────────────┐
-                     │ Object Storage │   │ Engine DB (its own)│
-                     │ S3 (ap-se-2)   │   └───────────────────┘
+                     ┌───────▼────────┐   (engine is STATELESS —
+                     │ Object Storage │    no engine DB; product
+                     │ S3 (ap-se-2)   │    owns all persistence)
                      │ docs+artifacts │
                      └────────────────┘
 ```
@@ -105,8 +105,10 @@ Engine output is **copied into** product tables on job success so the commercial
 | Audit trail + evidence viewer | `.17` |
 | Testing + deploy | `.20` |
 
-## 9. Open Architecture Questions
-1. **Engine result ingestion:** does the engine write results to a shared store the product reads, or return inline via poll (current contract = inline/`result_url`)? Recommend inline per v1.1 — keep engine stateless to the product.
-2. **Hosting target:** which AU-region host (AWS ap-southeast-2 vs other)? Affects object storage + deploy (`.20`).
-3. **Engine DB:** keep the engine's own DB, or make the engine stateless and have the product own all persistence? Recommend stateless engine for a cleaner reuse boundary.
-4. **Single vs separate deploy for worker:** run worker in-process with API for MVP, split later? Recommend separate worker process, same image.
+## 9. Resolved Architecture Decisions (2026-06-27, founder-approved)
+1. **Stateless engine.** The engine keeps **no DB of its own**; the **product owns all persistence**. The engine receives the full Input Envelope per request and returns results — no server-side project state. Cleanest reuse boundary.
+2. **Inline result delivery** per contract v1.1: results returned in the poll payload on `succeeded`, with `result_url` fallback only when >1 MB. No shared result store between engine and product.
+3. **Hosting: AWS, `ap-southeast-2` (Sydney).** Drives object storage, Postgres, and deploy (`.18`/`.20`). Satisfies AU data residency.
+4. **Separate worker process, same image.** The job worker runs as its own process/container (not in-process with the API) but is built from the same codebase/image. Scales independently of the API.
+
+> Consequence of (1): any prior engine-side schema in `changeorder-recovery` is bypassed; the engine is invoked as a pure function of its request. Persistence lives entirely in the product Postgres (§5).
