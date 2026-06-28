@@ -1,0 +1,81 @@
+# Full-stack dev/demo stack: Postgres + detection engine + product API + worker + web.
+#
+# Prereqs:
+#   * The engine repo cloned as a sibling: ../changeorder-recovery
+#     (branch feat/v1.2-engine-adapter, which carries backend/Dockerfile)
+#   * An Anthropic API key in the environment (ANTHROPIC_API_KEY) for the engine.
+#
+# Usage:
+#   ANTHROPIC_API_KEY=sk-ant-... docker compose up --build
+#   API  -> http://localhost:8000   Web -> http://localhost:3000   Engine -> http://localhost:8088
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: va
+      POSTGRES_PASSWORD: va
+      POSTGRES_DB: variation_audit
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U va -d variation_audit"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  engine:
+    build:
+      context: ../changeorder-recovery/backend
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "8088:8088"
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      VA_DATABASE_URL: postgresql+psycopg://va:va@db:5432/variation_audit
+      VA_ENGINE_BASE_URL: http://engine:8088
+      VA_JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-32-bytes-minimum!!}
+      VA_LOCAL_DOC_DIR: /data/docs
+    volumes:
+      - docdata:/data/docs
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  worker:
+    build:
+      context: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      VA_DATABASE_URL: postgresql+psycopg://va:va@db:5432/variation_audit
+      VA_ENGINE_BASE_URL: http://engine:8088
+      VA_LOCAL_DOC_DIR: /data/docs
+      RUN_MIGRATIONS: "0"          # the API container owns migrations
+    volumes:
+      - docdata:/data/docs
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  pgdata:
+  docdata:
