@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.router import router as auth_router
 from app.config import get_settings
 from app.routers.dashboard import router as dashboard_router
+from app.routers.notifications import router as notifications_router
 from app.routers.orgs import router as orgs_router
 from app.routers.projects import router as projects_router
 from app.routers.reports import router as reports_router
@@ -39,6 +40,7 @@ app.include_router(review_router)
 app.include_router(orgs_router)
 app.include_router(reports_router)
 app.include_router(dashboard_router)
+app.include_router(notifications_router)
 
 
 @app.get("/health")
