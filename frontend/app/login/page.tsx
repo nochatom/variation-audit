@@ -34,34 +34,46 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto mt-24 max-w-sm px-4">
-      <h1 className="mb-1 text-2xl font-semibold">Variation Audit</h1>
-      <p className="mb-6 text-sm text-slate-500">AU construction variation recovery</p>
-      <form onSubmit={submit} className="space-y-3 rounded-xl border bg-white p-6 shadow-sm">
-        <div className="flex gap-2 text-sm">
-          <button type="button" onClick={() => setMode("login")}
-            className={`flex-1 rounded py-1 ${mode === "login" ? "bg-slate-900 text-white" : "bg-slate-100"}`}>
-            Log in
-          </button>
-          <button type="button" onClick={() => setMode("signup")}
-            className={`flex-1 rounded py-1 ${mode === "signup" ? "bg-slate-900 text-white" : "bg-slate-100"}`}>
-            Sign up
-          </button>
+    <main className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex items-center gap-2.5">
+          <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-sm font-bold text-white">
+            V
+          </span>
+          <div>
+            <h1 className="text-[15px] font-semibold tracking-tight">Variation Audit</h1>
+            <p className="text-[12px] text-ink-subtle">AU construction variation recovery</p>
+          </div>
         </div>
-        {mode === "signup" && (
-          <input className="w-full rounded border px-3 py-2" placeholder="Organization name"
-            value={orgName} onChange={(e) => setOrgName(e.target.value)} required />
-        )}
-        <input className="w-full rounded border px-3 py-2" type="email" placeholder="Email"
-          value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input className="w-full rounded border px-3 py-2" type="password" placeholder="Password"
-          value={password} onChange={(e) => setPassword(e.target.value)} required />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button disabled={busy}
-          className="w-full rounded bg-slate-900 py-2 text-white disabled:opacity-50">
-          {busy ? "…" : mode === "login" ? "Log in" : "Create account"}
-        </button>
-      </form>
+
+        <form onSubmit={submit} className="va-panel space-y-3 p-6">
+          <div className="flex gap-1 rounded-md bg-canvas p-1 text-sm">
+            {(["login", "signup"] as const).map((m) => (
+              <button key={m} type="button" onClick={() => setMode(m)}
+                className={`flex-1 rounded-sm py-1.5 font-medium capitalize transition-colors ${
+                  mode === m ? "bg-surface-2 text-ink" : "text-ink-subtle hover:text-ink"
+                }`}>
+                {m === "login" ? "Log in" : "Sign up"}
+              </button>
+            ))}
+          </div>
+
+          {mode === "signup" && (
+            <input className="va-input" placeholder="Organization name"
+              value={orgName} onChange={(e) => setOrgName(e.target.value)} required />
+          )}
+          <input className="va-input" type="email" placeholder="Email"
+            value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input className="va-input" type="password" placeholder="Password"
+            value={password} onChange={(e) => setPassword(e.target.value)} required />
+
+          {error && <p className="text-sm text-red-400">{error}</p>}
+
+          <button disabled={busy} className="va-btn-primary w-full">
+            {busy ? "…" : mode === "login" ? "Log in" : "Create account"}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

@@ -8,3 +8,14 @@
 __pycache__/
 *.pyc
 .venv/
+
+# Local dev Postgres cluster
+.pgdata/
+.pgdata.log
+
+# local server logs
+.pgstart.out
+.pgstart.err
+backend/.uvicorn.out
+backend/.uvicorn.err
+frontend/.next-dev.out

@@ -44,83 +44,96 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <button onClick={() => { logout(); router.replace("/login"); }}
-          className="text-sm text-slate-500 hover:underline">Log out</button>
-      </div>
-
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
-
-      {data && (
-        <div className="mb-6 grid grid-cols-3 gap-4">
-          <Stat label="Projects" value={String(data.totals.projects)} />
-          <Stat label="Pending review" value={String(data.totals.pending)} />
-          <Stat label="Recoverable (confirmed)" value={aud(data.totals.recoverable_confirmed)} />
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-10 border-b border-hairline bg-canvas/80 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
+          <div className="flex items-center gap-2">
+            <span className="grid h-6 w-6 place-items-center rounded-sm bg-primary text-xs font-bold text-white">V</span>
+            <span className="text-sm font-semibold tracking-tight">Variation Audit</span>
+          </div>
+          <button onClick={() => { logout(); router.replace("/login"); }}
+            className="text-sm text-ink-subtle transition-colors hover:text-ink">Log out</button>
         </div>
-      )}
+      </header>
 
-      <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-100 text-left text-slate-600">
-            <tr>
-              <th className="px-4 py-2">Project</th>
-              <th className="px-4 py-2">Pending</th>
-              <th className="px-4 py-2">Confirmed</th>
-              <th className="px-4 py-2">Time-bar</th>
-              <th className="px-4 py-2">Recoverable</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.projects.map((p) => (
-              <tr key={p.id} className="border-t hover:bg-slate-50">
-                <td className="px-4 py-2">
-                  <Link href={`/projects/${p.id}`} className="font-medium text-blue-700 hover:underline">
-                    {p.name}
-                  </Link>
-                  {!p.has_contract && <span className="ml-2 text-xs text-amber-600">no contract</span>}
-                </td>
-                <td className="px-4 py-2">{p.counts.pending}</td>
-                <td className="px-4 py-2">{p.counts.confirmed}</td>
-                <td className="px-4 py-2">{p.time_bar_at_risk > 0 ? `⚠ ${p.time_bar_at_risk}` : "—"}</td>
-                <td className="px-4 py-2">{aud(p.recoverable_confirmed)}</td>
+      <main className="mx-auto max-w-6xl px-5 py-8">
+        <h1 className="mb-1 text-2xl font-semibold tracking-tightest">Dashboard</h1>
+        <p className="mb-6 text-sm text-ink-subtle">Variation recovery across your projects.</p>
+
+        {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
+
+        {data && (
+          <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Stat label="Projects" value={String(data.totals.projects)} />
+            <Stat label="Pending review" value={String(data.totals.pending)} />
+            <Stat label="Recoverable (confirmed)" value={aud(data.totals.recoverable_confirmed)} accent />
+          </div>
+        )}
+
+        <div className="va-panel overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-hairline text-left text-ink-subtle">
+                <th className="px-4 py-2.5 font-medium">Project</th>
+                <th className="px-4 py-2.5 font-medium">Pending</th>
+                <th className="px-4 py-2.5 font-medium">Confirmed</th>
+                <th className="px-4 py-2.5 font-medium">Time-bar</th>
+                <th className="px-4 py-2.5 font-medium">Recoverable</th>
               </tr>
-            ))}
-            {data && data.projects.length === 0 && (
-              <tr><td className="px-4 py-6 text-slate-400" colSpan={5}>No projects yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {data?.projects.map((p) => (
+                <tr key={p.id} className="border-b border-hairline last:border-0 transition-colors hover:bg-surface-2">
+                  <td className="px-4 py-3">
+                    <Link href={`/projects/${p.id}`} className="font-medium text-ink hover:text-primary-hover">
+                      {p.name}
+                    </Link>
+                    {!p.has_contract && (
+                      <span className="ml-2 rounded-pill bg-surface-2 px-2 py-0.5 text-[11px] text-ink-subtle">no contract</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-ink-muted">{p.counts.pending}</td>
+                  <td className="px-4 py-3 text-ink-muted">{p.counts.confirmed}</td>
+                  <td className="px-4 py-3">
+                    {p.time_bar_at_risk > 0
+                      ? <span className="text-amber-400">⚠ {p.time_bar_at_risk}</span>
+                      : <span className="text-ink-tertiary">—</span>}
+                  </td>
+                  <td className="px-4 py-3 font-medium">{aud(p.recoverable_confirmed)}</td>
+                </tr>
+              ))}
+              {data && data.projects.length === 0 && (
+                <tr><td className="px-4 py-8 text-center text-ink-subtle" colSpan={5}>No projects yet — create one below.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
-      <form onSubmit={createProject} className="mt-6 flex flex-wrap items-end gap-2 rounded-xl border bg-white p-4 shadow-sm">
-        <div className="flex-1">
-          <label className="block text-xs text-slate-500">Project name</label>
-          <input className="w-full rounded border px-3 py-2" value={name}
-            onChange={(e) => setName(e.target.value)} required />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500">State</label>
-          <input className="w-24 rounded border px-3 py-2" value={state}
-            onChange={(e) => setState(e.target.value)} />
-        </div>
-        <div className="w-full">
-          <label className="block text-xs text-slate-500">Contract text (optional)</label>
-          <textarea className="w-full rounded border px-3 py-2" rows={2} value={contract}
-            onChange={(e) => setContract(e.target.value)} />
-        </div>
-        <button className="rounded bg-slate-900 px-4 py-2 text-white">Create project</button>
-      </form>
-    </main>
+        <form onSubmit={createProject} className="va-panel mt-6 flex flex-wrap items-end gap-3 p-5">
+          <div className="min-w-[200px] flex-1">
+            <label className="va-eyebrow mb-1 block">Project name</label>
+            <input className="va-input" value={name} onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div>
+            <label className="va-eyebrow mb-1 block">State</label>
+            <input className="va-input w-24" value={state} onChange={(e) => setState(e.target.value)} />
+          </div>
+          <div className="w-full">
+            <label className="va-eyebrow mb-1 block">Contract text (optional)</label>
+            <textarea className="va-input" rows={2} value={contract} onChange={(e) => setContract(e.target.value)} />
+          </div>
+          <button className="va-btn-primary">Create project</button>
+        </form>
+      </main>
+    </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="rounded-xl border bg-white p-4 shadow-sm">
-      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
+    <div className="va-panel p-4">
+      <div className="va-eyebrow">{label}</div>
+      <div className={`mt-1.5 text-2xl font-semibold tracking-tight ${accent ? "text-primary-hover" : ""}`}>{value}</div>
     </div>
   );
 }
