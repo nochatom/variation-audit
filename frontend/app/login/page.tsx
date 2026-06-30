@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, setToken, setCompanyId } from "@/lib/api";
 
@@ -34,45 +35,68 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen items-center justify-center bg-ip-bg px-4 font-ip text-ip-ink">
       <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center gap-2.5">
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-sm font-bold text-white">
-            V
-          </span>
+        <div className="mb-7 flex items-center gap-2.5">
+          <span className="grid h-8 w-8 place-items-center rounded-md bg-ip-navy text-sm font-bold text-white">V</span>
           <div>
-            <h1 className="text-[15px] font-semibold tracking-tight">Variation Audit</h1>
-            <p className="text-[12px] text-ink-subtle">AU construction variation recovery</p>
+            <h1 className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</h1>
+            <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>
           </div>
         </div>
 
-        <form onSubmit={submit} className="va-panel space-y-3 p-6">
-          <div className="flex gap-1 rounded-md bg-canvas p-1 text-sm">
+        <div className="ip-card-lg p-6">
+          <div className="mb-5 flex gap-1 rounded-md border border-ip-line bg-ip-card p-1 text-sm">
             {(["login", "signup"] as const).map((m) => (
-              <button key={m} type="button" onClick={() => setMode(m)}
-                className={`flex-1 rounded-sm py-1.5 font-medium capitalize transition-colors ${
-                  mode === m ? "bg-surface-2 text-ink" : "text-ink-subtle hover:text-ink"
-                }`}>
+              <button
+                key={m}
+                type="button"
+                onClick={() => { setMode(m); setError(null); }}
+                className={`flex-1 rounded-sm py-1.5 font-semibold transition-colors ${
+                  mode === m ? "bg-ip-navy text-white" : "text-ip-ink-2 hover:text-ip-ink"
+                }`}
+              >
                 {m === "login" ? "Log in" : "Sign up"}
               </button>
             ))}
           </div>
 
-          {mode === "signup" && (
-            <input className="va-input" placeholder="Organization name"
-              value={orgName} onChange={(e) => setOrgName(e.target.value)} required />
-          )}
-          <input className="va-input" type="email" placeholder="Email"
-            value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <input className="va-input" type="password" placeholder="Password"
-            value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <h2 className="mb-1 text-lg font-bold tracking-tight text-ip-ink">
+            {mode === "login" ? "Sign in to your workspace" : "Create your workspace"}
+          </h2>
+          <p className="mb-5 text-[13px] text-ip-ink-2">
+            {mode === "login" ? "Welcome back. Enter your details to continue." : "Set up your organization to start recovering variations."}
+          </p>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          <form onSubmit={submit} className="space-y-3">
+            {mode === "signup" && (
+              <div>
+                <label className="ip-label mb-1 block">Organization name</label>
+                <input className="ip-input" placeholder="e.g. Harbourside Electrical Pty Ltd" value={orgName} onChange={(e) => setOrgName(e.target.value)} required />
+              </div>
+            )}
+            <div>
+              <label className="ip-label mb-1 block">Email</label>
+              <input className="ip-input" type="email" placeholder="name@company.com.au" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div>
+              <label className="ip-label mb-1 block">Password</label>
+              <input className="ip-input" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </div>
 
-          <button disabled={busy} className="va-btn-primary w-full">
-            {busy ? "…" : mode === "login" ? "Log in" : "Create account"}
-          </button>
-        </form>
+            {error && (
+              <p className="rounded-md border border-ip-risk/30 bg-ip-risk-bg px-3 py-2 text-sm font-medium text-ip-risk">{error}</p>
+            )}
+
+            <button disabled={busy} className="btn-navy w-full">
+              {busy ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}
+            </button>
+          </form>
+        </div>
+
+        <div className="mt-5 text-center text-[12px] text-ip-ink-3">
+          <Link href="/landing" className="hover:text-ip-ink">← Back to site</Link>
+        </div>
       </div>
     </main>
   );
