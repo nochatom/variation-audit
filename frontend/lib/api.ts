@@ -54,6 +54,27 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   return (await res.json()) as T;
 }
 
+// multipart upload (bearer token, no JSON content-type)
+async function upload<T>(path: string, file: File, field = "file"): Promise<T> {
+  const fd = new FormData();
+  fd.append(field, file);
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${BASE}${path}`, { method: "POST", headers, body: fd });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const b = await res.json();
+      detail = b.detail || detail;
+    } catch {
+      /* non-JSON */
+    }
+    throw new ApiError(res.status, detail);
+  }
+  return (await res.json()) as T;
+}
+
 // ---- auth ----------------------------------------------------------------
 export type TokenResponse = { access_token: string; user_id: string; email: string };
 export type Me = {
@@ -99,6 +120,40 @@ export const api = {
     }),
   addComment: (id: string, body: string) =>
     request<Comment>(`/variations/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) }),
+
+  // projects (list + ingestion)
+  listProjects: (companyId: string) => request<ProjectOut[]>(`/projects?company_id=${companyId}`),
+  uploadContract: (projectId: string, file: File, isScope = false) =>
+    upload<ProjectOut>(`/projects/${projectId}/contract?is_scope=${isScope}`, file),
+  uploadDocs: (
+    projectId: string,
+    kind: "comms" | "rfis" | "site-instructions" | "meeting-minutes",
+    file: File,
+  ) => upload<UploadResult>(`/projects/${projectId}/${kind}`, file),
+
+  // organization members
+  orgMembers: (companyId: string) => request<MemberOut[]>(`/orgs/${companyId}/members`),
+  addMember: (companyId: string, email: string, role: "admin" | "member") =>
+    request<MemberOut>(`/orgs/${companyId}/members`, { method: "POST", body: JSON.stringify({ email, role }) }),
+  setMemberRole: (companyId: string, userId: string, role: "admin" | "member") =>
+    request<MemberOut>(`/orgs/${companyId}/members/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) }),
+  removeMember: (companyId: string, userId: string) =>
+    request<void>(`/orgs/${companyId}/members/${userId}`, { method: "DELETE" }),
+
+  // audit & evidence
+  auditLog: (companyId: string, entityType?: string, limit = 100) =>
+    request<AuditEntry[]>(
+      `/audit?company_id=${companyId}${entityType ? `&entity_type=${entityType}` : ""}&limit=${limit}`,
+    ),
+  variationAudit: (id: string) => request<AuditEntry[]>(`/variations/${id}/audit`),
+  variationEvidence: (id: string) => request<EvidenceContext[]>(`/variations/${id}/evidence`),
+
+  // notifications
+  notifications: (unread = false) => request<NotificationItem[]>(`/notifications?unread=${unread}`),
+  unreadCount: () => request<{ count: number }>("/notifications/unread-count"),
+  markNotificationRead: (id: string) =>
+    request<NotificationItem>(`/notifications/${id}/read`, { method: "POST" }),
+  markAllNotificationsRead: () => request<{ updated: number }>("/notifications/read-all", { method: "POST" }),
 
   // reports — PDF fetched as a blob so we can attach the bearer token
   async reportPdf(projectId: string): Promise<Blob> {
@@ -147,4 +202,37 @@ export type VariationDetail = VariationSummary & {
   evidence: { type: string; reference: string | null; quote: string | null }[];
   value: { amount: number | null; estimate_low: number | null; estimate_high: number | null; basis_quality: string | null } | null;
   comments: Comment[];
+};
+export type ProjectOut = {
+  id: string;
+  company_id: string;
+  name: string;
+  state: string | null;
+  status: string;
+  has_contract: boolean;
+};
+export type UploadResult = { project_id: string; documents_added: number };
+export type MemberOut = { user_id: string; email: string; full_name: string | null; role: string };
+export type AuditEntry = {
+  id: string;
+  actor_user_id: string | null;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  created_at: string;
+};
+export type EvidenceContext = {
+  type: string;
+  reference: string | null;
+  quote: string | null;
+  source_document: { id: string; source_type: string; source: string | null; doc_timestamp: string | null } | null;
+};
+export type NotificationItem = {
+  id: string;
+  type: string;
+  payload: Record<string, unknown>;
+  read: boolean;
+  created_at: string;
 };

@@ -56,4 +56,39 @@
   .card:hover {
     @apply border-hairline-strong;
   }
+
+  /* ============ Ironclad Precision (light enterprise app) ============ */
+  .ip-card {
+    @apply rounded-lg border border-ip-line bg-ip-card shadow-ip-card;
+  }
+  .ip-card-lg {
+    @apply rounded-xl border border-ip-line bg-ip-card shadow-ip-card;
+  }
+  .ip-label {
+    @apply text-[12px] font-semibold uppercase tracking-[0.05em] text-ip-ink-3;
+  }
+  .btn-navy {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-ip-navy px-3.5 py-2
+           text-sm font-semibold text-white transition-colors hover:bg-ip-navy-2 disabled:opacity-50;
+  }
+  .btn-orange {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-ip-orange px-3.5 py-2
+           text-sm font-semibold text-white transition-colors hover:bg-ip-orange-2 disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-ip-line-strong
+           bg-ip-card px-3.5 py-2 text-sm font-semibold text-ip-navy transition-colors
+           hover:bg-ip-card-2 disabled:opacity-50;
+  }
+  .ip-input {
+    @apply w-full rounded-md border border-ip-line-strong bg-ip-card px-3 py-2 text-sm text-ip-ink
+           placeholder:text-ip-ink-3 focus:border-ip-orange focus:outline-none
+           focus:ring-2 focus:ring-ip-orange/25;
+  }
+  .ip-th {
+    @apply px-4 py-2.5 text-left text-[12px] font-semibold uppercase tracking-[0.04em] text-ip-ink-3;
+  }
+  .ip-row {
+    @apply border-b border-ip-line last:border-0;
+  }
 }
