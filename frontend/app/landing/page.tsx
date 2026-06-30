@@ -310,21 +310,36 @@ function Features() {
   );
 }
 
-/* ---------------- section: trust band (truthful, capability-framed) ---------------- */
+/* ---------------- section: product capabilities (factual, no metrics/claims) ---------------- */
 function TrustBand() {
   const items = [
-    { k: "8", label: "AU states & territories — Security of Payment aware" },
-    { k: "4", label: "Source types ingested: RFIs, site instructions, minutes, comms" },
-    { k: "100%", label: "Findings linked to source-document evidence" },
+    {
+      title: "Australia-wide Security of Payment awareness",
+      body: "Notice periods and time-bar logic account for state and territory SoP regimes.",
+    },
+    {
+      title: "Four supported document sources",
+      body: "RFIs, site instructions, meeting minutes and project communications.",
+    },
+    {
+      title: "Every variation linked to supporting evidence",
+      body: "Each finding traces back to the source document it was detected from.",
+    },
   ];
   return (
     <section className="relative border-t border-hairline/60">
       <div className="mx-auto max-w-6xl px-6 py-14">
+        <p className="va-eyebrow mb-6">Product capabilities</p>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           {items.map((i) => (
-            <div key={i.k} className="text-center sm:text-left">
-              <div className="text-3xl font-semibold tracking-tight text-ink">{i.k}</div>
-              <div className="mt-1 text-sm text-ink-subtle">{i.label}</div>
+            <div key={i.title} className="flex gap-3">
+              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-[5px] bg-primary/15 text-[11px] text-primary-hover">
+                ✓
+              </span>
+              <div>
+                <div className="text-sm font-semibold text-ink">{i.title}</div>
+                <div className="mt-1 text-[13px] leading-relaxed text-ink-subtle">{i.body}</div>
+              </div>
             </div>
           ))}
         </div>
