@@ -121,6 +121,67 @@ def parse_rfi_csv(data: bytes) -> list[dict]:
     return out
 
 
+# Canonical site-instruction field -> column aliases (architect/engineer/superintendent directions).
+_SITE_INSTRUCTION_ALIASES: dict[str, list[str]] = {
+    "number": ["si_number", "si_no", "si", "instruction_number", "instruction_no",
+               "number", "no", "ref", "reference", "id"],
+    "date_issued": ["date_issued", "date", "issued", "date_raised", "created", "when"],
+    "issued_by": ["issued_by", "from", "author", "superintendent", "architect", "engineer", "by"],
+    "instruction": ["instruction", "description", "detail", "details", "direction",
+                    "work", "scope", "body", "text"],
+    "reference": ["reference", "drawing", "drawing_ref", "spec", "clause"],
+    "status": ["status", "state"],
+}
+
+
+def _render_site_instruction(number, date_issued, issued_by, instruction, reference, status) -> str:
+    lines = [f"Site Instruction {number}"]
+    meta = []
+    if date_issued:
+        meta.append(f"Issued: {date_issued}")
+    if issued_by:
+        meta.append(f"By: {issued_by}")
+    if reference:
+        meta.append(f"Ref: {reference}")
+    if status:
+        meta.append(f"Status: {status}")
+    if meta:
+        lines.append("  ".join(meta))
+    if instruction:
+        lines.append(f"Instruction: {instruction}")
+    return "\n".join(lines)
+
+
+def parse_site_instructions_csv(data: bytes) -> list[dict]:
+    """Parse a site-instruction register CSV into document dicts.
+
+    Columns matched case-insensitively against common aliases; a row is skipped
+    only when it carries no instruction text.
+    """
+    text = data.decode("utf-8-sig", errors="replace")
+    reader = csv.DictReader(io.StringIO(text))
+    pick = _header_picker(reader)
+
+    out: list[dict] = []
+    for i, row in enumerate(reader):
+        instruction = pick(row, _SITE_INSTRUCTION_ALIASES["instruction"])
+        if not instruction:
+            continue
+        number = pick(row, _SITE_INSTRUCTION_ALIASES["number"]) or f"SI-{i + 1}"
+        date_issued = pick(row, _SITE_INSTRUCTION_ALIASES["date_issued"])
+        issued_by = pick(row, _SITE_INSTRUCTION_ALIASES["issued_by"])
+        reference = pick(row, _SITE_INSTRUCTION_ALIASES["reference"])
+        status = pick(row, _SITE_INSTRUCTION_ALIASES["status"])
+        out.append({
+            "ref": number,
+            "occurred_at": date_issued,
+            "status": status,
+            "text": _render_site_instruction(number, date_issued, issued_by,
+                                             instruction, reference, status),
+        })
+    return out
+
+
 def parse_comms_csv(data: bytes) -> list[dict]:
     """Parse a comms-export CSV into document dicts (id/kind/author/occurred_at/text).
 
