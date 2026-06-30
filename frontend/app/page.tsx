@@ -9,5 +9,5 @@ export default function Home() {
   useEffect(() => {
     router.replace(getToken() ? "/dashboard" : "/landing");
   }, [router]);
-  return <main className="grid min-h-screen place-items-center text-sm text-ink-subtle">Loading…</main>;
+  return <main className="grid min-h-screen place-items-center bg-ip-bg font-ip text-sm text-ip-ink-3">Loading…</main>;
 }
