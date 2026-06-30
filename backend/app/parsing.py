@@ -51,6 +51,76 @@ def _pdf_text(data: bytes) -> str:
     return "\n".join((page.extract_text() or "") for page in reader.pages).strip()
 
 
+def _header_picker(reader: csv.DictReader):
+    """Return a pick(row, aliases) closure matching headers case-insensitively."""
+    headers = {(h or "").lower().strip(): h for h in (reader.fieldnames or [])}
+
+    def pick(row: dict, aliases: list[str]) -> str | None:
+        for alias in aliases:
+            if alias in headers:
+                val = row.get(headers[alias])
+                if val not in (None, ""):
+                    return str(val).strip()
+        return None
+
+    return pick
+
+
+# Canonical RFI field -> column-name aliases a real RFI register might use.
+_RFI_ALIASES: dict[str, list[str]] = {
+    "number": ["rfi_number", "rfi_no", "rfi", "number", "no", "ref", "reference", "id"],
+    "subject": ["subject", "title", "topic", "description", "summary"],
+    "question": ["question", "query", "detail", "details", "body", "request"],
+    "response": ["response", "answer", "reply", "resolution", "outcome"],
+    "date_raised": ["date_raised", "raised", "date", "submitted", "created", "opened", "issued"],
+    "date_responded": ["date_responded", "responded", "answered", "closed", "resolved", "returned"],
+    "status": ["status", "state"],
+}
+
+
+def _render_rfi(number, subject, question, response, raised, responded, status) -> str:
+    lines = [f"RFI {number}" + (f" — {subject}" if subject else "")]
+    if status:
+        lines.append(f"Status: {status}")
+    if raised or responded:
+        lines.append(f"Raised: {raised or 'n/a'}  Responded: {responded or 'n/a'}")
+    if question:
+        lines.append(f"Question: {question}")
+    if response:
+        lines.append(f"Response: {response}")
+    return "\n".join(lines)
+
+
+def parse_rfi_csv(data: bytes) -> list[dict]:
+    """Parse an RFI register CSV into document dicts (ref/occurred_at/status/text).
+
+    Columns matched case-insensitively against common aliases. A row is skipped
+    only if it has no subject, question, or response (i.e. it's blank).
+    """
+    text = data.decode("utf-8-sig", errors="replace")
+    reader = csv.DictReader(io.StringIO(text))
+    pick = _header_picker(reader)
+
+    out: list[dict] = []
+    for i, row in enumerate(reader):
+        subject = pick(row, _RFI_ALIASES["subject"])
+        question = pick(row, _RFI_ALIASES["question"])
+        response = pick(row, _RFI_ALIASES["response"])
+        if not (subject or question or response):
+            continue
+        number = pick(row, _RFI_ALIASES["number"]) or f"RFI-{i + 1}"
+        raised = pick(row, _RFI_ALIASES["date_raised"])
+        responded = pick(row, _RFI_ALIASES["date_responded"])
+        status = pick(row, _RFI_ALIASES["status"])
+        out.append({
+            "ref": number,
+            "occurred_at": raised,
+            "status": status,
+            "text": _render_rfi(number, subject, question, response, raised, responded, status),
+        })
+    return out
+
+
 def parse_comms_csv(data: bytes) -> list[dict]:
     """Parse a comms-export CSV into document dicts (id/kind/author/occurred_at/text).
 

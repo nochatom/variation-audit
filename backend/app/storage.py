@@ -56,3 +56,8 @@ def build_loader():
     if s.local_doc_dir:
         return LocalDocumentLoader(s.local_doc_dir)
     return S3DocumentLoader(s.s3_bucket, s.s3_region, s.s3_endpoint_url)
+
+
+def get_store():
+    """FastAPI dependency yielding the document store (overridable in tests)."""
+    return build_loader()

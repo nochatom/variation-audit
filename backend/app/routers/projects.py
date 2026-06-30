@@ -10,10 +10,10 @@ from sqlalchemy.orm import Session
 
 from app import parsing
 from app.auth.deps import ensure_member, get_current_user, get_db
-from app.models import Membership, Project, ProjectStatus, User
+from app.models import Membership, Project, ProjectStatus, SourceType, User
 from app.services import jobs
 from app.services import projects as project_service
-from app.storage import build_loader
+from app.storage import build_loader, get_store
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -114,6 +114,28 @@ async def upload_comms(project_id: uuid.UUID, file: UploadFile = File(...),
             content=r["text"], source=r.get("author"), occurred_at=r.get("occurred_at"),
         )
     return CommsUploadResponse(project_id=str(project.id), documents_added=len(rows))
+
+
+class RfiUploadResponse(BaseModel):
+    project_id: str
+    documents_added: int
+
+
+@router.post("/{project_id}/rfis", response_model=RfiUploadResponse)
+async def upload_rfis(project_id: uuid.UUID, file: UploadFile = File(...),
+                      user: User = Depends(get_current_user),
+                      session: Session = Depends(get_db),
+                      store=Depends(get_store)) -> RfiUploadResponse:
+    """Ingest an RFI register CSV — one source_type=rfi Document per RFI row."""
+    project = _load_project(session, user, project_id)
+    rows = parsing.parse_rfi_csv(await file.read())
+    for r in rows:
+        project_service.add_document(
+            session, store, company_id=project.company_id, project_id=project.id,
+            source_type=SourceType.rfi, content=r["text"],
+            source=r["ref"], occurred_at=r.get("occurred_at"),
+        )
+    return RfiUploadResponse(project_id=str(project.id), documents_added=len(rows))
 
 
 class AnalyzeResponse(BaseModel):
