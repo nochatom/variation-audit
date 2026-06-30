@@ -76,6 +76,12 @@ export default function Landing() {
           <DashboardMock />
         </section>
       </main>
+
+      <HowItWorks />
+      <Features />
+      <TrustBand />
+      <CtaBanner />
+      <SiteFooter />
     </div>
   );
 }
@@ -223,5 +229,151 @@ function FooterCard({ label, value, sub }: { label: string; value: string; sub: 
       <div className="mt-1 text-[13px] font-semibold text-ink">{value}</div>
       <div className="mt-0.5 text-[11px] text-ink-subtle">{sub}</div>
     </div>
+  );
+}
+
+/* ---------------- section: how it works ---------------- */
+function HowItWorks() {
+  const steps = [
+    {
+      n: "01", title: "Ingest",
+      body: "Connect your project record — RFIs, site instructions, meeting minutes and comms, by upload or CSV. VariationIQ normalises every source into one timeline.",
+    },
+    {
+      n: "02", title: "Detect",
+      body: "AI reads the agreed contract baseline against every communication and surfaces work that was instructed or performed but never claimed.",
+    },
+    {
+      n: "03", title: "Recover",
+      body: "Each variation arrives with a confidence score, an AUD estimate, a time-bar countdown, and evidence linked to its source — ready for your commercial team.",
+    },
+  ];
+  return (
+    <section className="relative border-t border-hairline/60">
+      <div className="mx-auto max-w-6xl px-6 py-20">
+        <p className="va-eyebrow">How it works</p>
+        <h2 className="mt-2 max-w-2xl text-[clamp(1.8rem,3.5vw,2.5rem)] font-semibold tracking-tightest">
+          From project records to recoverable revenue.
+        </h2>
+        <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+          {steps.map((s) => (
+            <div key={s.n} className="va-panel p-6">
+              <div className="font-mono text-sm text-primary-hover">{s.n}</div>
+              <h3 className="mt-3 text-lg font-semibold tracking-tight">{s.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-ink-muted">{s.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- section: features ---------------- */
+function Features() {
+  const caps = [
+    { title: "Multi-source ingestion", body: "RFIs, site instructions, meeting minutes and project comms — parsed and normalised, not just stored." },
+    { title: "AI variation detection", body: "Finds out-of-scope and unclaimed work across the entire project record, clustered with its rationale." },
+    { title: "AUD value & time-bar risk", body: "Recoverable estimates in AUD, plus Security of Payment notice deadlines flagged before they lapse." },
+    { title: "Evidence-linked audit trail", body: "Every finding traces back to the exact source document, with an immutable record of each review decision." },
+  ];
+  const trades = ["General Contractors", "Electrical", "Plumbing", "HVAC", "Civil Engineering", "Large builders"];
+  return (
+    <section className="relative border-t border-hairline/60">
+      <div className="mx-auto max-w-6xl px-6 py-20">
+        <p className="va-eyebrow">Capabilities</p>
+        <h2 className="mt-2 max-w-2xl text-[clamp(1.8rem,3.5vw,2.5rem)] font-semibold tracking-tightest">
+          A revenue-recovery engine, not another document store.
+        </h2>
+        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {caps.map((c) => (
+            <div key={c.title} className="va-panel p-6">
+              <div className="grid h-8 w-8 place-items-center rounded-md bg-primary/15 text-primary-hover">◆</div>
+              <h3 className="mt-4 text-base font-semibold tracking-tight">{c.title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">{c.body}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-12">
+          <p className="va-eyebrow mb-3">Built for every trade</p>
+          <div className="flex flex-wrap gap-2">
+            {trades.map((t) => (
+              <span key={t} className="rounded-md border border-hairline bg-surface-1 px-3 py-1.5 text-[13px] text-ink-muted">
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- section: trust band (truthful, capability-framed) ---------------- */
+function TrustBand() {
+  const items = [
+    { k: "8", label: "AU states & territories — Security of Payment aware" },
+    { k: "4", label: "Source types ingested: RFIs, site instructions, minutes, comms" },
+    { k: "100%", label: "Findings linked to source-document evidence" },
+  ];
+  return (
+    <section className="relative border-t border-hairline/60">
+      <div className="mx-auto max-w-6xl px-6 py-14">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          {items.map((i) => (
+            <div key={i.k} className="text-center sm:text-left">
+              <div className="text-3xl font-semibold tracking-tight text-ink">{i.k}</div>
+              <div className="mt-1 text-sm text-ink-subtle">{i.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- section: closing CTA ---------------- */
+function CtaBanner() {
+  return (
+    <section className="relative border-t border-hairline/60">
+      <div className="mx-auto max-w-6xl px-6 py-20">
+        <div className="relative overflow-hidden rounded-xl border border-hairline-strong bg-surface-1 p-10 text-center sm:p-14">
+          <div aria-hidden className="pointer-events-none absolute -top-24 left-1/2 h-64 w-[600px] -translate-x-1/2 rounded-full bg-primary/15 blur-[120px]" />
+          <h2 className="relative text-[clamp(1.8rem,3.5vw,2.6rem)] font-semibold tracking-tightest">
+            Stop leaving variations unclaimed.
+          </h2>
+          <p className="relative mx-auto mt-3 max-w-xl text-ink-muted">
+            See what your projects are owed. Run a free analysis on your own project record in minutes.
+          </p>
+          <div className="relative mt-7 flex flex-wrap justify-center gap-3">
+            <Link href="/login" className="rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover">
+              Start Free Analysis
+            </Link>
+            <Link href="#demo" className="rounded-md border border-hairline bg-surface-1 px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-surface-2">
+              View Demo
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- footer ---------------- */
+function SiteFooter() {
+  return (
+    <footer className="relative border-t border-hairline/60">
+      <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-6 py-10 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-6 w-6 place-items-center rounded-sm bg-primary text-xs font-bold text-white">V</span>
+          <span className="text-sm font-semibold tracking-tight">VariationIQ</span>
+          <span className="text-[12px] text-ink-subtle">· AI revenue recovery for Australian construction</span>
+        </div>
+        <p className="text-[12px] text-ink-tertiary">
+          © 2026 VariationIQ · Estimates only — not legal advice.
+        </p>
+      </div>
+    </footer>
   );
 }
