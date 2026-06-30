@@ -160,6 +160,28 @@ async def upload_site_instructions(project_id: uuid.UUID, file: UploadFile = Fil
     return SiteInstructionUploadResponse(project_id=str(project.id), documents_added=len(rows))
 
 
+class MeetingMinutesUploadResponse(BaseModel):
+    project_id: str
+    documents_added: int
+
+
+@router.post("/{project_id}/meeting-minutes", response_model=MeetingMinutesUploadResponse)
+async def upload_meeting_minutes(project_id: uuid.UUID, file: UploadFile = File(...),
+                                 user: User = Depends(get_current_user),
+                                 session: Session = Depends(get_db),
+                                 store=Depends(get_store)) -> MeetingMinutesUploadResponse:
+    """Ingest a meeting-minutes register CSV — one source_type=meeting_note Document per item."""
+    project = _load_project(session, user, project_id)
+    rows = parsing.parse_meeting_minutes_csv(await file.read())
+    for r in rows:
+        project_service.add_document(
+            session, store, company_id=project.company_id, project_id=project.id,
+            source_type=SourceType.meeting_note, content=r["text"],
+            source=r["ref"], occurred_at=r.get("occurred_at"),
+        )
+    return MeetingMinutesUploadResponse(project_id=str(project.id), documents_added=len(rows))
+
+
 class AnalyzeResponse(BaseModel):
     job_id: str
     status: str

@@ -182,6 +182,71 @@ def parse_site_instructions_csv(data: bytes) -> list[dict]:
     return out
 
 
+# Canonical meeting-minute field -> column aliases (per minute item).
+_MEETING_MINUTE_ALIASES: dict[str, list[str]] = {
+    "number": ["item_number", "item_no", "item", "minute_no", "number", "no", "ref", "reference", "id"],
+    "date": ["meeting_date", "date", "minutes_date", "held", "when"],
+    "topic": ["topic", "subject", "title", "agenda", "heading"],
+    "notes": ["notes", "discussion", "minute", "detail", "details", "body", "text"],
+    "decision": ["decision", "resolution", "outcome"],
+    "action": ["action", "action_item", "follow_up", "task"],
+    "owner": ["owner", "responsible", "assignee", "by", "who"],
+    "status": ["status", "state"],
+}
+
+
+def _render_meeting_minute(number, date, topic, notes, decision, action, owner, status) -> str:
+    lines = [f"Meeting Minute {number}" + (f" — {topic}" if topic else "")]
+    meta = []
+    if date:
+        meta.append(f"Date: {date}")
+    if owner:
+        meta.append(f"Owner: {owner}")
+    if status:
+        meta.append(f"Status: {status}")
+    if meta:
+        lines.append("  ".join(meta))
+    if notes:
+        lines.append(f"Notes: {notes}")
+    if decision:
+        lines.append(f"Decision: {decision}")
+    if action:
+        lines.append(f"Action: {action}")
+    return "\n".join(lines)
+
+
+def parse_meeting_minutes_csv(data: bytes) -> list[dict]:
+    """Parse a meeting-minutes register CSV (one row per minute item).
+
+    Columns matched case-insensitively against common aliases; a row is skipped
+    only when it has no topic, notes, decision, or action (i.e. it's blank).
+    """
+    text = data.decode("utf-8-sig", errors="replace")
+    reader = csv.DictReader(io.StringIO(text))
+    pick = _header_picker(reader)
+
+    out: list[dict] = []
+    for i, row in enumerate(reader):
+        topic = pick(row, _MEETING_MINUTE_ALIASES["topic"])
+        notes = pick(row, _MEETING_MINUTE_ALIASES["notes"])
+        decision = pick(row, _MEETING_MINUTE_ALIASES["decision"])
+        action = pick(row, _MEETING_MINUTE_ALIASES["action"])
+        if not (topic or notes or decision or action):
+            continue
+        number = pick(row, _MEETING_MINUTE_ALIASES["number"]) or f"MIN-{i + 1}"
+        date = pick(row, _MEETING_MINUTE_ALIASES["date"])
+        owner = pick(row, _MEETING_MINUTE_ALIASES["owner"])
+        status = pick(row, _MEETING_MINUTE_ALIASES["status"])
+        out.append({
+            "ref": number,
+            "occurred_at": date,
+            "status": status,
+            "text": _render_meeting_minute(number, date, topic, notes, decision,
+                                           action, owner, status),
+        })
+    return out
+
+
 def parse_comms_csv(data: bytes) -> list[dict]:
     """Parse a comms-export CSV into document dicts (id/kind/author/occurred_at/text).
 
