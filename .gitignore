@@ -18,4 +18,11 @@ __pycache__/
 .pgstart.err
 backend/.uvicorn.out
 backend/.uvicorn.err
+backend/.worker.out
+backend/.worker.err
 frontend/.next-dev.out
+frontend/.next-dev.err
+
+# business-dev docs (contain third-party personal data — not for repo history)
+linkedin-profile-package.md
+prospect-list-*
