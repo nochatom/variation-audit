@@ -23,6 +23,8 @@ jobs:
       - name: pytest
         run: python -m pytest -q
       - name: alembic offline render (schema sanity)
+        env:
+          VA_JWT_SECRET: ci-schema-check-only-not-a-real-secret
         run: alembic upgrade head --sql > /dev/null
 
   frontend:
