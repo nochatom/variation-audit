@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { api } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
+import { useTheme } from "@/lib/use-theme";
 
 type NavItem = { label: string; href: string; icon: ReactNode; adminOnly?: boolean };
 
@@ -54,7 +55,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const body = (
     <div className="flex h-full flex-col bg-ip-card">
       <div className="flex h-14 items-center gap-2.5 border-b border-ip-line px-5">
-        <span className="grid h-7 w-7 place-items-center rounded-md bg-ip-navy text-sm font-bold text-white">V</span>
+        <span className="grid h-7 w-7 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
         <span className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</span>
       </div>
 
@@ -103,6 +104,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 function Topbar({ onMenu }: { onMenu: () => void }) {
   const pathname = usePathname();
   const { me, org, logout } = useApp();
+  const { theme, toggleTheme } = useTheme();
   const [menu, setMenu] = useState(false);
   const [unread, setUnread] = useState(0);
   const initials = (me?.email ?? "?").slice(0, 2).toUpperCase();
@@ -122,6 +124,18 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
         </div>
 
         <div className="relative flex items-center gap-3">
+          <button
+            onClick={toggleTheme}
+            className="rounded-md p-1.5 text-ip-ink-2 hover:bg-ip-card-2"
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" /></svg>
+            )}
+          </button>
           <Link href="/notifications" className="relative rounded-md p-1.5 text-ip-ink-2 hover:bg-ip-card-2" aria-label="Notifications">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-5 w-5"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" /></svg>
             {unread > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-ip-orange ring-2 ring-ip-card" />}
@@ -129,7 +143,7 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
           <span className="hidden rounded-pill border border-ip-line bg-ip-card-2 px-2.5 py-1 text-[12px] font-semibold text-ip-ink-2 sm:inline">
             {org?.role === "admin" ? "Admin" : "Member"}
           </span>
-          <button onClick={() => setMenu((v) => !v)} className="grid h-8 w-8 place-items-center rounded-full bg-ip-navy text-[11px] font-bold text-white">
+          <button onClick={() => setMenu((v) => !v)} className="grid h-8 w-8 place-items-center rounded-full bg-ip-navy-fill text-[11px] font-bold text-white">
             {initials}
           </button>
           {menu && (

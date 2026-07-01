@@ -4,9 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, setToken, setCompanyId } from "@/lib/api";
+import { useTheme } from "@/lib/use-theme";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,10 +37,22 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-ip-bg px-4 font-ip text-ip-ink">
+    <main className="relative flex min-h-screen items-center justify-center bg-ip-bg px-4 font-ip text-ip-ink">
+      <button
+        onClick={toggleTheme}
+        className="absolute right-4 top-4 rounded-md p-1.5 text-ip-ink-2 hover:bg-ip-card-2"
+        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      >
+        {theme === "dark" ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" /></svg>
+        )}
+      </button>
       <div className="w-full max-w-sm">
         <div className="mb-7 flex items-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-md bg-ip-navy text-sm font-bold text-white">V</span>
+          <span className="grid h-8 w-8 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
           <div>
             <h1 className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</h1>
             <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>
@@ -53,7 +67,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => { setMode(m); setError(null); }}
                 className={`flex-1 rounded-sm py-1.5 font-semibold transition-colors ${
-                  mode === m ? "bg-ip-navy text-white" : "text-ip-ink-2 hover:text-ip-ink"
+                  mode === m ? "bg-ip-navy-fill text-white" : "text-ip-ink-2 hover:text-ip-ink"
                 }`}
               >
                 {m === "login" ? "Log in" : "Sign up"}

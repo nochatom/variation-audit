@@ -1,14 +1,18 @@
 import type { Config } from "tailwindcss";
 
 // Two token sets share this config:
-//  • dark Linear tokens (canvas/surface/ink/primary) — marketing landing + login
-//  • "ip" = Ironclad Precision (light) — the enterprise application (Dashboard → Settings)
+//  • dark Linear tokens (canvas/surface/ink/primary) — marketing landing only (fixed, no toggle)
+//  • "ip" = Ironclad Precision — the enterprise application + Login/Sign Up.
+//    ip-* colors resolve from CSS custom properties (see globals.css :root / .dark)
+//    so the same utility classes (bg-ip-card, text-ip-ink, etc.) render light or
+//    dark depending on the `dark` class on <html>, toggled by lib/use-theme.ts.
 const config: Config = {
+  darkMode: "class",
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        // ---- dark (landing/login) ----
+        // ---- dark (landing — fixed, not theme-toggled) ----
         canvas: "#010102",
         surface: { 1: "#0f1011", 2: "#141516", 3: "#18191a", 4: "#191a1b" },
         hairline: { DEFAULT: "#23252a", strong: "#34343a" },
@@ -16,26 +20,28 @@ const config: Config = {
         primary: { DEFAULT: "#5e6ad2", hover: "#828fff", focus: "#5e69d1" },
         success: "#27a644",
 
-        // ---- Ironclad Precision (light app) ----
+        // ---- Ironclad Precision (app + auth pages, light/dark toggle) ----
         ip: {
-          bg: "#f7f9ff",          // surface
-          card: "#ffffff",         // container-lowest
-          "card-2": "#eef4ff",     // container-low
-          "card-3": "#e5effe",     // container
-          line: "#dfe4ee",         // subtle border
-          "line-strong": "#c5c6cd", // outline-variant
-          ink: "#121c27",          // on-surface
-          "ink-2": "#45474d",      // on-surface-variant
-          "ink-3": "#75777d",      // outline / muted label
-          navy: "#051125",         // primary (steel navy)
-          "navy-2": "#1b263b",     // primary-container
-          "navy-3": "#3c475d",     // on-primary-fixed-variant
-          orange: "#ff7a26",       // construction orange (actions + time-bar)
-          "orange-2": "#9e4300",   // darker orange (hover / text on light)
-          recovery: "#0a7d34",     // recovered margin (green text)
-          "recovery-2": "#00a437", // recovery accent
-          risk: "#ba1a1a",         // time-bar / error
-          "risk-bg": "#ffdad6",
+          bg: "rgb(var(--ip-bg) / <alpha-value>)",
+          card: "rgb(var(--ip-card) / <alpha-value>)",
+          "card-2": "rgb(var(--ip-card-2) / <alpha-value>)",
+          "card-3": "rgb(var(--ip-card-3) / <alpha-value>)",
+          line: "rgb(var(--ip-line) / <alpha-value>)",
+          "line-strong": "rgb(var(--ip-line-strong) / <alpha-value>)",
+          ink: "rgb(var(--ip-ink) / <alpha-value>)",
+          "ink-2": "rgb(var(--ip-ink-2) / <alpha-value>)",
+          "ink-3": "rgb(var(--ip-ink-3) / <alpha-value>)",
+          navy: "rgb(var(--ip-navy) / <alpha-value>)",               // adaptive accent: text/icons/translucent chips — lightens in dark
+          "navy-2": "rgb(var(--ip-navy-2) / <alpha-value>)",
+          "navy-3": "rgb(var(--ip-navy-3) / <alpha-value>)",
+          "navy-fill": "rgb(var(--ip-navy-fill) / <alpha-value>)",     // solid fill for white-text buttons/badges — stays dark-navy in both themes
+          "navy-fill-2": "rgb(var(--ip-navy-fill-2) / <alpha-value>)",
+          orange: "rgb(var(--ip-orange) / <alpha-value>)",            // construction orange (actions + time-bar)
+          "orange-2": "rgb(var(--ip-orange-2) / <alpha-value>)",
+          recovery: "rgb(var(--ip-recovery) / <alpha-value>)",        // recovered margin (green text)
+          "recovery-2": "rgb(var(--ip-recovery-2) / <alpha-value>)",
+          risk: "rgb(var(--ip-risk) / <alpha-value>)",                // time-bar / error
+          "risk-bg": "rgb(var(--ip-risk-bg) / <alpha-value>)",
         },
       },
       borderRadius: {

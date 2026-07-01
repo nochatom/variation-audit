@@ -38,7 +38,7 @@ export default function AuditPage() {
 
       <div className="mb-6 flex gap-1 rounded-md border border-ip-line bg-ip-card p-1">
         {FILTERS.map((f) => (
-          <button key={f} onClick={() => setFilter(f)} className={`rounded-sm px-3.5 py-1.5 text-sm font-semibold capitalize transition-colors ${filter === f ? "bg-ip-navy text-white" : "text-ip-ink-2 hover:text-ip-ink"}`}>{f}</button>
+          <button key={f} onClick={() => setFilter(f)} className={`rounded-sm px-3.5 py-1.5 text-sm font-semibold capitalize transition-colors ${filter === f ? "bg-ip-navy-fill text-white" : "text-ip-ink-2 hover:text-ip-ink"}`}>{f}</button>
         ))}
       </div>
 

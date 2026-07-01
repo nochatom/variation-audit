@@ -6,6 +6,9 @@
   html {
     color-scheme: dark;
   }
+  html.dark {
+    color-scheme: dark;
+  }
   body {
     @apply bg-canvas text-ink;
     -webkit-font-smoothing: antialiased;
@@ -13,6 +16,53 @@
   }
   ::selection {
     background: rgba(94, 106, 210, 0.35);
+  }
+
+  /* Ironclad Precision tokens — light (default) and dark. Landing/login-legacy
+     dark tokens above (canvas/surface/ink/primary) are untouched by this toggle. */
+  :root {
+    --ip-bg: 247 249 255;
+    --ip-card: 255 255 255;
+    --ip-card-2: 238 244 255;
+    --ip-card-3: 229 239 254;
+    --ip-line: 223 228 238;
+    --ip-line-strong: 197 198 205;
+    --ip-ink: 18 28 39;
+    --ip-ink-2: 69 71 77;
+    --ip-ink-3: 117 119 125;
+    --ip-navy: 5 17 37;
+    --ip-navy-2: 27 38 59;
+    --ip-navy-3: 60 71 93;
+    --ip-navy-fill: 5 17 37;
+    --ip-navy-fill-2: 27 38 59;
+    --ip-orange: 255 122 38;
+    --ip-orange-2: 158 67 0;
+    --ip-recovery: 10 125 52;
+    --ip-recovery-2: 0 164 55;
+    --ip-risk: 186 26 26;
+    --ip-risk-bg: 255 218 214;
+  }
+  .dark {
+    --ip-bg: 10 13 19;
+    --ip-card: 18 22 31;
+    --ip-card-2: 24 29 40;
+    --ip-card-3: 31 37 49;
+    --ip-line: 42 49 64;
+    --ip-line-strong: 60 68 86;
+    --ip-ink: 238 241 247;
+    --ip-ink-2: 170 178 194;
+    --ip-ink-3: 124 132 148;
+    --ip-navy: 147 168 224;
+    --ip-navy-2: 185 198 236;
+    --ip-navy-3: 90 108 148;
+    --ip-navy-fill: 51 68 107;
+    --ip-navy-fill-2: 68 88 131;
+    --ip-orange: 255 138 61;
+    --ip-orange-2: 255 178 122;
+    --ip-recovery: 61 220 120;
+    --ip-recovery-2: 84 225 102;
+    --ip-risk: 255 107 94;
+    --ip-risk-bg: 58 20 17;
   }
 }
 
@@ -68,8 +118,8 @@
     @apply text-[12px] font-semibold uppercase tracking-[0.05em] text-ip-ink-3;
   }
   .btn-navy {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-ip-navy px-3.5 py-2
-           text-sm font-semibold text-white transition-colors hover:bg-ip-navy-2 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-ip-navy-fill px-3.5 py-2
+           text-sm font-semibold text-white transition-colors hover:bg-ip-navy-fill-2 disabled:opacity-50;
   }
   .btn-orange {
     @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-ip-orange px-3.5 py-2

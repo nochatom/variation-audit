@@ -57,7 +57,7 @@ function VariationsInner() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-1 rounded-md border border-ip-line bg-ip-card p-1">
           {TABS.map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={`rounded-sm px-3.5 py-1.5 text-sm font-semibold capitalize transition-colors ${tab === t ? "bg-ip-navy text-white" : "text-ip-ink-2 hover:text-ip-ink"}`}>{t}</button>
+            <button key={t} onClick={() => setTab(t)} className={`rounded-sm px-3.5 py-1.5 text-sm font-semibold capitalize transition-colors ${tab === t ? "bg-ip-navy-fill text-white" : "text-ip-ink-2 hover:text-ip-ink"}`}>{t}</button>
           ))}
         </div>
         {rows && rows.length > 0 && (
