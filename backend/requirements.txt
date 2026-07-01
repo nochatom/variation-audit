@@ -15,3 +15,4 @@ email-validator>=2.2       # pydantic EmailStr
 python-multipart>=0.0.9    # file uploads (.3)
 pypdf>=5.0                 # PDF text extraction (.3)
 reportlab>=4.2             # report PDF generation (.15)
+slowapi>=0.1.9              # per-IP rate limiting on every endpoint

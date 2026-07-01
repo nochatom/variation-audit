@@ -22,11 +22,12 @@ export default function TeamPage() {
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    if (!companyId || !email) return;
+    const trimmedEmail = email.trim();
+    if (!companyId || !trimmedEmail) return;
     setBusy(true);
     setError(null);
     try {
-      await api.addMember(companyId, email, role);
+      await api.addMember(companyId, trimmedEmail, role);
       setEmail("");
       await load();
     } catch (e: any) {
@@ -72,7 +73,7 @@ export default function TeamPage() {
         <form onSubmit={add} className="flex flex-wrap items-end gap-3">
           <div className="min-w-[240px] flex-1">
             <label className="ip-label mb-1 block">Invite by email</label>
-            <input className="ip-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com.au" required />
+            <input className="ip-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} placeholder="name@company.com.au" required />
           </div>
           <div>
             <label className="ip-label mb-1 block">Role</label>

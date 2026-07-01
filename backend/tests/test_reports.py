@@ -95,6 +95,27 @@ def test_render_report_pdf_returns_pdf_bytes():
     assert len(pdf) > 1000
 
 
+def test_render_report_pdf_escapes_hostile_free_text():
+    """Project name / variation title can contain reportlab markup or malformed
+    tags (via user input or LLM output derived from an uploaded document) —
+    must not break Paragraph's mini-XML parser or inject unintended markup."""
+    report = {
+        "project": {"name": "<b>Evil</b> & <script>x</script> <unclosed",
+                    "state": "NSW", "status": "completed"},
+        "baseline": None,
+        "generated_at": "2026-06-28T00:00:00Z", "status_filter": "confirmed",
+        "summary": {"variation_count": 1, "recoverable_total": 100.0,
+                    "currency": "AUD", "time_bar_at_risk": 0},
+        "variations": [{"title": "<font size=\"999\">huge</font> <b>bold & broken",
+                        "confidence_score": 0.5, "confidence_band": "medium",
+                        "time_bar_risk": False, "evidence_count": 0, "value": {}}],
+    }
+    # Would raise inside reportlab's paraparser if the hostile markup weren't
+    # escaped first — a clean render is itself proof the fix works.
+    pdf = render_report_pdf(report)
+    assert isinstance(pdf, bytes) and pdf[:5] == b"%PDF-"
+
+
 # -- endpoints -------------------------------------------------------------
 def _client(session, user):
     def _db():

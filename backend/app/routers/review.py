@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.auth.deps import ensure_member, get_current_user, get_db
@@ -62,7 +62,15 @@ class ReviewAction(BaseModel):
 
 
 class CommentIn(BaseModel):
-    body: str
+    body: str = Field(min_length=1, max_length=5000)
+
+    @field_validator("body")
+    @classmethod
+    def _strip_body(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("body must not be blank")
+        return v
 
 
 # ---- helpers -------------------------------------------------------------

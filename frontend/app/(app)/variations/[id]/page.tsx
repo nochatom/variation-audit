@@ -110,7 +110,7 @@ export default function VariationDetailsPage() {
                   ))}
                 </div>
                 <form onSubmit={addComment} className="mt-4 flex gap-2">
-                  <input className="ip-input" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a review note…" />
+                  <input className="ip-input" value={comment} onChange={(e) => setComment(e.target.value)} maxLength={5000} placeholder="Add a review note…" />
                   <button className="btn-navy" disabled={busy}>{busy ? "Posting…" : "Post"}</button>
                 </form>
               </Card>

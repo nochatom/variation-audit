@@ -9,6 +9,11 @@ __pycache__/
 *.pyc
 .venv/
 
+# Secrets — never commit. .env.example files ARE committed (no real values).
+.env
+.env.*
+!.env.example
+
 # Local dev Postgres cluster
 .pgdata/
 .pgdata.log

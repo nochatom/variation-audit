@@ -23,8 +23,8 @@ export default function LoginPage() {
     try {
       const tok =
         mode === "login"
-          ? await api.login(email, password)
-          : await api.signup(email, password, orgName);
+          ? await api.login(email.trim(), password)
+          : await api.signup(email.trim(), password, orgName.trim());
       setToken(tok.access_token);
       const me = await api.me();
       if (me.organizations[0]) setCompanyId(me.organizations[0].id);
@@ -86,16 +86,26 @@ export default function LoginPage() {
             {mode === "signup" && (
               <div>
                 <label className="ip-label mb-1 block">Organization name</label>
-                <input className="ip-input" placeholder="e.g. Harbourside Electrical Pty Ltd" value={orgName} onChange={(e) => setOrgName(e.target.value)} required />
+                <input className="ip-input" placeholder="e.g. Harbourside Electrical Pty Ltd" value={orgName} onChange={(e) => setOrgName(e.target.value)} minLength={1} maxLength={200} required />
               </div>
             )}
             <div>
               <label className="ip-label mb-1 block">Email</label>
-              <input className="ip-input" type="email" placeholder="name@company.com.au" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input className="ip-input" type="email" placeholder="name@company.com.au" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} required />
             </div>
             <div>
               <label className="ip-label mb-1 block">Password</label>
-              <input className="ip-input" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <input
+                className="ip-input"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={mode === "signup" ? 8 : undefined}
+                maxLength={128}
+                required
+              />
+              {mode === "signup" && <p className="mt-1 text-[11px] text-ip-ink-3">At least 8 characters.</p>}
             </div>
 
             {error && (

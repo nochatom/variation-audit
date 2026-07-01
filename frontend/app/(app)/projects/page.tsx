@@ -34,10 +34,11 @@ export default function ProjectsPage() {
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    if (!companyId || !name) return;
+    const trimmedName = name.trim();
+    if (!companyId || !trimmedName) return;
     setBusy(true);
     try {
-      await api.createProject(companyId, name, contract || undefined, state || undefined);
+      await api.createProject(companyId, trimmedName, contract || undefined, state || undefined);
       setName("");
       setContract("");
       setCreating(false);
@@ -64,7 +65,7 @@ export default function ProjectsPage() {
           <form onSubmit={create} className="flex flex-wrap items-end gap-3">
             <div className="min-w-[220px] flex-1">
               <label className="ip-label mb-1 block">Project name</label>
-              <input className="ip-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sydney Metro — Package 4" required />
+              <input className="ip-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sydney Metro — Package 4" minLength={1} maxLength={300} required />
             </div>
             <div>
               <label className="ip-label mb-1 block">State</label>
@@ -84,7 +85,7 @@ export default function ProjectsPage() {
             </div>
             <div className="w-full">
               <label className="ip-label mb-1 block">Contract / scope text (optional)</label>
-              <textarea className="ip-input" rows={3} value={contract} onChange={(e) => setContract(e.target.value)} placeholder="Paste the agreed scope baseline, or upload a document later from Documents." />
+              <textarea className="ip-input" rows={3} value={contract} onChange={(e) => setContract(e.target.value)} maxLength={500000} placeholder="Paste the agreed scope baseline, or upload a document later from Documents." />
             </div>
             <button className="btn-navy" disabled={busy}>{busy ? "Creating…" : "Create project"}</button>
           </form>

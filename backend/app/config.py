@@ -34,8 +34,10 @@ class Settings(BaseSettings):
     idempotency_window_days: int = 7                          # decision .21.4
     worker_idle_sleep: float = 2.0
 
-    # Auth (.2) — override jwt_secret in every non-dev environment
-    jwt_secret: str = Field(default="dev-only-change-me")
+    # Auth (.2) — REQUIRED, no insecure default. Set VA_JWT_SECRET (32+ random
+    # bytes, e.g. `openssl rand -hex 32`) in every environment, including local
+    # dev (.env, git-ignored) and tests (see tests/conftest.py).
+    jwt_secret: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24               # 24h
 

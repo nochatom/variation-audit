@@ -86,7 +86,7 @@ def test_health():
 def test_signup_endpoint_returns_token():
     client = _client_with(FakeSession(results=[FakeResult(scalar=None)]))
     resp = client.post("/auth/signup", json={
-        "email": "new@firm.com.au", "password": "pw12345", "org_name": "Acme"})
+        "email": "new@firm.com.au", "password": "pw123456", "org_name": "Acme"})
     assert resp.status_code == 201
     body = resp.json()
     assert body["token_type"] == "bearer"

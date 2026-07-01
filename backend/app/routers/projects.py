@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -17,14 +17,61 @@ from app.storage import build_loader, get_store
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
+# Australian states/territories — mirrors the frontend's <select> (defense in
+# depth: validated server-side too, since the API is reachable directly).
+AU_STATES = {"NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"}
+MAX_TEXT_LEN = 500_000        # ~500KB of contract/scope text — generous but bounded
+MAX_CONTRACT_BYTES = 20 * 1024 * 1024   # 20MB — contract/scope PDFs
+MAX_CSV_BYTES = 10 * 1024 * 1024        # 10MB — register CSV uploads
+
+
+async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
+    """Read an upload, rejecting it (413) if it exceeds max_bytes.
+
+    Reads in chunks rather than the whole body up front, so an oversized
+    upload is rejected without buffering the entire payload into memory.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status.HTTP_413_CONTENT_TOO_LARGE,
+                f"file exceeds the {max_bytes // (1024 * 1024)}MB limit",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
 
 # ---- schemas -------------------------------------------------------------
 class CreateProjectRequest(BaseModel):
     company_id: uuid.UUID
-    name: str
-    contract_text: str | None = None
-    scope_text: str | None = None
+    name: str = Field(min_length=1, max_length=300)
+    contract_text: str | None = Field(default=None, max_length=MAX_TEXT_LEN)
+    scope_text: str | None = Field(default=None, max_length=MAX_TEXT_LEN)
     state: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("name must not be blank")
+        return v
+
+    @field_validator("state")
+    @classmethod
+    def _valid_au_state(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        v = v.strip().upper()
+        if v not in AU_STATES:
+            raise ValueError(f"state must be one of {sorted(AU_STATES)}")
+        return v
 
 
 class ProjectOut(BaseModel):
@@ -87,7 +134,7 @@ async def upload_contract(project_id: uuid.UUID, is_scope: bool = False,
                           user: User = Depends(get_current_user),
                           session: Session = Depends(get_db)) -> ProjectOut:
     project = _load_project(session, user, project_id)
-    text = parsing.extract_text(file.filename or "", await file.read())
+    text = parsing.extract_text(file.filename or "", await _read_capped(file, MAX_CONTRACT_BYTES))
     if is_scope:
         project_service.set_contract(session, project, scope_text=text)
     else:
@@ -105,7 +152,7 @@ async def upload_comms(project_id: uuid.UUID, file: UploadFile = File(...),
                        user: User = Depends(get_current_user),
                        session: Session = Depends(get_db)) -> CommsUploadResponse:
     project = _load_project(session, user, project_id)
-    rows = parsing.parse_comms_csv(await file.read())
+    rows = parsing.parse_comms_csv(await _read_capped(file, MAX_CSV_BYTES))
     store = build_loader()
     for r in rows:
         project_service.add_document(
@@ -128,7 +175,7 @@ async def upload_rfis(project_id: uuid.UUID, file: UploadFile = File(...),
                       store=Depends(get_store)) -> RfiUploadResponse:
     """Ingest an RFI register CSV — one source_type=rfi Document per RFI row."""
     project = _load_project(session, user, project_id)
-    rows = parsing.parse_rfi_csv(await file.read())
+    rows = parsing.parse_rfi_csv(await _read_capped(file, MAX_CSV_BYTES))
     for r in rows:
         project_service.add_document(
             session, store, company_id=project.company_id, project_id=project.id,
@@ -150,7 +197,7 @@ async def upload_site_instructions(project_id: uuid.UUID, file: UploadFile = Fil
                                    store=Depends(get_store)) -> SiteInstructionUploadResponse:
     """Ingest a site-instruction register CSV — one source_type=site_instruction Document per row."""
     project = _load_project(session, user, project_id)
-    rows = parsing.parse_site_instructions_csv(await file.read())
+    rows = parsing.parse_site_instructions_csv(await _read_capped(file, MAX_CSV_BYTES))
     for r in rows:
         project_service.add_document(
             session, store, company_id=project.company_id, project_id=project.id,
@@ -172,7 +219,7 @@ async def upload_meeting_minutes(project_id: uuid.UUID, file: UploadFile = File(
                                  store=Depends(get_store)) -> MeetingMinutesUploadResponse:
     """Ingest a meeting-minutes register CSV — one source_type=meeting_note Document per item."""
     project = _load_project(session, user, project_id)
-    rows = parsing.parse_meeting_minutes_csv(await file.read())
+    rows = parsing.parse_meeting_minutes_csv(await _read_capped(file, MAX_CSV_BYTES))
     for r in rows:
         project_service.add_document(
             session, store, company_id=project.company_id, project_id=project.id,

@@ -1,8 +1,8 @@
 """Auth endpoints: signup, login, me."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,21 +10,27 @@ from app.auth import service
 from app.auth.deps import get_current_user, get_db
 from app.auth.tokens import create_access_token
 from app.models import Membership, Organization, User
+from app.rate_limit import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# Brute-force / credential-stuffing protection — tighter than the app-wide default.
+AUTH_RATE_LIMIT = "5/minute"
 
 
 # ---- schemas -------------------------------------------------------------
 class SignupRequest(BaseModel):
     email: EmailStr
-    password: str
-    org_name: str
-    full_name: str | None = None
+    password: str = Field(min_length=8, max_length=128)
+    org_name: str = Field(min_length=1, max_length=200)
+    full_name: str | None = Field(default=None, max_length=200)
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    # No min_length here — don't help an attacker learn valid password shape;
+    # max_length still caps bcrypt input size (DoS/truncation hygiene).
+    password: str = Field(max_length=128)
 
 
 class TokenResponse(BaseModel):
@@ -49,7 +55,8 @@ class MeResponse(BaseModel):
 
 # ---- endpoints -----------------------------------------------------------
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def signup(req: SignupRequest, session: Session = Depends(get_db)) -> TokenResponse:
+@limiter.limit(AUTH_RATE_LIMIT)
+def signup(request: Request, req: SignupRequest, session: Session = Depends(get_db)) -> TokenResponse:
     try:
         user, _org, _m = service.signup(
             session, email=req.email, password=req.password,
@@ -61,7 +68,8 @@ def signup(req: SignupRequest, session: Session = Depends(get_db)) -> TokenRespo
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(req: LoginRequest, session: Session = Depends(get_db)) -> TokenResponse:
+@limiter.limit(AUTH_RATE_LIMIT)
+def login(request: Request, req: LoginRequest, session: Session = Depends(get_db)) -> TokenResponse:
     user = service.authenticate(session, email=req.email, password=req.password)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")

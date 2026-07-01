@@ -10,9 +10,13 @@ Run locally:
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.auth.router import router as auth_router
 from app.config import get_settings
+from app.rate_limit import limiter
 from app.routers.audit import router as audit_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.notifications import router as notifications_router
@@ -26,6 +30,13 @@ app = FastAPI(
     version="0.1.0",
     description="AU construction variation recovery — product layer.",
 )
+
+# Rate limiting (per client IP) — a default limit applies to every endpoint via
+# SlowAPIMiddleware; individual routers (e.g. auth login/signup) tighten this
+# further with @limiter.limit(...) for brute-force protection.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Browser frontend and API are separate origins, so CORS is required.
 app.add_middleware(

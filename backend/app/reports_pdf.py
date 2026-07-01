@@ -5,6 +5,7 @@ Pure-Python via reportlab — no native deps, works in any AU-region container.
 from __future__ import annotations
 
 import io
+from xml.sax.saxutils import escape as _xml_escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -23,6 +24,18 @@ def _aud(n) -> str:
     return f"${n:,.0f}" if n is not None else "—"
 
 
+def _esc(v) -> str:
+    """Escape a value before it's interpolated into a Paragraph markup string.
+
+    ReportLab's Paragraph parses a small XML-like markup language (<b>, <i>,
+    &nbsp;, ...) from the text it's given. Any of these fields can ultimately
+    trace back to user input (project name) or LLM output derived from an
+    uploaded document (variation title, baseline fields), so every one must be
+    escaped — otherwise a crafted value can break layout or the parse itself.
+    """
+    return _xml_escape(str(v)) if v is not None else ""
+
+
 def render_report_pdf(report: dict) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, title="Variation Review Report",
@@ -36,25 +49,25 @@ def render_report_pdf(report: dict) -> bytes:
 
     flow.append(Paragraph("Variation Review Report", styles["Title"]))
     flow.append(Paragraph(
-        f"Project: <b>{project.get('name', '')}</b> &nbsp;|&nbsp; "
-        f"State: {project.get('state') or 'N/A'} &nbsp;|&nbsp; "
-        f"Showing: {report.get('status_filter', '')} variations",
+        f"Project: <b>{_esc(project.get('name', ''))}</b> &nbsp;|&nbsp; "
+        f"State: {_esc(project.get('state') or 'N/A')} &nbsp;|&nbsp; "
+        f"Showing: {_esc(report.get('status_filter', ''))} variations",
         styles["Normal"]))
-    flow.append(Paragraph(f"Generated: {report.get('generated_at', '')}", styles["Normal"]))
+    flow.append(Paragraph(f"Generated: {_esc(report.get('generated_at', ''))}", styles["Normal"]))
     flow.append(Spacer(1, 6 * mm))
 
     # Summary box
     flow.append(Paragraph(
         f"<b>Recoverable total: {_aud(summary.get('recoverable_total'))} "
-        f"{summary.get('currency', 'AUD')}</b> &nbsp; "
-        f"across {summary.get('variation_count', 0)} variation(s); "
-        f"{summary.get('time_bar_at_risk', 0)} with time-bar risk.",
+        f"{_esc(summary.get('currency', 'AUD'))}</b> &nbsp; "
+        f"across {int(summary.get('variation_count', 0))} variation(s); "
+        f"{int(summary.get('time_bar_at_risk', 0))} with time-bar risk.",
         styles["Normal"]))
     if baseline:
         flow.append(Paragraph(
-            f"SoP regime: {baseline.get('sop_regime') or 'N/A'} &nbsp;|&nbsp; "
-            f"Notice clause: {baseline.get('notice_clause') or 'N/A'} &nbsp;|&nbsp; "
-            f"Time-bar: {baseline.get('time_bar_days') if baseline.get('time_bar_days') is not None else 'N/A'} days",
+            f"SoP regime: {_esc(baseline.get('sop_regime') or 'N/A')} &nbsp;|&nbsp; "
+            f"Notice clause: {_esc(baseline.get('notice_clause') or 'N/A')} &nbsp;|&nbsp; "
+            f"Time-bar: {_esc(baseline.get('time_bar_days') if baseline.get('time_bar_days') is not None else 'N/A')} days",
             styles["Italic"]))
     flow.append(Spacer(1, 6 * mm))
 
@@ -64,7 +77,7 @@ def render_report_pdf(report: dict) -> bytes:
     for v in report.get("variations", []):
         val = v.get("value") or {}
         rows.append([
-            Paragraph(v.get("title", ""), styles["Normal"]),
+            Paragraph(_esc(v.get("title", "")), styles["Normal"]),
             f"{v.get('confidence_band') or ''} ({v.get('confidence_score', 0):.2f})",
             "YES" if v.get("time_bar_risk") else "no",
             _aud(val.get("amount")),
