@@ -6,6 +6,8 @@ import { api, OrgDashboard } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
 import { PageHeader, Card, Chip, ErrorNote, Spinner, EmptyState, statusTone, aud } from "@/components/ui";
 
+const AU_STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"] as const;
+
 export default function ProjectsPage() {
   const { companyId } = useApp();
   const [data, setData] = useState<OrgDashboard | null>(null);
@@ -66,7 +68,19 @@ export default function ProjectsPage() {
             </div>
             <div>
               <label className="ip-label mb-1 block">State</label>
-              <input className="ip-input w-28" value={state} onChange={(e) => setState(e.target.value)} placeholder="NSW" />
+              <div className="relative">
+                <select
+                  className="ip-input w-28 appearance-none pr-7"
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  required
+                >
+                  {AU_STATES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-ip-ink-3">▼</span>
+              </div>
             </div>
             <div className="w-full">
               <label className="ip-label mb-1 block">Contract / scope text (optional)</label>
