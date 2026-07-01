@@ -16,7 +16,9 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.auth.router import router as auth_router
 from app.config import get_settings
+from app.logging_config import configure_logging
 from app.rate_limit import limiter
+from app.request_logging import RequestLoggingMiddleware
 from app.routers.audit import router as audit_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.notifications import router as notifications_router
@@ -24,6 +26,9 @@ from app.routers.orgs import router as orgs_router
 from app.routers.projects import router as projects_router
 from app.routers.reports import router as reports_router
 from app.routers.review import router as review_router
+from app.security_headers import SecurityHeadersMiddleware
+
+configure_logging()
 
 app = FastAPI(
     title="Variation Audit API",
@@ -45,6 +50,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Applies security headers to every response, including error responses from
+# the middleware above.
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Outermost — measures true end-to-end latency and logs every request as
+# structured JSON (see app/logging_config.py), with auth failures (401/403)
+# and rate-limit trips (429) elevated to WARNING for easy filtering/alerting.
+app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(auth_router)
 app.include_router(projects_router)

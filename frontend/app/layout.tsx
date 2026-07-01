@@ -10,15 +10,14 @@ export const metadata: Metadata = {
   description: "AU construction variation recovery — review queue, value, and claims.",
 };
 
-// Applies the saved Ironclad theme (light/dark) before paint, so app/login
-// pages never flash the wrong theme. Landing ignores the `dark` class entirely.
-const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("va_theme");if(t==="dark")document.documentElement.classList.add("dark");}catch(e){}})();`;
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-AU" className={`${inter.variable} ${publicSans.variable}`}>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {/* Same-origin static file (public/theme-init.js), not inline — lets the
+            CSP use script-src 'self' with no 'unsafe-inline'. Blocking (no
+            async/defer) so it still runs before paint, avoiding theme flash. */}
+        <script src="/theme-init.js" />
       </head>
       <body className="bg-canvas font-sans text-ink antialiased">{children}</body>
     </html>

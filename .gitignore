@@ -27,6 +27,8 @@ backend/.worker.out
 backend/.worker.err
 frontend/.next-dev.out
 frontend/.next-dev.err
+frontend/.next-prod.out
+frontend/.next-prod.err
 
 # business-dev docs (contain third-party personal data — not for repo history)
 linkedin-profile-package.md

@@ -39,7 +39,8 @@ class Settings(BaseSettings):
     # dev (.env, git-ignored) and tests (see tests/conftest.py).
     jwt_secret: str
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24               # 24h
+    access_token_expire_minutes: int = 15                     # short-lived; refresh_token carries the session
+    refresh_token_expire_days: int = 30                       # rotated on every use (.2.1)
 
     # CORS — origins allowed to call the API (the frontend)
     cors_origins: list[str] = ["http://localhost:3000"]

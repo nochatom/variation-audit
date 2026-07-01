@@ -11,6 +11,8 @@ from app.models import (
     AuditLog,
     ConfidenceBand,
     Membership,
+    Project,
+    ProjectStatus,
     ReviewComment,
     ReviewStatus,
     User,
@@ -89,10 +91,37 @@ def test_review_queue_endpoint():
     cid = uuid.uuid4()
     membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid)
     v = _variation(company_id=cid)
-    session = FakeSession(results=[FakeResult(scalar=membership), FakeResult(scalars=[v])])
+    project = Project(id=v.project_id, company_id=cid, name="Tower A",
+                      status=ProjectStatus.in_progress)
+    # session.get(Project, ...) -> project ; ensure_member execute -> membership ; queue -> [v]
+    session = FakeSession(results=[FakeResult(scalar=membership), FakeResult(scalars=[v])],
+                          get_obj=project)
     resp = _client(session, user).get(f"/projects/{v.project_id}/review-queue?company_id={cid}")
     assert resp.status_code == 200
     assert resp.json()[0]["title"] == "Extra GPOs"
+
+
+def test_review_queue_endpoint_ignores_mismatched_company_id_param():
+    """Object-level authorization: the owning org is derived from the project,
+    not the caller-supplied company_id — a mismatched value must not matter."""
+    user = _user()
+    cid = uuid.uuid4()
+    other_cid = uuid.uuid4()  # attacker's own org — different from the project's
+    membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid)
+    v = _variation(company_id=cid)
+    project = Project(id=v.project_id, company_id=cid, name="Tower A",
+                      status=ProjectStatus.in_progress)
+    session = FakeSession(results=[FakeResult(scalar=membership), FakeResult(scalars=[v])],
+                          get_obj=project)
+    resp = _client(session, user).get(f"/projects/{v.project_id}/review-queue?company_id={other_cid}")
+    assert resp.status_code == 200  # authorized via the real project.company_id, not the param
+
+
+def test_review_queue_endpoint_unknown_project_404s():
+    user = _user()
+    session = FakeSession(get_obj=None)
+    resp = _client(session, user).get(f"/projects/{uuid.uuid4()}/review-queue")
+    assert resp.status_code == 404
 
 
 def test_review_action_endpoint_confirms():

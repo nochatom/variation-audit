@@ -62,6 +62,20 @@ CREATE TABLE memberships (
 );
 CREATE INDEX idx_memberships_company ON memberships(company_id);
 
+-- Rotating, revocable refresh tokens (.2.1). Only a SHA-256 hash of the opaque
+-- secret is ever stored. replaced_by_id chains rotations; a token presented
+-- after it's already been revoked (i.e. reused post-rotation) signals theft.
+CREATE TABLE refresh_tokens (
+    id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id          uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash       text NOT NULL UNIQUE,
+    created_at       timestamptz NOT NULL DEFAULT now(),
+    expires_at       timestamptz NOT NULL,
+    revoked_at       timestamptz,
+    replaced_by_id   uuid REFERENCES refresh_tokens(id) ON DELETE SET NULL
+);
+CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
+
 -- ---------------------------------------------------------------------------
 -- Projects & documents
 -- ---------------------------------------------------------------------------

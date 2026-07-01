@@ -87,18 +87,7 @@ export default function Landing() {
 function Backdrop() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.035) 1px, transparent 1px)",
-          backgroundSize: "44px 44px",
-          maskImage:
-            "radial-gradient(ellipse 75% 55% at 50% 0%, #000 55%, transparent 100%)",
-          WebkitMaskImage:
-            "radial-gradient(ellipse 75% 55% at 50% 0%, #000 55%, transparent 100%)",
-        }}
-      />
+      <div className="landing-grid-bg absolute inset-0" />
       <div className="absolute -top-40 left-1/2 h-[560px] w-[900px] -translate-x-1/2 rounded-full bg-primary/12 blur-[150px]" />
       <div className="absolute right-[-140px] top-44 h-[380px] w-[380px] rounded-full bg-primary/10 blur-[130px]" />
     </div>
@@ -433,17 +422,7 @@ function CtaBanner() {
       <Divider />
       <div className="mx-auto max-w-6xl px-6 py-24">
         <div className="relative overflow-hidden rounded-2xl border border-hairline-strong bg-surface-1 p-12 text-center lift sm:p-16">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-60"
-            style={{
-              backgroundImage:
-                "linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)",
-              backgroundSize: "36px 36px",
-              maskImage: "radial-gradient(ellipse 60% 80% at 50% 50%, #000, transparent 75%)",
-              WebkitMaskImage: "radial-gradient(ellipse 60% 80% at 50% 50%, #000, transparent 75%)",
-            }}
-          />
+          <div aria-hidden className="landing-cta-grid-bg pointer-events-none absolute inset-0 opacity-60" />
           <div aria-hidden className="pointer-events-none absolute -top-28 left-1/2 h-64 w-[640px] -translate-x-1/2 rounded-full bg-primary/15 blur-[120px]" />
           <h2 className="relative text-[clamp(1.9rem,3.6vw,2.8rem)] font-semibold tracking-tightest">
             Stop leaving variations unclaimed.

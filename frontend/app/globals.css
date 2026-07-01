@@ -141,4 +141,22 @@
   .ip-row {
     @apply border-b border-ip-line last:border-0;
   }
+
+  /* Landing page decorative grid backgrounds — extracted from inline style={{}}
+     (identical values, zero visual change) so style-src can be 'self' only,
+     no 'unsafe-inline', under the CSP in next.config.js. */
+  .landing-grid-bg {
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, #000 55%, transparent 100%);
+    mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, #000 55%, transparent 100%);
+  }
+  .landing-cta-grid-bg {
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 36px 36px;
+    -webkit-mask-image: radial-gradient(ellipse 60% 80% at 50% 50%, #000, transparent 75%);
+    mask-image: radial-gradient(ellipse 60% 80% at 50% 50%, #000, transparent 75%);
+  }
 }

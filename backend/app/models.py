@@ -158,6 +158,29 @@ class Membership(Base):
     organization: Mapped[Organization] = relationship(back_populates="memberships")
 
 
+class RefreshToken(Base):
+    """A rotating, revocable refresh token (.2.1). Only the SHA-256 hash of the
+    opaque secret half is ever stored — never the raw token. `replaced_by_id`
+    chains rotations; a token presented after it's been revoked (i.e. already
+    rotated) signals possible theft (see auth/refresh_tokens.py)."""
+
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = _pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    created_at: Mapped[datetime] = _created()
+    expires_at: Mapped[datetime] = mapped_column(nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("refresh_tokens.id", ondelete="SET NULL"), nullable=True
+    )
+
+    user: Mapped[User] = relationship()
+
+
 # --------------------------------------------------------------------------
 # Projects & documents
 # --------------------------------------------------------------------------

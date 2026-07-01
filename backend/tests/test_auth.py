@@ -91,6 +91,7 @@ def test_signup_endpoint_returns_token():
     body = resp.json()
     assert body["token_type"] == "bearer"
     assert decode_token(body["access_token"])["sub"] == body["user_id"]
+    assert body["refresh_token"] and "." in body["refresh_token"]
 
 
 def test_login_endpoint_success_and_bad_password():

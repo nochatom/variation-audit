@@ -18,7 +18,7 @@ type Ctx = {
   org: Org | null;
   isAdmin: boolean;
   setCompany: (id: string) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   reload: () => Promise<void>;
 };
 
@@ -65,8 +65,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     persistCompany(id);
     setCid(id);
   }
-  function logout() {
-    apiLogout();
+  async function logout() {
+    await api.logout(); // revokes the refresh token server-side, then clears local storage
     router.replace("/login");
   }
 

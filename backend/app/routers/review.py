@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.auth.deps import ensure_member, get_current_user, get_db
-from app.models import ReviewStatus, User, Variation
+from app.models import Project, ReviewStatus, User, Variation
 from app.services import review as review_service
 
 router = APIRouter(tags=["review"])
@@ -94,12 +94,18 @@ def _load(session, user, variation_id) -> Variation:
 
 # ---- endpoints -----------------------------------------------------------
 @router.get("/projects/{project_id}/review-queue", response_model=list[VariationSummary])
-def review_queue(project_id: uuid.UUID, company_id: uuid.UUID,
+def review_queue(project_id: uuid.UUID, company_id: uuid.UUID | None = None,
                  review_status: ReviewStatus = ReviewStatus.pending,
                  user: User = Depends(get_current_user),
                  session: Session = Depends(get_db)) -> list[VariationSummary]:
-    ensure_member(session, user, company_id)
-    rows = review_service.review_queue(session, company_id, project_id=project_id,
+    # Object-level authorization: derive the owning org from the project
+    # itself, never from a caller-supplied company_id (kept optional, ignored,
+    # for backward compatibility with existing callers that still send it).
+    project = session.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "project not found")
+    ensure_member(session, user, project.company_id)
+    rows = review_service.review_queue(session, project.company_id, project_id=project_id,
                                        status=review_status)
     return [_summary(v) for v in rows]
 

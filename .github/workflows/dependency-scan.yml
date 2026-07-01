@@ -1,0 +1,49 @@
+name: Dependency vulnerability scan
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  schedule:
+    # Catches newly-disclosed CVEs in already-pinned dependencies, not just
+    # ones introduced by a code change.
+    - cron: "0 6 * * 1" # every Monday 06:00 UTC
+
+jobs:
+  python-deps:
+    name: pip-audit (backend)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt pip-audit
+      - name: pip-audit
+        # Audits the actually-installed environment (resolved transitive
+        # versions included), not just the direct pins in requirements.txt.
+        run: pip-audit
+
+  node-deps:
+    name: npm audit (frontend)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: npm audit
+        # high/critical only — low/moderate findings in transitive dev-only
+        # deps are common noise that would make this check unreliable.
+        run: npm audit --audit-level=high

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api, setToken, setCompanyId } from "@/lib/api";
+import { api, storeTokens, setCompanyId } from "@/lib/api";
 import { useTheme } from "@/lib/use-theme";
 
 export default function LoginPage() {
@@ -25,7 +25,7 @@ export default function LoginPage() {
         mode === "login"
           ? await api.login(email.trim(), password)
           : await api.signup(email.trim(), password, orgName.trim());
-      setToken(tok.access_token);
+      storeTokens(tok);
       const me = await api.me();
       if (me.organizations[0]) setCompanyId(me.organizations[0].id);
       router.replace("/dashboard");

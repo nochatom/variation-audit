@@ -1,11 +1,14 @@
 "use client";
 
-// Thin client for the Variation Audit product API. Stores the JWT + active
-// company in localStorage and attaches the bearer token on every request.
+// Thin client for the Variation Audit product API. Stores the access +
+// refresh JWT pair and active company in localStorage, attaches the bearer
+// token on every request, and transparently rotates the access token via
+// /auth/refresh on a 401 (retrying the original request once).
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 const TOKEN_KEY = "va_token";
+const REFRESH_KEY = "va_refresh_token";
 const COMPANY_KEY = "va_company_id";
 
 export function getToken(): string | null {
@@ -15,6 +18,13 @@ export function getToken(): string | null {
 export function setToken(t: string) {
   window.localStorage.setItem(TOKEN_KEY, t);
 }
+export function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(REFRESH_KEY);
+}
+export function setRefreshToken(t: string) {
+  window.localStorage.setItem(REFRESH_KEY, t);
+}
 export function getCompanyId(): string | null {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(COMPANY_KEY);
@@ -22,8 +32,15 @@ export function getCompanyId(): string | null {
 export function setCompanyId(id: string) {
   window.localStorage.setItem(COMPANY_KEY, id);
 }
+/** Store both halves of a token pair (login/signup/refresh response). */
+export function storeTokens(t: { access_token: string; refresh_token: string }) {
+  setToken(t.access_token);
+  setRefreshToken(t.refresh_token);
+}
+/** Local-only clear (no server call) — used as the fallback path. */
 export function logout() {
   window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(REFRESH_KEY);
   window.localStorage.removeItem(COMPANY_KEY);
 }
 
@@ -35,48 +52,100 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
+// Endpoints that must never trigger the auto-refresh-and-retry loop below.
+const NO_REFRESH_PATHS = ["/auth/login", "/auth/signup", "/auth/refresh"];
+
+// De-dupes concurrent refresh attempts: if several requests 401 at once (a
+// just-expired access token), only ONE /auth/refresh call should fire. Every
+// refresh token is single-use (rotated) — a second concurrent call reusing
+// the same stale token would be misread server-side as token theft and
+// revoke every session.
+let refreshInFlight: Promise<{ access_token: string; refresh_token: string }> | null = null;
+
+async function doRefresh(): Promise<{ access_token: string; refresh_token: string }> {
+  const rt = getRefreshToken();
+  if (!rt) throw new ApiError(401, "no refresh token");
+  const res = await fetch(`${BASE}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: rt }),
+  });
+  if (!res.ok) throw new ApiError(res.status, "session expired");
+  const body = await res.json();
+  storeTokens(body);
+  return body;
+}
+
+async function refreshOnce(): Promise<{ access_token: string; refresh_token: string }> {
+  if (!refreshInFlight) {
+    refreshInFlight = doRefresh().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+async function parseErrorDetail(res: Response): Promise<string> {
+  let detail = res.statusText;
+  try {
+    const body = await res.json();
+    detail = body.detail || body.error?.message || detail;
+  } catch {
+    /* non-JSON error */
+  }
+  return detail;
+}
+
+async function request<T>(path: string, opts: RequestInit = {}, _retried = false): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
-  if (!res.ok) {
-    let detail = res.statusText;
+
+  if (res.status === 401 && !_retried && !NO_REFRESH_PATHS.includes(path) && getRefreshToken()) {
     try {
-      const body = await res.json();
-      detail = body.detail || body.error?.message || detail;
+      await refreshOnce();
     } catch {
-      /* non-JSON error */
+      logout();
+      throw new ApiError(401, await parseErrorDetail(res));
     }
-    throw new ApiError(res.status, detail);
+    return request<T>(path, opts, true); // retry exactly once with the new access token
+  }
+
+  if (!res.ok) {
+    throw new ApiError(res.status, await parseErrorDetail(res));
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
 // multipart upload (bearer token, no JSON content-type)
-async function upload<T>(path: string, file: File, field = "file"): Promise<T> {
+async function upload<T>(path: string, file: File, field = "file", _retried = false): Promise<T> {
   const fd = new FormData();
   fd.append(field, file);
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, { method: "POST", headers, body: fd });
-  if (!res.ok) {
-    let detail = res.statusText;
+
+  if (res.status === 401 && !_retried && getRefreshToken()) {
     try {
-      const b = await res.json();
-      detail = b.detail || detail;
+      await refreshOnce();
     } catch {
-      /* non-JSON */
+      logout();
+      throw new ApiError(401, await parseErrorDetail(res));
     }
-    throw new ApiError(res.status, detail);
+    return upload<T>(path, file, field, true);
+  }
+
+  if (!res.ok) {
+    throw new ApiError(res.status, await parseErrorDetail(res));
   }
   return (await res.json()) as T;
 }
 
 // ---- auth ----------------------------------------------------------------
-export type TokenResponse = { access_token: string; user_id: string; email: string };
+export type TokenResponse = { access_token: string; refresh_token: string; user_id: string; email: string };
 export type Me = {
   user_id: string;
   email: string;
@@ -93,6 +162,25 @@ export const api = {
       body: JSON.stringify({ email, password, org_name, full_name }),
     }),
   me: () => request<Me>("/auth/me"),
+
+  /** Revoke this session's refresh token server-side, then clear local storage. */
+  async logout(): Promise<void> {
+    const rt = getRefreshToken();
+    if (rt) {
+      try {
+        await fetch(`${BASE}/auth/logout`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: rt }),
+        });
+      } catch {
+        /* best-effort — still clear local state even if the network call fails */
+      }
+    }
+    logout();
+  },
+  /** Revoke every refresh token for the current user — signs out all devices. */
+  logoutAll: () => request<void>("/auth/logout-all", { method: "POST" }),
 
   // dashboard
   orgDashboard: (companyId: string) => request<OrgDashboard>(`/dashboard?company_id=${companyId}`),
