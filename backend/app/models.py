@@ -194,6 +194,9 @@ class Project(Base):
     project_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="construction_trade")
     country: Mapped[str] = mapped_column(String(2), nullable=False, server_default="AU")
     status: Mapped[ProjectStatus] = mapped_column(nullable=False, default=ProjectStatus.in_progress)
+    # Soft archive: hidden from the default dashboard/list, fully recoverable.
+    # NULL = active. Orthogonal to status (also records WHEN it was archived).
+    archived_at: Mapped[datetime | None] = mapped_column()
     # Engine baseline inputs (contract v1.2) — required to drive run_recovery.
     contract_text: Mapped[str | None] = mapped_column(Text)
     scope_text: Mapped[str | None] = mapped_column(Text)

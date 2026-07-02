@@ -210,7 +210,15 @@ export const api = {
     request<Comment>(`/variations/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) }),
 
   // projects (list + ingestion)
-  listProjects: (companyId: string) => request<ProjectOut[]>(`/projects?company_id=${companyId}`),
+  listProjects: (companyId: string, archived = false) =>
+    request<ProjectOut[]>(`/projects?company_id=${companyId}&archived=${archived}`),
+  getProject: (projectId: string) => request<ProjectOut>(`/projects/${projectId}`),
+  archiveProject: (projectId: string) =>
+    request<ProjectOut>(`/projects/${projectId}/archive`, { method: "POST" }),
+  unarchiveProject: (projectId: string) =>
+    request<ProjectOut>(`/projects/${projectId}/unarchive`, { method: "POST" }),
+  deleteProject: (projectId: string) =>
+    request<void>(`/projects/${projectId}`, { method: "DELETE" }),
   uploadContract: (projectId: string, file: File, isScope = false) =>
     upload<ProjectOut>(`/projects/${projectId}/contract?is_scope=${isScope}`, file),
   uploadDocs: (
@@ -298,6 +306,7 @@ export type ProjectOut = {
   state: string | null;
   status: string;
   has_contract: boolean;
+  archived_at: string | null;
 };
 export type UploadResult = { project_id: string; documents_added: number };
 export type MemberOut = { user_id: string; email: string; full_name: string | null; role: string };

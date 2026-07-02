@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import parsing
-from app.auth.deps import ensure_member, get_current_user, get_db
+from app.auth.deps import ensure_member, get_current_user, get_db, require_admin
 from app.models import Membership, Project, ProjectStatus, SourceType, User
 from app.rate_limit import ANALYSIS_LIMIT, UPLOAD_LIMIT, limiter
 from app.services import jobs
@@ -82,12 +82,14 @@ class ProjectOut(BaseModel):
     state: str | None = None
     status: str
     has_contract: bool = False
+    archived_at: str | None = None
 
 
 def _out(p) -> ProjectOut:
     return ProjectOut(id=str(p.id), company_id=str(p.company_id), name=p.name,
                       state=p.state, status=p.status.value,
-                      has_contract=bool(p.contract_text))
+                      has_contract=bool(p.contract_text),
+                      archived_at=p.archived_at.isoformat() if p.archived_at else None)
 
 
 # ---- endpoints -----------------------------------------------------------
@@ -104,10 +106,13 @@ def create_project(req: CreateProjectRequest, user: User = Depends(get_current_u
 
 
 @router.get("", response_model=list[ProjectOut])
-def list_projects(company_id: uuid.UUID, user: User = Depends(get_current_user),
+def list_projects(company_id: uuid.UUID, archived: bool = False,
+                  user: User = Depends(get_current_user),
                   session: Session = Depends(get_db)) -> list[ProjectOut]:
+    """Active projects by default; ?archived=true lists archived ones instead."""
     ensure_member(session, user, company_id)
-    return [_out(p) for p in project_service.list_projects(session, company_id)]
+    return [_out(p) for p in
+            project_service.list_projects(session, company_id, archived=archived)]
 
 
 def _load_project(session, user, project_id):
@@ -127,6 +132,34 @@ def _load_project(session, user, project_id):
 def get_project(project_id: uuid.UUID, user: User = Depends(get_current_user),
                 session: Session = Depends(get_db)) -> ProjectOut:
     return _out(_load_project(session, user, project_id))
+
+
+# ---- lifecycle: archive (any member, reversible) / delete (admin, permanent) ----
+@router.post("/{project_id}/archive", response_model=ProjectOut)
+def archive_project(project_id: uuid.UUID, user: User = Depends(get_current_user),
+                    session: Session = Depends(get_db)) -> ProjectOut:
+    """Hide the project from the default dashboard. Reversible via /unarchive."""
+    project = _load_project(session, user, project_id)
+    return _out(project_service.archive_project(session, project, actor=user))
+
+
+@router.post("/{project_id}/unarchive", response_model=ProjectOut)
+def unarchive_project(project_id: uuid.UUID, user: User = Depends(get_current_user),
+                      session: Session = Depends(get_db)) -> ProjectOut:
+    """Restore an archived project to the active dashboard."""
+    project = _load_project(session, user, project_id)
+    return _out(project_service.unarchive_project(session, project, actor=user))
+
+
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(project_id: uuid.UUID, user: User = Depends(get_current_user),
+                   session: Session = Depends(get_db)) -> None:
+    """PERMANENTLY delete a project and all its documents, jobs, variations,
+    evidence, estimates and comments (DB-level cascades). Admin-only;
+    irreversible — the UI requires typing the project name to confirm."""
+    project = _load_project(session, user, project_id)
+    require_admin(session, user, project.company_id)
+    project_service.delete_project(session, project, actor=user)
 
 
 @router.post("/{project_id}/contract", response_model=ProjectOut)

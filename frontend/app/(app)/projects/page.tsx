@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, OrgDashboard } from "@/lib/api";
+import { api, OrgDashboard, ProjectOut } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
-import { PageHeader, Card, Chip, ErrorNote, Spinner, EmptyState, statusTone, aud } from "@/components/ui";
+import { PageHeader, Card, Chip, ErrorNote, Spinner, EmptyState, statusTone, aud, fmtDate } from "@/components/ui";
 
 const AU_STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"] as const;
 
@@ -13,6 +13,9 @@ export default function ProjectsPage() {
   const [data, setData] = useState<OrgDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [tab, setTab] = useState<"active" | "archived">("active");
+  const [archived, setArchived] = useState<ProjectOut[] | null>(null);
+  const [restoring, setRestoring] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [state, setState] = useState("NSW");
@@ -22,7 +25,12 @@ export default function ProjectsPage() {
   async function load() {
     if (!companyId) return;
     try {
-      setData(await api.orgDashboard(companyId));
+      const [dash, arch] = await Promise.all([
+        api.orgDashboard(companyId),
+        api.listProjects(companyId, true),
+      ]);
+      setData(dash);
+      setArchived(arch);
     } catch (e: any) {
       setError(e.message);
     }
@@ -31,6 +39,18 @@ export default function ProjectsPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
+
+  async function restore(id: string) {
+    setRestoring(id);
+    try {
+      await api.unarchiveProject(id);
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setRestoring(null);
+    }
+  }
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -92,13 +112,22 @@ export default function ProjectsPage() {
         </Card>
       )}
 
+      <div className="mb-6 flex gap-1 rounded-md border border-ip-line bg-ip-card p-1 text-sm" style={{ width: "fit-content" }}>
+        {(["active", "archived"] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`rounded-sm px-3.5 py-1.5 font-semibold capitalize transition-colors ${tab === t ? "bg-ip-navy-fill text-white" : "text-ip-ink-2 hover:text-ip-ink"}`}>
+            {t}{t === "archived" && archived ? ` (${archived.length})` : ""}
+          </button>
+        ))}
+      </div>
+
       {!data && !error && <Spinner />}
 
-      {data && data.projects.length === 0 && !creating && (
+      {tab === "active" && data && data.projects.length === 0 && !creating && (
         <EmptyState title="No projects yet" body="Create a project to start ingesting documents and detecting unclaimed variations." action={<button onClick={() => setCreating(true)} className="btn-orange">Create project</button>} />
       )}
 
-      {data && data.projects.length > 0 && (
+      {tab === "active" && data && data.projects.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {data.projects.map((p) => (
             <Link key={p.id} href={`/projects/${p.id}`} className="ip-card group p-5 transition-colors hover:bg-ip-card-2">
@@ -116,6 +145,31 @@ export default function ProjectsPage() {
                 <Mini label="Recoverable" value={aud(p.recoverable_confirmed)} recovery />
               </div>
             </Link>
+          ))}
+        </div>
+      )}
+
+      {tab === "archived" && archived && archived.length === 0 && (
+        <EmptyState title="No archived projects" body="Archive a project from its details page to hide it from the dashboard without losing anything." />
+      )}
+
+      {tab === "archived" && archived && archived.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {archived.map((p) => (
+            <div key={p.id} className="ip-card p-5 opacity-90">
+              <div className="flex items-start justify-between gap-2">
+                <Link href={`/projects/${p.id}`} className="font-bold tracking-tight text-ip-ink hover:text-ip-navy">{p.name}</Link>
+                <Chip>archived</Chip>
+              </div>
+              <div className="mt-1 text-[12px] text-ip-ink-3">
+                {p.state || "—"} · archived {fmtDate(p.archived_at)}
+              </div>
+              <div className="mt-4 border-t border-ip-line pt-4">
+                <button onClick={() => restore(p.id)} disabled={restoring === p.id} className="btn-ghost">
+                  {restoring === p.id ? "Restoring…" : "Restore to dashboard"}
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       )}

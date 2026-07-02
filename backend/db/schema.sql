@@ -86,6 +86,7 @@ CREATE TABLE projects (
     project_type  text NOT NULL DEFAULT 'construction_trade',
     country       char(2) NOT NULL DEFAULT 'AU' CHECK (country = 'AU'),  -- MVP: AU only
     status        project_status NOT NULL DEFAULT 'in_progress',
+    archived_at   timestamptz,                                   -- soft archive: NULL = active
     contract_text text,                                          -- engine baseline input (contract v1.2)
     scope_text    text,                                          -- scope / BOQ
     state         varchar(8),                                    -- AU state/territory (SoP regime hint)

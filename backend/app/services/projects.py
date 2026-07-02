@@ -7,12 +7,12 @@ documents are stored and registered as Document rows for later analysis.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.models import Document, Project, ProjectStatus, SourceType
+from app.models import AuditLog, Document, Project, ProjectStatus, SourceType, User
 
 
 def create_project(
@@ -41,11 +41,59 @@ def create_project(
     return project
 
 
-def list_projects(session: Session, company_id: uuid.UUID) -> list[Project]:
+def list_projects(session: Session, company_id: uuid.UUID, *,
+                  archived: bool = False) -> list[Project]:
+    """Active projects by default; archived=True lists only archived ones."""
+    stmt = select(Project).where(Project.company_id == company_id)
+    stmt = stmt.where(Project.archived_at.is_not(None) if archived
+                      else Project.archived_at.is_(None))
     return list(session.execute(
-        select(Project).where(Project.company_id == company_id)
-        .order_by(Project.created_at.desc())
+        stmt.order_by(Project.created_at.desc())
     ).scalars().all())
+
+
+def archive_project(session: Session, project: Project, *, actor: User) -> Project:
+    """Soft-archive: hidden from the default dashboard/list, fully recoverable."""
+    if project.archived_at is None:
+        project.archived_at = datetime.now(timezone.utc)
+        session.add(AuditLog(
+            company_id=project.company_id, actor_user_id=actor.id,
+            entity_type="project", entity_id=project.id, action="project.archived",
+            before={"archived": False}, after={"archived": True},
+        ))
+        session.commit()
+    return project
+
+
+def unarchive_project(session: Session, project: Project, *, actor: User) -> Project:
+    """Restore an archived project to the active dashboard."""
+    if project.archived_at is not None:
+        project.archived_at = None
+        session.add(AuditLog(
+            company_id=project.company_id, actor_user_id=actor.id,
+            entity_type="project", entity_id=project.id, action="project.unarchived",
+            before={"archived": True}, after={"archived": False},
+        ))
+        session.commit()
+    return project
+
+
+def delete_project(session: Session, project: Project, *, actor: User) -> None:
+    """PERMANENT delete — admin-only at the router. Irreversible.
+
+    A single core DELETE lets the DB-level ON DELETE CASCADE chains remove
+    documents, analysis jobs, variations, evidence, value estimates and
+    comments atomically. The audit row survives on purpose (no FK to
+    projects): the org keeps a record that the project was deleted, by whom.
+    """
+    session.add(AuditLog(
+        company_id=project.company_id, actor_user_id=actor.id,
+        entity_type="project", entity_id=project.id, action="project.deleted",
+        before={"name": project.name, "status": project.status.value},
+        after=None,
+    ))
+    session.execute(delete(Project).where(Project.id == project.id))
+    session.commit()
 
 
 def get_project(session: Session, company_id: uuid.UUID, project_id: uuid.UUID) -> Project | None:

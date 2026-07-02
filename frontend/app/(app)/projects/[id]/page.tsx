@@ -2,33 +2,71 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { api, ProjectDashboard, VariationSummary } from "@/lib/api";
+import { useParams, useRouter } from "next/navigation";
+import { api, ProjectDashboard, ProjectOut, VariationSummary } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
 import { PageHeader, StatCard, Card, Chip, ConfidenceBar, TimeBarFlag, ErrorNote, InfoNote, Spinner, statusTone, aud } from "@/components/ui";
 
 export default function ProjectDetails() {
-  const { companyId } = useApp();
+  const { companyId, isAdmin } = useApp();
+  const router = useRouter();
   const projectId = useParams<{ id: string }>().id;
 
   const [dash, setDash] = useState<ProjectDashboard | null>(null);
+  const [proj, setProj] = useState<ProjectOut | null>(null);
   const [pending, setPending] = useState<VariationSummary[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const load = useCallback(async () => {
     if (!companyId) return;
-    const [d, q] = await Promise.all([
+    const [d, p, q] = await Promise.all([
       api.projectDashboard(projectId),
+      api.getProject(projectId),
       api.reviewQueue(projectId, companyId, "pending"),
     ]);
     setDash(d);
+    setProj(p);
     setPending(q);
   }, [companyId, projectId]);
 
   useEffect(() => {
     load().catch((e) => setError(e.message));
   }, [load]);
+
+  const archived = !!proj?.archived_at;
+
+  async function toggleArchive() {
+    setLifecycleBusy(true);
+    try {
+      if (archived) {
+        await api.unarchiveProject(projectId);
+        setMsg("Project restored to the active dashboard.");
+      } else {
+        await api.archiveProject(projectId);
+        setMsg("Project archived — hidden from the dashboard, fully recoverable from Projects → Archived.");
+      }
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLifecycleBusy(false);
+    }
+  }
+
+  async function confirmDelete() {
+    setLifecycleBusy(true);
+    try {
+      await api.deleteProject(projectId);
+      router.replace("/projects");
+    } catch (e: any) {
+      setError(e.message);
+      setLifecycleBusy(false);
+      setConfirmingDelete(false);
+    }
+  }
 
   async function analyze() {
     setMsg("Queuing analysis…");
@@ -56,6 +94,10 @@ export default function ProjectDetails() {
         description={dash ? `${dash.project.state || "—"} · ${dash.project.status} · ${dash.document_count} documents` : undefined}
         actions={
           <>
+            {archived && <Chip>archived</Chip>}
+            <button onClick={toggleArchive} disabled={lifecycleBusy} className="btn-ghost">
+              {lifecycleBusy ? "…" : archived ? "Restore" : "Archive"}
+            </button>
             <Link href={`/documents?project=${projectId}`} className="btn-ghost">Documents</Link>
             <button onClick={downloadPdf} className="btn-ghost">Report PDF</button>
             <button onClick={analyze} className="btn-orange">Run analysis</button>
@@ -123,8 +165,63 @@ export default function ProjectDetails() {
               </Card>
             </div>
           </div>
+
+          {isAdmin && (
+            <Card className="mt-6 border-ip-risk/30 p-5">
+              <h3 className="text-sm font-bold text-ip-risk">Danger zone</h3>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[13px] text-ip-ink-2">
+                  Permanently delete this project and <span className="font-semibold">all</span> of its
+                  documents, analyses, variations, evidence and comments. This cannot be undone —
+                  prefer <span className="font-semibold">Archive</span> unless you are certain.
+                </p>
+                <button onClick={() => setConfirmingDelete(true)}
+                        className="rounded-md bg-ip-risk/10 px-3.5 py-2 text-sm font-semibold text-ip-risk hover:bg-ip-risk/20">
+                  Delete project…
+                </button>
+              </div>
+            </Card>
+          )}
+
+          {confirmingDelete && dash && (
+            <DeleteModal
+              projectName={dash.project.name}
+              busy={lifecycleBusy}
+              onCancel={() => setConfirmingDelete(false)}
+              onConfirm={confirmDelete}
+            />
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+function DeleteModal({ projectName, busy, onCancel, onConfirm }: {
+  projectName: string; busy: boolean; onCancel: () => void; onConfirm: () => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const match = typed.trim() === projectName;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ip-navy/40 px-4" onClick={onCancel}>
+      <div className="ip-card-lg w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-ip-risk">Permanently delete project?</h3>
+        <p className="mt-2 text-[13px] leading-relaxed text-ip-ink-2">
+          This deletes <span className="font-semibold text-ip-ink">{projectName}</span> and every
+          document, analysis job, variation, evidence record and comment in it.{" "}
+          <span className="font-semibold text-ip-risk">This action cannot be undone.</span>
+        </p>
+        <label className="ip-label mb-1 mt-4 block">Type the project name to confirm</label>
+        <input className="ip-input" value={typed} onChange={(e) => setTyped(e.target.value)}
+               placeholder={projectName} autoFocus />
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onCancel} className="btn-ghost" disabled={busy}>Cancel</button>
+          <button onClick={onConfirm} disabled={!match || busy}
+                  className="rounded-md bg-ip-risk px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40">
+            {busy ? "Deleting…" : "Delete permanently"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

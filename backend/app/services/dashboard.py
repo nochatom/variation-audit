@@ -34,8 +34,11 @@ def _status_counts(variations) -> dict:
 
 
 def org_overview(session: Session, company_id: uuid.UUID) -> dict:
+    # Archived projects are hidden from the default dashboard (recoverable
+    # via the Projects page's Archived tab / the archived=true list filter).
     projects = list(session.execute(
-        select(Project).where(Project.company_id == company_id)
+        select(Project).where(Project.company_id == company_id,
+                              Project.archived_at.is_(None))
         .order_by(Project.created_at.desc())
     ).scalars().all())
     variations = list(session.execute(
