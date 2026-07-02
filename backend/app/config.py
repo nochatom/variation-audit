@@ -45,6 +45,28 @@ class Settings(BaseSettings):
     # CORS — origins allowed to call the API (the frontend)
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Rate limiting (per client IP; slowapi/limits grammar, e.g. "5/minute").
+    # Defaults are production values — tests relax only the app-wide default
+    # (tests/conftest.py) so category limits stay genuinely exercised.
+    #   default:  the SPA fans out 1+N parallel requests per page view (org
+    #             dashboard + one review-queue call per project) and browsers
+    #             add CORS preflights; offices also NAT many users behind one
+    #             IP — so this is an abuse ceiling, not a capacity budget.
+    #   auth:     login/signup/refresh mint tokens; strict per OWASP
+    #             brute-force / credential-stuffing guidance.
+    #   uploads:  a full project setup is 5 uploads (contract + 4 registers);
+    #             allows that plus retries while capping parse/disk abuse.
+    #   analysis: each request enqueues a multi-minute LLM job with real API
+    #             cost; normal usage is a few runs/day, so cap cost abuse.
+    rate_limit_default: str = "300/minute"
+    rate_limit_auth: str = "5/minute"
+    rate_limit_uploads: str = "20/minute"
+    rate_limit_analysis: str = "10/hour"
+    # Multi-worker/multi-instance deployments must share one budget: set this
+    # to redis://... so all processes count against the same store. The
+    # in-memory default is only correct for a single process.
+    rate_limit_storage_uri: str = "memory://"
+
 
 @lru_cache
 def get_settings() -> Settings:

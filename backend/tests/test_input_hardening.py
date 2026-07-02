@@ -123,8 +123,88 @@ def test_login_rate_limited_after_5_attempts():
         app.dependency_overrides[get_db] = _db
         client = TestClient(app)
         payload = {"email": "nope@firm.com", "password": "wrong1234"}
-        statuses = [client.post("/auth/login", json=payload).status_code for _ in range(6)]
+        responses = [client.post("/auth/login", json=payload) for _ in range(6)]
+        statuses = [r.status_code for r in responses]
         assert statuses[:5] == [401, 401, 401, 401, 401]  # invalid creds, but allowed through
         assert statuses[5] == 429                          # 6th request in the same minute: rate-limited
+        # headers_enabled=True: well-behaved clients get told when to retry
+        assert "retry-after" in responses[5].headers
     finally:
         limiter.reset()
+
+
+def _project_client_n(n: int, contract_text: str | None = None):
+    """Like _project_client but survives `n` requests (one execute per request)."""
+    user = User(id=uuid.uuid4(), email="ca@firm.com", password_hash="x", is_active=True)
+    cid = uuid.uuid4()
+    project = Project(id=uuid.uuid4(), company_id=cid, name="Tower A",
+                      contract_text=contract_text, status=ProjectStatus.in_progress)
+    membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid)
+    session = FakeSession(
+        results=[FakeResult(scalar=membership, scalars=[membership]) for _ in range(n)],
+        get_obj=project,
+    )
+
+    def _db():
+        yield session
+    app.dependency_overrides[get_db] = _db
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_store] = lambda: FakeStore()
+    return TestClient(app), project
+
+
+def test_uploads_rate_limited_after_20_per_minute():
+    limiter.reset()
+    try:
+        client, project = _project_client_n(25)
+        csv = b"rfi_number,subject,question\nR1,Subject,Question\n"
+        statuses = [
+            client.post(f"/projects/{project.id}/rfis",
+                        files={"file": ("rfis.csv", csv, "text/csv")}).status_code
+            for _ in range(21)
+        ]
+        assert statuses[:20] == [200] * 20
+        assert statuses[20] == 429
+    finally:
+        limiter.reset()
+
+
+def test_analysis_rate_limited_after_10_per_hour(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.models import JobStatus
+    from app.routers import projects as projects_router
+
+    limiter.reset()
+    try:
+        client, project = _project_client_n(15, contract_text="Agreed scope baseline.")
+        monkeypatch.setattr(
+            projects_router.jobs, "enqueue_analysis",
+            lambda *a, **k: SimpleNamespace(id=uuid.uuid4(), status=JobStatus.queued),
+        )
+        statuses = [client.post(f"/projects/{project.id}/analyze").status_code for _ in range(11)]
+        assert statuses[:10] == [202] * 10
+        assert statuses[10] == 429
+    finally:
+        limiter.reset()
+
+
+def test_health_exempt_from_rate_limiting():
+    # LB probes must never be throttled. The volume check alone can't prove
+    # the exemption under the relaxed test default, so also assert /health is
+    # registered in the limiter's exempt set.
+    assert "app.main.health" in limiter._exempt_routes
+    client = TestClient(app)
+    assert all(client.get("/health").status_code == 200 for _ in range(30))
+
+
+def test_configured_limits_use_valid_grammar():
+    # A typo'd VA_RATE_LIMIT_* env value should fail here, not at first 429.
+    from limits import parse
+
+    from app.config import get_settings
+
+    s = get_settings()
+    for value in (s.rate_limit_default, s.rate_limit_auth,
+                  s.rate_limit_uploads, s.rate_limit_analysis):
+        parse(value)  # raises ValueError on bad grammar

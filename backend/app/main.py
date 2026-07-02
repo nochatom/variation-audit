@@ -70,7 +70,10 @@ app.include_router(notifications_router)
 app.include_router(audit_router)
 
 
+# Exempt from rate limiting: load balancers and uptime monitors probe this
+# frequently and must never consume budget or receive a 429.
 @app.get("/health")
+@limiter.exempt
 def health() -> dict:
     s = get_settings()
     return {"status": "ok", "region": s.s3_region}

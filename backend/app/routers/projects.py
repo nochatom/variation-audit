@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app import parsing
 from app.auth.deps import ensure_member, get_current_user, get_db
 from app.models import Membership, Project, ProjectStatus, SourceType, User
+from app.rate_limit import ANALYSIS_LIMIT, UPLOAD_LIMIT, limiter
 from app.services import jobs
 from app.services import projects as project_service
 from app.storage import build_loader, get_store
@@ -129,7 +130,9 @@ def get_project(project_id: uuid.UUID, user: User = Depends(get_current_user),
 
 
 @router.post("/{project_id}/contract", response_model=ProjectOut)
-async def upload_contract(project_id: uuid.UUID, is_scope: bool = False,
+@limiter.limit(UPLOAD_LIMIT)
+async def upload_contract(request: Request, response: Response,
+                          project_id: uuid.UUID, is_scope: bool = False,
                           file: UploadFile = File(...),
                           user: User = Depends(get_current_user),
                           session: Session = Depends(get_db)) -> ProjectOut:
@@ -148,7 +151,9 @@ class CommsUploadResponse(BaseModel):
 
 
 @router.post("/{project_id}/comms", response_model=CommsUploadResponse)
-async def upload_comms(project_id: uuid.UUID, file: UploadFile = File(...),
+@limiter.limit(UPLOAD_LIMIT)
+async def upload_comms(request: Request, response: Response,
+                       project_id: uuid.UUID, file: UploadFile = File(...),
                        user: User = Depends(get_current_user),
                        session: Session = Depends(get_db)) -> CommsUploadResponse:
     project = _load_project(session, user, project_id)
@@ -169,7 +174,9 @@ class RfiUploadResponse(BaseModel):
 
 
 @router.post("/{project_id}/rfis", response_model=RfiUploadResponse)
-async def upload_rfis(project_id: uuid.UUID, file: UploadFile = File(...),
+@limiter.limit(UPLOAD_LIMIT)
+async def upload_rfis(request: Request, response: Response,
+                      project_id: uuid.UUID, file: UploadFile = File(...),
                       user: User = Depends(get_current_user),
                       session: Session = Depends(get_db),
                       store=Depends(get_store)) -> RfiUploadResponse:
@@ -191,7 +198,10 @@ class SiteInstructionUploadResponse(BaseModel):
 
 
 @router.post("/{project_id}/site-instructions", response_model=SiteInstructionUploadResponse)
-async def upload_site_instructions(project_id: uuid.UUID, file: UploadFile = File(...),
+@limiter.limit(UPLOAD_LIMIT)
+async def upload_site_instructions(request: Request, response: Response,
+                                   project_id: uuid.UUID,
+                                   file: UploadFile = File(...),
                                    user: User = Depends(get_current_user),
                                    session: Session = Depends(get_db),
                                    store=Depends(get_store)) -> SiteInstructionUploadResponse:
@@ -213,7 +223,10 @@ class MeetingMinutesUploadResponse(BaseModel):
 
 
 @router.post("/{project_id}/meeting-minutes", response_model=MeetingMinutesUploadResponse)
-async def upload_meeting_minutes(project_id: uuid.UUID, file: UploadFile = File(...),
+@limiter.limit(UPLOAD_LIMIT)
+async def upload_meeting_minutes(request: Request, response: Response,
+                                 project_id: uuid.UUID,
+                                 file: UploadFile = File(...),
                                  user: User = Depends(get_current_user),
                                  session: Session = Depends(get_db),
                                  store=Depends(get_store)) -> MeetingMinutesUploadResponse:
@@ -236,7 +249,9 @@ class AnalyzeResponse(BaseModel):
 
 @router.post("/{project_id}/analyze", response_model=AnalyzeResponse,
              status_code=status.HTTP_202_ACCEPTED)
-def analyze(project_id: uuid.UUID, user: User = Depends(get_current_user),
+@limiter.limit(ANALYSIS_LIMIT)
+def analyze(request: Request, response: Response, project_id: uuid.UUID,
+            user: User = Depends(get_current_user),
             session: Session = Depends(get_db)) -> AnalyzeResponse:
     project = _load_project(session, user, project_id)
     if not (project.contract_text or "").strip():

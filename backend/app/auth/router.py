@@ -1,7 +1,7 @@
 """Auth endpoints: signup, login, me."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,12 +11,10 @@ from app.auth.deps import get_current_user, get_db
 from app.auth.tokens import create_access_token
 from app.logging_config import security_logger
 from app.models import Membership, Organization, User
+from app.rate_limit import AUTH_LIMIT as AUTH_RATE_LIMIT
 from app.rate_limit import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-# Brute-force / credential-stuffing protection — tighter than the app-wide default.
-AUTH_RATE_LIMIT = "5/minute"
 
 
 # ---- schemas -------------------------------------------------------------
@@ -72,7 +70,8 @@ class MeResponse(BaseModel):
 # ---- endpoints -----------------------------------------------------------
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(AUTH_RATE_LIMIT)
-def signup(request: Request, req: SignupRequest, session: Session = Depends(get_db)) -> TokenResponse:
+def signup(request: Request, response: Response, req: SignupRequest,
+           session: Session = Depends(get_db)) -> TokenResponse:
     try:
         user, org, _m = service.signup(
             session, email=req.email, password=req.password,
@@ -90,7 +89,8 @@ def signup(request: Request, req: SignupRequest, session: Session = Depends(get_
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit(AUTH_RATE_LIMIT)
-def login(request: Request, req: LoginRequest, session: Session = Depends(get_db)) -> TokenResponse:
+def login(request: Request, response: Response, req: LoginRequest,
+          session: Session = Depends(get_db)) -> TokenResponse:
     user = service.authenticate(session, email=req.email, password=req.password)
     if user is None:
         security_logger.warning("login failed", extra={"event": "login_failed", "email": req.email})
@@ -114,7 +114,8 @@ def me(user: User = Depends(get_current_user), session: Session = Depends(get_db
 
 @router.post("/refresh", response_model=RefreshResponse)
 @limiter.limit(AUTH_RATE_LIMIT)
-def refresh(request: Request, req: RefreshRequest, session: Session = Depends(get_db)) -> RefreshResponse:
+def refresh(request: Request, response: Response, req: RefreshRequest,
+            session: Session = Depends(get_db)) -> RefreshResponse:
     """Exchange a refresh token for a new access + refresh token pair (rotation).
 
     The presented refresh token is revoked either way — a rotated token can
