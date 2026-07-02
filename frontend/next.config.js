@@ -27,6 +27,12 @@ const CSP = [
   "img-src 'self' data:",
   "font-src 'self'",
   `connect-src 'self' ${API_ORIGIN} ${SENTRY_INGEST_ORIGIN}`,
+  // Session Replay's compression runs in a Worker constructed from a blob:
+  // URL (new Blob([...]) + URL.createObjectURL) — without this, CSP falls
+  // back through child-src to default-src 'self', which does NOT cover
+  // blob:, and Worker creation is silently blocked (Replay degrades to a
+  // slower non-worker buffer rather than failing loudly).
+  "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

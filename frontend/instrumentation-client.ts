@@ -10,8 +10,22 @@ const dsn =
 Sentry.init({
   dsn,
   tracesSampleRate: 1.0,
-  // No session-replay/profiling integrations added — keep the client bundle
-  // and CSP surface minimal until there's a concrete need for them.
+  // Session Replay, errors only — this app handles construction
+  // variation-claim data meant as legal evidence, so no blanket session
+  // recording (replaysSessionSampleRate: 0): only the ~60s around a
+  // captured error is recorded (replaysOnErrorSampleRate: 1.0). maskAllText
+  // + blockAllMedia are Sentry's own privacy-first defaults — set explicitly
+  // here so that choice is visible in code, not an invisible default.
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 1.0,
+  integrations: [
+    Sentry.replayIntegration({
+      maskAllText: true,
+      blockAllMedia: true,
+    }),
+  ],
+  // No profiling integration added — keep the client bundle and CSP surface
+  // minimal until there's a concrete need for it.
 });
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
