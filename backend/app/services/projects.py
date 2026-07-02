@@ -6,13 +6,23 @@ documents are stored and registered as Document rows for later analysis.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
+from typing import Protocol
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models import AuditLog, Document, Project, ProjectStatus, SourceType, User
+
+log = logging.getLogger("va.projects")
+
+
+class DocumentStore(Protocol):
+    """The subset of storage.py's loaders delete_project needs."""
+
+    def delete(self, storage_key: str) -> None: ...
 
 
 def create_project(
@@ -78,14 +88,33 @@ def unarchive_project(session: Session, project: Project, *, actor: User) -> Pro
     return project
 
 
-def delete_project(session: Session, project: Project, *, actor: User) -> None:
+def delete_project(session: Session, project: Project, *, actor: User,
+                   store: DocumentStore | None = None) -> None:
     """PERMANENT delete — admin-only at the router. Irreversible.
 
     A single core DELETE lets the DB-level ON DELETE CASCADE chains remove
     documents, analysis jobs, variations, evidence, value estimates and
     comments atomically. The audit row survives on purpose (no FK to
     projects): the org keeps a record that the project was deleted, by whom.
+
+    The DB rows are the source of truth for "is this project gone" — object
+    storage cleanup is best-effort and happens first (reading storage_key off
+    rows that are about to be cascade-deleted). A flaky S3 call must never
+    block or half-complete an irreversible delete the admin already
+    confirmed, so failures are logged, not raised; nothing here retries or
+    queues a sweep for orphaned blobs — acceptable for MVP scale.
     """
+    if store is not None:
+        keys = session.execute(
+            select(Document.storage_key).where(Document.project_id == project.id)
+        ).scalars().all()
+        for key in keys:
+            try:
+                store.delete(key)
+            except Exception:
+                log.warning("failed to delete storage object %s for project %s",
+                           key, project.id, exc_info=True)
+
     session.add(AuditLog(
         company_id=project.company_id, actor_user_id=actor.id,
         entity_type="project", entity_id=project.id, action="project.deleted",

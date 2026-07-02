@@ -11,18 +11,31 @@ from fastapi.testclient import TestClient
 from app.auth.deps import get_current_user, get_db
 from app.main import app
 from app.models import AuditLog, Membership, MembershipRole, Project, ProjectStatus, User
+from app.storage import get_store
 from tests.fakes import FakeResult, FakeSession
+
+
+class FakeStore:
+    """Records delete() calls instead of touching real storage."""
+
+    def __init__(self):
+        self.deleted: list[str] = []
+
+    def delete(self, storage_key: str) -> None:
+        self.deleted.append(storage_key)
 
 
 def _user():
     return User(id=uuid.uuid4(), email="ca@firm.com", password_hash="x", is_active=True)
 
 
-def _client(session, user):
+def _client(session, user, store=None):
     def _db():
         yield session
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_current_user] = lambda: user
+    if store is not None:
+        app.dependency_overrides[get_store] = lambda: store
     return TestClient(app)
 
 
@@ -31,21 +44,25 @@ def teardown_function():
 
 
 def _setup(role=MembershipRole.member, member_of_project_org=True, archived_at=None,
-           extra_results=0):
+           extra_results=0, doc_storage_keys=None):
     user = _user()
     cid = uuid.uuid4()
     project = Project(id=uuid.uuid4(), company_id=cid, name="Tower A",
                       status=ProjectStatus.completed, archived_at=archived_at)
     m_cid = cid if member_of_project_org else uuid.uuid4()
     membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=m_cid, role=role)
-    results = [FakeResult(scalar=membership, scalars=[membership])] * (2 + extra_results)
+    results = [FakeResult(scalar=membership, scalars=[membership])] * 2
+    if extra_results:
+        # The delete path's extra execute() is the Document.storage_key query.
+        results += [FakeResult(scalars=doc_storage_keys or [])] * extra_results
     session = FakeSession(results=results, get_obj=project)
-    return _client(session, user), session, project
+    store = FakeStore() if doc_storage_keys is not None else None
+    return _client(session, user, store=store), session, project, store
 
 
 # -- archive / unarchive ------------------------------------------------------
 def test_member_can_archive_project():
-    client, session, project = _setup()
+    client, session, project, _ = _setup()
     resp = client.post(f"/projects/{project.id}/archive")
     assert resp.status_code == 200
     assert resp.json()["archived_at"] is not None
@@ -57,7 +74,7 @@ def test_member_can_archive_project():
 
 def test_unarchive_restores_project():
     from datetime import datetime, timezone
-    client, session, project = _setup(archived_at=datetime.now(timezone.utc))
+    client, session, project, _ = _setup(archived_at=datetime.now(timezone.utc))
     resp = client.post(f"/projects/{project.id}/unarchive")
     assert resp.status_code == 200
     assert resp.json()["archived_at"] is None
@@ -67,14 +84,14 @@ def test_unarchive_restores_project():
 
 def test_archive_is_idempotent_no_duplicate_audit():
     from datetime import datetime, timezone
-    client, session, project = _setup(archived_at=datetime.now(timezone.utc))
+    client, session, project, _ = _setup(archived_at=datetime.now(timezone.utc))
     resp = client.post(f"/projects/{project.id}/archive")
     assert resp.status_code == 200
     assert session.added_of(AuditLog) == []   # already archived: no new event
 
 
 def test_archive_org_isolation_404_for_outsider():
-    client, session, project = _setup(member_of_project_org=False)
+    client, session, project, _ = _setup(member_of_project_org=False)
     resp = client.post(f"/projects/{project.id}/archive")
     assert resp.status_code == 404            # not visible across orgs
     assert project.archived_at is None
@@ -82,31 +99,45 @@ def test_archive_org_isolation_404_for_outsider():
 
 # -- permanent delete ---------------------------------------------------------
 def test_delete_requires_admin_403_for_member():
-    client, session, project = _setup(role=MembershipRole.member)
+    client, session, project, _ = _setup(role=MembershipRole.member)
     resp = client.delete(f"/projects/{project.id}")
     assert resp.status_code == 403
     assert session.added_of(AuditLog) == []   # nothing recorded, nothing deleted
 
 
 def test_admin_delete_succeeds_and_audits():
-    client, session, project = _setup(role=MembershipRole.admin, extra_results=1)
+    client, session, project, store = _setup(
+        role=MembershipRole.admin, extra_results=1,
+        doc_storage_keys=["proj/doc-a.txt", "proj/doc-b.txt"],
+    )
     resp = client.delete(f"/projects/{project.id}")
     assert resp.status_code == 204
     audits = session.added_of(AuditLog)
     assert len(audits) == 1 and audits[0].action == "project.deleted"
     assert audits[0].before["name"] == "Tower A"
     assert session.commits == 1
+    # storage cleanup: every document's blob deleted before the row cascade
+    assert store.deleted == ["proj/doc-a.txt", "proj/doc-b.txt"]
+
+
+def test_delete_with_no_documents_skips_storage_calls():
+    client, session, project, store = _setup(
+        role=MembershipRole.admin, extra_results=1, doc_storage_keys=[],
+    )
+    resp = client.delete(f"/projects/{project.id}")
+    assert resp.status_code == 204
+    assert store.deleted == []
 
 
 def test_delete_org_isolation_404_for_outsider():
-    client, session, project = _setup(role=MembershipRole.admin, member_of_project_org=False)
+    client, session, project, _ = _setup(role=MembershipRole.admin, member_of_project_org=False)
     resp = client.delete(f"/projects/{project.id}")
     assert resp.status_code == 404
 
 
 # -- surface --------------------------------------------------------------------
 def test_project_out_includes_archived_at():
-    client, _, project = _setup()
+    client, _, project, _s = _setup()
     resp = client.get(f"/projects/{project.id}")
     assert resp.status_code == 200
     assert "archived_at" in resp.json() and resp.json()["archived_at"] is None

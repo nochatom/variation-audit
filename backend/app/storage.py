@@ -27,6 +27,10 @@ class S3DocumentLoader:
         self._s3.put_object(Bucket=self.bucket, Key=storage_key, Body=body)
         return storage_key
 
+    def delete(self, storage_key: str) -> None:
+        # S3 delete_object is idempotent — a missing key is not an error.
+        self._s3.delete_object(Bucket=self.bucket, Key=storage_key)
+
 
 class LocalDocumentLoader:
     """Reads document content from a local directory. For dev/tests only."""
@@ -46,6 +50,13 @@ class LocalDocumentLoader:
         with open(path, "wb") as fh:
             fh.write(body)
         return storage_key
+
+    def delete(self, storage_key: str) -> None:
+        path = os.path.join(self.base_dir, storage_key)
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass  # already gone — same idempotent contract as S3
 
 
 def build_loader():

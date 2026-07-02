@@ -153,13 +153,15 @@ def unarchive_project(project_id: uuid.UUID, user: User = Depends(get_current_us
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(project_id: uuid.UUID, user: User = Depends(get_current_user),
-                   session: Session = Depends(get_db)) -> None:
+                   session: Session = Depends(get_db),
+                   store=Depends(get_store)) -> None:
     """PERMANENTLY delete a project and all its documents, jobs, variations,
-    evidence, estimates and comments (DB-level cascades). Admin-only;
-    irreversible — the UI requires typing the project name to confirm."""
+    evidence, estimates and comments (DB-level cascades + best-effort object
+    storage cleanup). Admin-only; irreversible — the UI requires typing the
+    project name to confirm."""
     project = _load_project(session, user, project_id)
     require_admin(session, user, project.company_id)
-    project_service.delete_project(session, project, actor=user)
+    project_service.delete_project(session, project, actor=user, store=store)
 
 
 @router.post("/{project_id}/contract", response_model=ProjectOut)
