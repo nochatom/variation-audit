@@ -5,17 +5,20 @@ import Link from "next/link";
 import { api, OrgDashboard, ProjectOut } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
 import { PageHeader, Card, Chip, ErrorNote, Spinner, EmptyState, statusTone, aud, fmtDate } from "@/components/ui";
+import { ProjectActionsMenu, DeleteProjectModal } from "@/components/project-actions";
 
 const AU_STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"] as const;
 
 export default function ProjectsPage() {
-  const { companyId } = useApp();
+  const { companyId, isAdmin } = useApp();
   const [data, setData] = useState<OrgDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [tab, setTab] = useState<"active" | "archived">("active");
   const [archived, setArchived] = useState<ProjectOut[] | null>(null);
-  const [restoring, setRestoring] = useState<string | null>(null);
+  const [lifecycleBusyId, setLifecycleBusyId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectOut | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const [name, setName] = useState("");
   const [state, setState] = useState("NSW");
@@ -40,15 +43,41 @@ export default function ProjectsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
+  async function archiveOne(id: string) {
+    setLifecycleBusyId(id);
+    try {
+      await api.archiveProject(id);
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLifecycleBusyId(null);
+    }
+  }
+
   async function restore(id: string) {
-    setRestoring(id);
+    setLifecycleBusyId(id);
     try {
       await api.unarchiveProject(id);
       await load();
     } catch (e: any) {
       setError(e.message);
     } finally {
-      setRestoring(null);
+      setLifecycleBusyId(null);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      await api.deleteProject(deleteTarget.id);
+      setDeleteTarget(null);
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -132,8 +161,18 @@ export default function ProjectsPage() {
           {data.projects.map((p) => (
             <Link key={p.id} href={`/projects/${p.id}`} className="ip-card group p-5 transition-colors hover:bg-ip-card-2">
               <div className="flex items-start justify-between gap-2">
-                <h3 className="font-bold tracking-tight text-ip-ink">{p.name}</h3>
-                <Chip tone={statusTone(p.status)}>{p.status}</Chip>
+                <h3 className="min-w-0 flex-1 truncate font-bold tracking-tight text-ip-ink">{p.name}</h3>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Chip tone={statusTone(p.status)}>{p.status}</Chip>
+                  <ProjectActionsMenu
+                    project={{ archived_at: null }}
+                    isAdmin={isAdmin}
+                    busy={lifecycleBusyId === p.id}
+                    onArchive={() => archiveOne(p.id)}
+                    onRestore={() => {}}
+                    onRequestDelete={() => {}}
+                  />
+                </div>
               </div>
               <div className="mt-1 flex items-center gap-2 text-[12px]">
                 {!p.has_contract && <Chip tone="orange">no contract</Chip>}
@@ -158,20 +197,37 @@ export default function ProjectsPage() {
           {archived.map((p) => (
             <div key={p.id} className="ip-card p-5 opacity-90">
               <div className="flex items-start justify-between gap-2">
-                <Link href={`/projects/${p.id}`} className="font-bold tracking-tight text-ip-ink hover:text-ip-navy">{p.name}</Link>
-                <Chip>archived</Chip>
+                <Link href={`/projects/${p.id}`} className="min-w-0 flex-1 truncate font-bold tracking-tight text-ip-ink hover:text-ip-navy">{p.name}</Link>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Chip>archived</Chip>
+                  <ProjectActionsMenu
+                    project={p}
+                    isAdmin={isAdmin}
+                    busy={lifecycleBusyId === p.id}
+                    onArchive={() => {}}
+                    onRestore={() => restore(p.id)}
+                    onRequestDelete={() => setDeleteTarget(p)}
+                  />
+                </div>
               </div>
               <div className="mt-1 text-[12px] text-ip-ink-3">
                 {p.state || "—"} · archived {fmtDate(p.archived_at)}
               </div>
-              <div className="mt-4 border-t border-ip-line pt-4">
-                <button onClick={() => restore(p.id)} disabled={restoring === p.id} className="btn-ghost">
-                  {restoring === p.id ? "Restoring…" : "Restore to dashboard"}
-                </button>
-              </div>
+              {lifecycleBusyId === p.id && (
+                <div className="mt-4 border-t border-ip-line pt-4 text-[12px] text-ip-ink-3">Restoring…</div>
+              )}
             </div>
           ))}
         </div>
+      )}
+
+      {deleteTarget && (
+        <DeleteProjectModal
+          projectName={deleteTarget.name}
+          busy={deleteBusy}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={confirmDelete}
+        />
       )}
     </div>
   );

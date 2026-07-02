@@ -5,6 +5,7 @@ Default-list/dashboard *filtering* runs real SQL (archived_at IS NULL) and is
 covered by live verification against Postgres, not FakeSession.
 """
 import uuid
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
@@ -73,7 +74,6 @@ def test_member_can_archive_project():
 
 
 def test_unarchive_restores_project():
-    from datetime import datetime, timezone
     client, session, project, _ = _setup(archived_at=datetime.now(timezone.utc))
     resp = client.post(f"/projects/{project.id}/unarchive")
     assert resp.status_code == 200
@@ -83,7 +83,6 @@ def test_unarchive_restores_project():
 
 
 def test_archive_is_idempotent_no_duplicate_audit():
-    from datetime import datetime, timezone
     client, session, project, _ = _setup(archived_at=datetime.now(timezone.utc))
     resp = client.post(f"/projects/{project.id}/archive")
     assert resp.status_code == 200
@@ -99,15 +98,28 @@ def test_archive_org_isolation_404_for_outsider():
 
 # -- permanent delete ---------------------------------------------------------
 def test_delete_requires_admin_403_for_member():
-    client, session, project, _ = _setup(role=MembershipRole.member)
+    # Archived, so the only thing standing between this and success is role —
+    # isolates the RBAC check from the archive-first check below.
+    client, session, project, _ = _setup(role=MembershipRole.member,
+                                         archived_at=datetime.now(timezone.utc))
     resp = client.delete(f"/projects/{project.id}")
     assert resp.status_code == 403
     assert session.added_of(AuditLog) == []   # nothing recorded, nothing deleted
 
 
+def test_delete_rejects_active_project_409_even_for_admin():
+    # The safety gate: archive-first is enforced server-side, not just hidden
+    # in the UI — a direct API call from an admin still can't skip it.
+    client, session, project, _ = _setup(role=MembershipRole.admin)  # archived_at=None
+    resp = client.delete(f"/projects/{project.id}")
+    assert resp.status_code == 409
+    assert "archived" in resp.json()["detail"]
+    assert session.added_of(AuditLog) == []   # nothing recorded, nothing deleted
+
+
 def test_admin_delete_succeeds_and_audits():
     client, session, project, store = _setup(
-        role=MembershipRole.admin, extra_results=1,
+        role=MembershipRole.admin, archived_at=datetime.now(timezone.utc), extra_results=1,
         doc_storage_keys=["proj/doc-a.txt", "proj/doc-b.txt"],
     )
     resp = client.delete(f"/projects/{project.id}")
@@ -122,7 +134,8 @@ def test_admin_delete_succeeds_and_audits():
 
 def test_delete_with_no_documents_skips_storage_calls():
     client, session, project, store = _setup(
-        role=MembershipRole.admin, extra_results=1, doc_storage_keys=[],
+        role=MembershipRole.admin, archived_at=datetime.now(timezone.utc),
+        extra_results=1, doc_storage_keys=[],
     )
     resp = client.delete(f"/projects/{project.id}")
     assert resp.status_code == 204

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { api, ProjectDashboard, ProjectOut, VariationSummary } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
 import { PageHeader, StatCard, Card, Chip, ConfidenceBar, TimeBarFlag, ErrorNote, InfoNote, Spinner, statusTone, aud } from "@/components/ui";
+import { ProjectActionsMenu, DeleteProjectModal } from "@/components/project-actions";
 
 export default function ProjectDetails() {
   const { companyId, isAdmin } = useApp();
@@ -38,16 +39,24 @@ export default function ProjectDetails() {
 
   const archived = !!proj?.archived_at;
 
-  async function toggleArchive() {
+  async function archive() {
     setLifecycleBusy(true);
     try {
-      if (archived) {
-        await api.unarchiveProject(projectId);
-        setMsg("Project restored to the active dashboard.");
-      } else {
-        await api.archiveProject(projectId);
-        setMsg("Project archived — hidden from the dashboard, fully recoverable from Projects → Archived.");
-      }
+      await api.archiveProject(projectId);
+      setMsg("Project archived — hidden from the dashboard, fully recoverable from Projects → Archived.");
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLifecycleBusy(false);
+    }
+  }
+
+  async function restore() {
+    setLifecycleBusy(true);
+    try {
+      await api.unarchiveProject(projectId);
+      setMsg("Project restored to the active dashboard.");
       await load();
     } catch (e: any) {
       setError(e.message);
@@ -95,12 +104,19 @@ export default function ProjectDetails() {
         actions={
           <>
             {archived && <Chip>archived</Chip>}
-            <button onClick={toggleArchive} disabled={lifecycleBusy} className="btn-ghost">
-              {lifecycleBusy ? "…" : archived ? "Restore" : "Archive"}
-            </button>
             <Link href={`/documents?project=${projectId}`} className="btn-ghost">Documents</Link>
             <button onClick={downloadPdf} className="btn-ghost">Report PDF</button>
             <button onClick={analyze} className="btn-orange">Run analysis</button>
+            {proj && (
+              <ProjectActionsMenu
+                project={proj}
+                isAdmin={isAdmin}
+                busy={lifecycleBusy}
+                onArchive={archive}
+                onRestore={restore}
+                onRequestDelete={() => setConfirmingDelete(true)}
+              />
+            )}
           </>
         }
       />
@@ -166,25 +182,8 @@ export default function ProjectDetails() {
             </div>
           </div>
 
-          {isAdmin && (
-            <Card className="mt-6 border-ip-risk/30 p-5">
-              <h3 className="text-sm font-bold text-ip-risk">Danger zone</h3>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-[13px] text-ip-ink-2">
-                  Permanently delete this project and <span className="font-semibold">all</span> of its
-                  documents, analyses, variations, evidence and comments. This cannot be undone —
-                  prefer <span className="font-semibold">Archive</span> unless you are certain.
-                </p>
-                <button onClick={() => setConfirmingDelete(true)}
-                        className="rounded-md bg-ip-risk/10 px-3.5 py-2 text-sm font-semibold text-ip-risk hover:bg-ip-risk/20">
-                  Delete project…
-                </button>
-              </div>
-            </Card>
-          )}
-
           {confirmingDelete && dash && (
-            <DeleteModal
+            <DeleteProjectModal
               projectName={dash.project.name}
               busy={lifecycleBusy}
               onCancel={() => setConfirmingDelete(false)}
@@ -193,35 +192,6 @@ export default function ProjectDetails() {
           )}
         </>
       )}
-    </div>
-  );
-}
-
-function DeleteModal({ projectName, busy, onCancel, onConfirm }: {
-  projectName: string; busy: boolean; onCancel: () => void; onConfirm: () => void;
-}) {
-  const [typed, setTyped] = useState("");
-  const match = typed.trim() === projectName;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ip-navy/40 px-4" onClick={onCancel}>
-      <div className="ip-card-lg w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-ip-risk">Permanently delete project?</h3>
-        <p className="mt-2 text-[13px] leading-relaxed text-ip-ink-2">
-          This deletes <span className="font-semibold text-ip-ink">{projectName}</span> and every
-          document, analysis job, variation, evidence record and comment in it.{" "}
-          <span className="font-semibold text-ip-risk">This action cannot be undone.</span>
-        </p>
-        <label className="ip-label mb-1 mt-4 block">Type the project name to confirm</label>
-        <input className="ip-input" value={typed} onChange={(e) => setTyped(e.target.value)}
-               placeholder={projectName} autoFocus />
-        <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onCancel} className="btn-ghost" disabled={busy}>Cancel</button>
-          <button onClick={onConfirm} disabled={!match || busy}
-                  className="rounded-md bg-ip-risk px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40">
-            {busy ? "Deleting…" : "Delete permanently"}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

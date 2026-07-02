@@ -158,9 +158,19 @@ def delete_project(project_id: uuid.UUID, user: User = Depends(get_current_user)
     """PERMANENTLY delete a project and all its documents, jobs, variations,
     evidence, estimates and comments (DB-level cascades + best-effort object
     storage cleanup). Admin-only; irreversible — the UI requires typing the
-    project name to confirm."""
+    project name to confirm.
+
+    Archive-first is enforced here, not just hidden in the UI: an active
+    project must be archived before it can be permanently deleted (409 if
+    not). This is a deliberate safety gate against accidental data loss,
+    not something a direct API call should be able to skip."""
     project = _load_project(session, user, project_id)
     require_admin(session, user, project.company_id)
+    if project.archived_at is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "project must be archived before it can be permanently deleted",
+        )
     project_service.delete_project(session, project, actor=user, store=store)
 
 
