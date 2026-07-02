@@ -1,6 +1,16 @@
+const { withSentryConfig } = require("@sentry/nextjs");
+
 // Mirrors the fallback in lib/api.ts so the CSP's connect-src always matches
 // the origin the browser will actually call.
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+// Sentry's browser SDK submits events to this ingest host — must be in
+// connect-src or the strict CSP below silently blocks error reporting.
+// Mirrors the fallback baked into instrumentation(-client).ts.
+const SENTRY_DSN =
+  process.env.NEXT_PUBLIC_SENTRY_DSN ||
+  "https://062ca873e45ee9f89035b98c4d5e8361@o4511662990819328.ingest.de.sentry.io/4511662992785488";
+const SENTRY_INGEST_ORIGIN = `https://${new URL(SENTRY_DSN).host}`;
 
 // script-src needs 'unsafe-inline': Next.js App Router embeds its own inline
 // RSC-hydration payload scripts (<script>self.__next_f.push(...)</script>) in
@@ -16,7 +26,7 @@ const CSP = [
   "style-src 'self'",
   "img-src 'self' data:",
   "font-src 'self'",
-  `connect-src 'self' ${API_ORIGIN}`,
+  `connect-src 'self' ${API_ORIGIN} ${SENTRY_INGEST_ORIGIN}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -44,4 +54,14 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withSentryConfig(nextConfig, {
+  org: "variationiq",
+  project: "sentry-amethyst-flower",
+  silent: true,
+  // No SENTRY_AUTH_TOKEN is configured yet — explicitly disable source-map
+  // upload rather than rely on the plugin's implicit skip-with-warning, so
+  // this is a deliberate, visible state instead of an easily-missed log line.
+  // Set SENTRY_AUTH_TOKEN (org-level, Settings -> Auth Tokens) and remove
+  // this override to enable readable stack traces in production.
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+});
