@@ -229,12 +229,31 @@ export const api = {
 
   // organization members
   orgMembers: (companyId: string) => request<MemberOut[]>(`/orgs/${companyId}/members`),
-  addMember: (companyId: string, email: string, role: "admin" | "member") =>
-    request<MemberOut>(`/orgs/${companyId}/members`, { method: "POST", body: JSON.stringify({ email, role }) }),
   setMemberRole: (companyId: string, userId: string, role: "admin" | "member") =>
     request<MemberOut>(`/orgs/${companyId}/members/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) }),
   removeMember: (companyId: string, userId: string) =>
     request<void>(`/orgs/${companyId}/members/${userId}`, { method: "DELETE" }),
+
+  // organization invitations — never requires the invited email to already
+  // have an account; a pending invitation is created either way.
+  orgInvitations: (companyId: string) => request<InvitationOut[]>(`/orgs/${companyId}/invitations`),
+  createInvitation: (companyId: string, email: string, role: "admin" | "member") =>
+    request<InvitationOut>(`/orgs/${companyId}/invitations`, {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    }),
+  revokeInvitation: (companyId: string, invitationId: string) =>
+    request<void>(`/orgs/${companyId}/invitations/${invitationId}`, { method: "DELETE" }),
+
+  // accept-invite flow (public token lookup + accept/register)
+  previewInvitation: (token: string) => request<InvitationPreview>(`/invitations/${token}`),
+  acceptInvitation: (token: string) =>
+    request<{ company_id: string; role: string }>(`/invitations/${token}/accept`, { method: "POST" }),
+  registerViaInvitation: (token: string, password: string, full_name?: string) =>
+    request<TokenResponse>(`/invitations/${token}/register`, {
+      method: "POST",
+      body: JSON.stringify({ password, full_name }),
+    }),
 
   // audit & evidence
   auditLog: (companyId: string, entityType?: string, limit = 100) =>
@@ -310,6 +329,17 @@ export type ProjectOut = {
 };
 export type UploadResult = { project_id: string; documents_added: number };
 export type MemberOut = { user_id: string; email: string; full_name: string | null; role: string };
+export type InvitationOut = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  invited_by: string | null;
+  created_at: string;
+  expires_at: string;
+  accept_url: string | null;
+};
+export type InvitationPreview = { email: string; org_name: string; role: string; account_exists: boolean };
 export type AuditEntry = {
   id: string;
   actor_user_id: string | null;

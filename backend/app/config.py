@@ -34,6 +34,24 @@ class Settings(BaseSettings):
     idempotency_window_days: int = 7                          # decision .21.4
     worker_idle_sleep: float = 2.0
 
+    # Organization invitations (.19a)
+    invitation_expire_days: int = 7
+    # Frontend origin used to build the accept-invite link embedded in the
+    # invitation email (and returned as accept_url for a "copy invite link"
+    # fallback — see app/routers/invitations.py).
+    frontend_base_url: str = "http://localhost:3000"
+
+    # Outbound email (invitations). Unset smtp_host -> ConsoleMailer: the
+    # accept link is written to the structured log instead of sent, so the
+    # invitation flow is fully testable without real mail infrastructure
+    # (see app/mailer.py, mirrors the S3/local-dir split in app/storage.py).
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_use_tls: bool = True
+    smtp_from: str = "VariationIQ <noreply@variationiq.example>"
+
     # Auth (.2) — REQUIRED, no insecure default. Set VA_JWT_SECRET (32+ random
     # bytes, e.g. `openssl rand -hex 32`) in every environment, including local
     # dev (.env, git-ignored) and tests (see tests/conftest.py).

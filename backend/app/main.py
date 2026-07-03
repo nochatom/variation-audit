@@ -21,6 +21,8 @@ from app.rate_limit import limiter
 from app.request_logging import RequestLoggingMiddleware
 from app.routers.audit import router as audit_router
 from app.routers.dashboard import router as dashboard_router
+from app.routers.invitations import org_router as org_invitations_router
+from app.routers.invitations import public_router as invitations_router
 from app.routers.notifications import router as notifications_router
 from app.routers.orgs import router as orgs_router
 from app.routers.projects import router as projects_router
@@ -64,6 +66,8 @@ app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(review_router)
 app.include_router(orgs_router)
+app.include_router(org_invitations_router)
+app.include_router(invitations_router)
 app.include_router(reports_router)
 app.include_router(dashboard_router)
 app.include_router(notifications_router)

@@ -158,6 +158,39 @@ class Membership(Base):
     organization: Mapped[Organization] = relationship(back_populates="memberships")
 
 
+class Invitation(Base):
+    """A pending organization invitation (.19a) — email-addressed, not user-addressed.
+
+    Unlike Membership, an Invitation does not require the invited email to
+    already belong to a User: the row is created immediately either way, and
+    a User is only required at *acceptance* time (register-and-accept for a
+    new email, or accept for an existing account). Only the SHA-256 hash of
+    the opaque token secret is ever stored, matching RefreshToken. Status is
+    derived from accepted_at/revoked_at/expires_at rather than a separate
+    enum column, also matching RefreshToken's convention.
+    """
+
+    __tablename__ = "invitations"
+
+    id: Mapped[uuid.UUID] = _pk()
+    company_id: Mapped[uuid.UUID] = _company_fk()
+    email: Mapped[str] = mapped_column(CITEXT, nullable=False, index=True)
+    role: Mapped[MembershipRole] = mapped_column(nullable=False, default=MembershipRole.member)
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    invited_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = _created()
+    expires_at: Mapped[datetime] = mapped_column(nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column()
+    accepted_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column()
+
+    organization: Mapped[Organization] = relationship()
+
+
 class RefreshToken(Base):
     """A rotating, revocable refresh token (.2.1). Only the SHA-256 hash of the
     opaque secret half is ever stored — never the raw token. `replaced_by_id`

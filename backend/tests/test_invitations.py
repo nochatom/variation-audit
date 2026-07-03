@@ -1,0 +1,400 @@
+"""Organization invitations (.19a): service logic + endpoints.
+
+Covers the reported bug directly: "Invite member" must never require the
+invited email to already have an account, and must never return "no user
+with that email" (see test_create_invitation_endpoint_new_email_never_404s).
+"""
+import uuid
+from datetime import datetime, timedelta, timezone
+
+from fastapi.testclient import TestClient
+
+from app.auth.deps import get_current_user, get_db
+from app.auth.security import hash_password
+from app.main import app
+from app.mailer import get_mailer
+from app.models import Invitation, Membership, MembershipRole, Organization, User
+from app.services import invitations as inv
+from tests.fakes import FakeResult, FakeSession
+
+
+def _now():
+    return datetime.now(timezone.utc)
+
+
+def _user(email="invitee@firm.com"):
+    return User(id=uuid.uuid4(), email=email, password_hash="x", is_active=True)
+
+
+def _fixture_invitation(*, company_id=None, email="invitee@firm.com",
+                        accepted=False, revoked=False, expired=False,
+                        role=MembershipRole.member):
+    company_id = company_id or uuid.uuid4()
+    secret = "test-invite-secret-abc123"
+    row = Invitation(
+        id=uuid.uuid4(), company_id=company_id, email=email, role=role,
+        token_hash=inv._hash(secret),
+        expires_at=_now() + (timedelta(days=-1) if expired else timedelta(days=7)),
+        accepted_at=_now() if accepted else None,
+        revoked_at=_now() if revoked else None,
+    )
+    raw = inv._encode(row.id, secret)
+    return row, raw
+
+
+class FakeMailer:
+    def __init__(self):
+        self.sent: list[dict] = []
+
+    def send_invitation(self, **kwargs):
+        self.sent.append(kwargs)
+
+
+# -- service: create_invitation ----------------------------------------------
+def test_create_invitation_for_unknown_email_succeeds():
+    """The core bug fix: no account needs to exist for this email."""
+    session = FakeSession(results=[
+        FakeResult(scalar=None),      # _user_by_email -> no such user
+        FakeResult(scalars=[]),       # no stale pending invitation
+    ])
+    actor = _user("admin@firm.com")
+    cid = uuid.uuid4()
+    row, raw = inv.create_invitation(session, company_id=cid, actor=actor,
+                                     email="brandnew@firm.com", role=MembershipRole.member)
+    assert "." in raw
+    assert row.email == "brandnew@firm.com"
+    assert inv.status_of(row) == "pending"
+    assert session.commits == 1
+    assert len(session.added_of(Invitation)) == 1
+
+
+def test_create_invitation_existing_user_not_yet_member_succeeds():
+    existing = _user("existing@firm.com")
+    session = FakeSession(results=[
+        FakeResult(scalar=existing),  # _user_by_email -> found
+        FakeResult(scalar=None),      # _membership -> not a member
+        FakeResult(scalars=[]),       # no stale invitation
+    ])
+    actor = _user("admin@firm.com")
+    row, raw = inv.create_invitation(session, company_id=uuid.uuid4(), actor=actor,
+                                     email="existing@firm.com")
+    assert row.email == "existing@firm.com"
+
+
+def test_create_invitation_already_member_raises():
+    existing = _user("member@firm.com")
+    membership = Membership(id=uuid.uuid4(), user_id=existing.id, company_id=uuid.uuid4(),
+                            role=MembershipRole.member)
+    session = FakeSession(results=[
+        FakeResult(scalar=existing),
+        FakeResult(scalar=membership),
+    ])
+    actor = _user("admin@firm.com")
+    try:
+        inv.create_invitation(session, company_id=uuid.uuid4(), actor=actor, email="member@firm.com")
+        assert False, "expected AlreadyMember"
+    except inv.AlreadyMember:
+        pass
+
+
+def test_create_invitation_revokes_stale_pending_invite():
+    stale, _ = _fixture_invitation(email="brandnew@firm.com")
+    session = FakeSession(results=[
+        FakeResult(scalar=None),
+        FakeResult(scalars=[stale]),
+    ])
+    actor = _user("admin@firm.com")
+    inv.create_invitation(session, company_id=uuid.uuid4(), actor=actor, email="brandnew@firm.com")
+    assert stale.revoked_at is not None
+
+
+# -- service: get_invitation_by_token ------------------------------------------
+def test_get_invitation_by_token_malformed_raises():
+    session = FakeSession()
+    try:
+        inv.get_invitation_by_token(session, "not-a-valid-token")
+        assert False, "expected InvalidToken"
+    except inv.InvalidToken:
+        pass
+
+
+def test_get_invitation_by_token_unknown_id_raises():
+    session = FakeSession(get_obj=None)
+    _, raw = _fixture_invitation()
+    try:
+        inv.get_invitation_by_token(session, raw)
+        assert False, "expected InvalidToken"
+    except inv.InvalidToken:
+        pass
+
+
+def test_get_invitation_by_token_wrong_secret_raises():
+    row, _ = _fixture_invitation()
+    session = FakeSession(get_obj=row)
+    forged = inv._encode(row.id, "wrong-secret")
+    try:
+        inv.get_invitation_by_token(session, forged)
+        assert False, "expected InvalidToken"
+    except inv.InvalidToken:
+        pass
+
+
+def test_get_invitation_by_token_expired_raises():
+    row, raw = _fixture_invitation(expired=True)
+    session = FakeSession(get_obj=row)
+    try:
+        inv.get_invitation_by_token(session, raw)
+        assert False, "expected InvitationExpired"
+    except inv.InvitationExpired:
+        pass
+
+
+def test_get_invitation_by_token_revoked_raises():
+    row, raw = _fixture_invitation(revoked=True)
+    session = FakeSession(get_obj=row)
+    try:
+        inv.get_invitation_by_token(session, raw)
+        assert False, "expected InvitationRevoked"
+    except inv.InvitationRevoked:
+        pass
+
+
+def test_get_invitation_by_token_accepted_raises():
+    row, raw = _fixture_invitation(accepted=True)
+    session = FakeSession(get_obj=row)
+    try:
+        inv.get_invitation_by_token(session, raw)
+        assert False, "expected InvitationAlreadyUsed"
+    except inv.InvitationAlreadyUsed:
+        pass
+
+
+def test_get_invitation_by_token_valid_returns_row():
+    row, raw = _fixture_invitation()
+    session = FakeSession(get_obj=row)
+    result = inv.get_invitation_by_token(session, raw)
+    assert result is row
+
+
+# -- service: accept_for_existing_user -----------------------------------------
+def test_accept_for_existing_user_email_mismatch_raises():
+    row, raw = _fixture_invitation(email="invitee@firm.com")
+    session = FakeSession(get_obj=row)
+    wrong_user = _user("someone-else@firm.com")
+    try:
+        inv.accept_for_existing_user(session, raw_token=raw, user=wrong_user)
+        assert False, "expected EmailMismatch"
+    except inv.EmailMismatch:
+        pass
+
+
+def test_accept_for_existing_user_creates_membership():
+    row, raw = _fixture_invitation(email="invitee@firm.com", role=MembershipRole.admin)
+    session = FakeSession(get_obj=row, results=[FakeResult(scalar=None)])  # _membership -> not yet
+    user = _user("invitee@firm.com")
+    m = inv.accept_for_existing_user(session, raw_token=raw, user=user)
+    assert m.company_id == row.company_id
+    assert m.role == MembershipRole.admin
+    assert row.accepted_at is not None
+    assert row.accepted_by == user.id
+    assert len(session.added_of(Membership)) == 1
+
+
+def test_accept_for_existing_user_already_member_is_idempotent():
+    row, raw = _fixture_invitation(email="invitee@firm.com")
+    user = _user("invitee@firm.com")
+    existing_membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=row.company_id,
+                                     role=MembershipRole.member)
+    session = FakeSession(get_obj=row, results=[FakeResult(scalar=existing_membership)])
+    m = inv.accept_for_existing_user(session, raw_token=raw, user=user)
+    assert m is existing_membership
+    assert len(session.added_of(Membership)) == 0  # no duplicate created
+    assert row.accepted_at is not None
+
+
+# -- service: register_and_accept ----------------------------------------------
+def test_register_and_accept_creates_user_and_membership():
+    row, raw = _fixture_invitation(email="newuser@firm.com", role=MembershipRole.member)
+    session = FakeSession(get_obj=row, results=[FakeResult(scalar=None)])  # _user_by_email -> none
+    user, m = inv.register_and_accept(session, raw_token=raw, password="goodpassword1", full_name="New User")
+    assert user.email == "newuser@firm.com"
+    assert m.company_id == row.company_id
+    assert row.accepted_at is not None
+    assert len(session.added_of(User)) == 1
+    assert len(session.added_of(Membership)) == 1
+
+
+def test_register_and_accept_existing_email_raises():
+    row, raw = _fixture_invitation(email="existing@firm.com")
+    existing = _user("existing@firm.com")
+    session = FakeSession(get_obj=row, results=[FakeResult(scalar=existing)])
+    try:
+        inv.register_and_accept(session, raw_token=raw, password="goodpassword1", full_name=None)
+        assert False, "expected EmailAlreadyRegistered"
+    except inv.EmailAlreadyRegistered:
+        pass
+
+
+# -- endpoints ------------------------------------------------------------------
+def _client(session, user=None, mailer=None):
+    def _db():
+        yield session
+    app.dependency_overrides[get_db] = _db
+    if user is not None:
+        app.dependency_overrides[get_current_user] = lambda: user
+    if mailer is not None:
+        app.dependency_overrides[get_mailer] = lambda: mailer
+    return TestClient(app)
+
+
+def teardown_function():
+    app.dependency_overrides.clear()
+
+
+def test_create_invitation_endpoint_requires_admin():
+    cid = uuid.uuid4()
+    member_role = Membership(id=uuid.uuid4(), user_id=uuid.uuid4(), company_id=cid, role=MembershipRole.member)
+    session = FakeSession(results=[FakeResult(scalar=member_role)])
+    resp = _client(session, _user()).post(f"/orgs/{cid}/invitations", json={"email": "x@firm.com"})
+    assert resp.status_code == 403
+
+
+def test_create_invitation_endpoint_new_email_never_404s():
+    """Direct regression test for the reported bug: inviting an email with no
+    existing account must succeed (201), and must never surface the old
+    "no user with that email" message anywhere in the response."""
+    cid = uuid.uuid4()
+    admin = _user("admin@firm.com")
+    admin_membership = Membership(id=uuid.uuid4(), user_id=admin.id, company_id=cid, role=MembershipRole.admin)
+    org = Organization(id=cid, name="Acme Constructions")
+    session = FakeSession(
+        results=[
+            FakeResult(scalar=admin_membership),  # require_admin
+            FakeResult(scalar=None),               # _user_by_email -> no account
+            FakeResult(scalars=[]),                # no stale invite
+            FakeResult(scalar=org),                # _org_name lookup
+        ],
+    )
+    mailer = FakeMailer()
+    resp = _client(session, admin, mailer).post(
+        f"/orgs/{cid}/invitations", json={"email": "brandnew@nosuchaccount.com", "role": "member"},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert "no user with that email" not in resp.text.lower()
+    assert body["email"] == "brandnew@nosuchaccount.com"
+    assert body["status"] == "pending"
+    assert body["accept_url"] and "/accept-invite/" in body["accept_url"]
+    assert len(mailer.sent) == 1
+    assert mailer.sent[0]["to_email"] == "brandnew@nosuchaccount.com"
+
+
+def test_create_invitation_endpoint_already_member_returns_409():
+    cid = uuid.uuid4()
+    admin = _user("admin@firm.com")
+    admin_membership = Membership(id=uuid.uuid4(), user_id=admin.id, company_id=cid, role=MembershipRole.admin)
+    existing = _user("existing@firm.com")
+    existing_membership = Membership(id=uuid.uuid4(), user_id=existing.id, company_id=cid, role=MembershipRole.member)
+    session = FakeSession(results=[
+        FakeResult(scalar=admin_membership),
+        FakeResult(scalar=existing),
+        FakeResult(scalar=existing_membership),
+    ])
+    resp = _client(session, admin, FakeMailer()).post(
+        f"/orgs/{cid}/invitations", json={"email": "existing@firm.com"},
+    )
+    assert resp.status_code == 409
+
+
+def test_list_invitations_endpoint():
+    cid = uuid.uuid4()
+    admin = _user("admin@firm.com")
+    admin_membership = Membership(id=uuid.uuid4(), user_id=admin.id, company_id=cid, role=MembershipRole.admin)
+    pending, _ = _fixture_invitation(company_id=cid, email="a@firm.com")
+    session = FakeSession(results=[
+        FakeResult(scalar=admin_membership),
+        FakeResult(scalars=[pending]),
+    ])
+    resp = _client(session, admin).get(f"/orgs/{cid}/invitations")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1 and body[0]["email"] == "a@firm.com"
+
+
+def test_revoke_invitation_endpoint():
+    cid = uuid.uuid4()
+    admin = _user("admin@firm.com")
+    admin_membership = Membership(id=uuid.uuid4(), user_id=admin.id, company_id=cid, role=MembershipRole.admin)
+    row, _ = _fixture_invitation(company_id=cid)
+    session = FakeSession(get_obj=row, results=[FakeResult(scalar=admin_membership)])
+    resp = _client(session, admin).delete(f"/orgs/{cid}/invitations/{row.id}")
+    assert resp.status_code == 204
+    assert row.revoked_at is not None
+
+
+def test_preview_invitation_endpoint_public_no_auth():
+    row, raw = _fixture_invitation(email="invitee@firm.com")
+    org = Organization(id=row.company_id, name="Acme Constructions")
+    session = FakeSession(get_obj=row, results=[FakeResult(scalar=org), FakeResult(scalar=None)])
+    app.dependency_overrides[get_db] = lambda: session
+    resp = TestClient(app).get(f"/invitations/{raw}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["email"] == "invitee@firm.com"
+    assert body["org_name"] == "Acme Constructions"
+    assert body["account_exists"] is False
+
+
+def test_preview_invitation_endpoint_invalid_token_404s():
+    session = FakeSession(get_obj=None)
+    app.dependency_overrides[get_db] = lambda: session
+    resp = TestClient(app).get("/invitations/bogus.token")
+    assert resp.status_code == 404
+
+
+def test_preview_invitation_endpoint_expired_returns_410():
+    row, raw = _fixture_invitation(expired=True)
+    session = FakeSession(get_obj=row)
+    app.dependency_overrides[get_db] = lambda: session
+    resp = TestClient(app).get(f"/invitations/{raw}")
+    assert resp.status_code == 410
+
+
+def test_accept_invitation_endpoint_wrong_email_403s():
+    row, raw = _fixture_invitation(email="invitee@firm.com")
+    session = FakeSession(get_obj=row)
+    wrong_user = _user("someone-else@firm.com")
+    resp = _client(session, wrong_user).post(f"/invitations/{raw}/accept")
+    assert resp.status_code == 403
+
+
+def test_accept_invitation_endpoint_success():
+    row, raw = _fixture_invitation(email="invitee@firm.com")
+    user = _user("invitee@firm.com")
+    session = FakeSession(get_obj=row, results=[FakeResult(scalar=None)])
+    resp = _client(session, user).post(f"/invitations/{raw}/accept")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["company_id"] == str(row.company_id)
+
+
+def test_register_via_invitation_endpoint_success():
+    row, raw = _fixture_invitation(email="newuser@firm.com")
+    session = FakeSession(get_obj=row, results=[FakeResult(scalar=None)])
+    resp = _client(session).post(
+        f"/invitations/{raw}/register", json={"password": "goodpassword1", "full_name": "New User"},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["access_token"] and body["refresh_token"]
+    assert body["email"] == "newuser@firm.com"
+
+
+def test_register_via_invitation_endpoint_existing_email_409s():
+    row, raw = _fixture_invitation(email="existing@firm.com")
+    existing = _user("existing@firm.com")
+    session = FakeSession(get_obj=row, results=[FakeResult(scalar=existing)])
+    resp = _client(session).post(
+        f"/invitations/{raw}/register", json={"password": "goodpassword1"},
+    )
+    assert resp.status_code == 409

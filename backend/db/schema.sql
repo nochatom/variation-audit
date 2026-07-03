@@ -76,6 +76,27 @@ CREATE TABLE refresh_tokens (
 );
 CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
 
+-- Organization invitations (.19a). Email-addressed, not user-addressed: a row
+-- is created whether or not the email already belongs to a User. Status is
+-- derived from accepted_at/revoked_at/expires_at (same convention as
+-- refresh_tokens.revoked_at) rather than a separate enum column. Only the
+-- SHA-256 hash of the opaque token secret is ever stored.
+CREATE TABLE invitations (
+    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id   uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    email        citext NOT NULL,
+    role         membership_role NOT NULL DEFAULT 'member',
+    token_hash   text NOT NULL UNIQUE,
+    invited_by   uuid REFERENCES users(id) ON DELETE SET NULL,
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    expires_at   timestamptz NOT NULL,
+    accepted_at  timestamptz,
+    accepted_by  uuid REFERENCES users(id) ON DELETE SET NULL,
+    revoked_at   timestamptz
+);
+CREATE INDEX idx_invitations_company ON invitations(company_id);
+CREATE INDEX idx_invitations_email ON invitations(email);
+
 -- ---------------------------------------------------------------------------
 -- Projects & documents
 -- ---------------------------------------------------------------------------

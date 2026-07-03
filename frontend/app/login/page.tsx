@@ -1,12 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, storeTokens, setCompanyId } from "@/lib/api";
 import { useTheme } from "@/lib/use-theme";
 
+// Only ever follow a same-site relative path (never a scheme or "//host"
+// prefix) — the redirect param is attacker-controllable query input, so an
+// open redirect must be structurally impossible here, not just unlikely.
+function safeRedirect(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
+  return raw;
+}
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
@@ -27,7 +44,7 @@ export default function LoginPage() {
       storeTokens(tok);
       const me = await api.me();
       if (me.organizations[0]) setCompanyId(me.organizations[0].id);
-      router.replace("/dashboard");
+      router.replace(safeRedirect(searchParams.get("redirect")));
     } catch (err: any) {
       setError(err.message || "Failed");
     } finally {
