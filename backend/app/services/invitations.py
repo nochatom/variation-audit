@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.security import hash_password
@@ -57,6 +58,10 @@ class InvitationNotFound(Exception):
 
 class AlreadyMember(Exception):
     """create_invitation() called for an email that's already in this org."""
+
+
+class DuplicateInvitation(Exception):
+    """A non-expired pending invitation for this (company, email) already exists."""
 
 
 def _now() -> datetime:
@@ -125,12 +130,21 @@ def list_pending(session: Session, company_id: uuid.UUID) -> list[Invitation]:
 def create_invitation(session: Session, *, company_id: uuid.UUID, actor: User,
                       email: str, role: MembershipRole = MembershipRole.member,
                       expire_days: int = 7) -> tuple[Invitation, str]:
-    """Create (or resend/refresh) a pending invitation. Never requires the
-    email to already have an account — that's the whole point of this flow.
+    """Create a pending invitation. Never requires the email to already have
+    an account — that's the whole point of this flow.
 
-    If the email already belongs to a member of this org, refuses (nothing to
-    invite). If a pending invitation for this email already exists, it is
-    revoked and replaced (resend semantics), matching GitHub/Linear/Slack.
+    Refuses (AlreadyMember) if the email already belongs to a member of this
+    org. Refuses (DuplicateInvitation) if a still-pending (non-expired)
+    invitation for this email already exists — the admin must revoke it
+    first (DELETE .../invitations/{id}) before re-inviting, rather than this
+    silently resending. A merely *expired* dangling invitation does NOT
+    block re-inviting: it's auto-revoked here so the email is never
+    permanently stuck just because a 7-day-old invite lapsed.
+
+    A DB-level partial unique index (company_id, email WHERE accepted_at IS
+    NULL AND revoked_at IS NULL — migration 0005) backstops this against a
+    race between two concurrent invites for the same email; a violation of
+    that index is caught below and re-raised as DuplicateInvitation too.
     """
     existing_user = _user_by_email(session, email)
     if existing_user is not None:
@@ -138,7 +152,8 @@ def create_invitation(session: Session, *, company_id: uuid.UUID, actor: User,
         if m is not None:
             raise AlreadyMember(email)
 
-    stale = session.execute(
+    now = _now()
+    open_rows = session.execute(
         select(Invitation).where(
             Invitation.company_id == company_id,
             Invitation.email == email,
@@ -146,9 +161,11 @@ def create_invitation(session: Session, *, company_id: uuid.UUID, actor: User,
             Invitation.revoked_at.is_(None),
         )
     ).scalars().all()
-    now = _now()
-    for row in stale:
-        row.revoked_at = now
+    for row in open_rows:
+        if row.expires_at < now:
+            row.revoked_at = now
+        else:
+            raise DuplicateInvitation(email)
 
     secret = secrets.token_urlsafe(32)
     inv = Invitation(
@@ -163,17 +180,27 @@ def create_invitation(session: Session, *, company_id: uuid.UUID, actor: User,
     session.add(inv)
     _audit(session, company_id, actor.id, "invitation.created", inv.id,
            {"email": email, "role": role.value})
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise DuplicateInvitation(email) from None
     return inv, _encode(inv.id, secret)
 
 
 def revoke_invitation(session: Session, *, company_id: uuid.UUID, actor: User,
                       invitation_id: uuid.UUID) -> None:
+    """Revoke a pending OR expired invitation (both are "not yet accepted,
+    still visible in the pending list" from the admin's point of view — an
+    expired one must stay revocable so the admin isn't ever stuck unable to
+    dismiss it or re-invite the same email). Already accepted/revoked
+    invitations can't be revoked again."""
     inv = session.get(Invitation, invitation_id)
     if inv is None or inv.company_id != company_id:
         raise InvitationNotFound(str(invitation_id))
-    if status_of(inv) != "pending":
-        raise InvitationError(f"invitation is {status_of(inv)}, not pending")
+    st = status_of(inv)
+    if st not in ("pending", "expired"):
+        raise InvitationError(f"invitation is {st}, cannot be revoked")
     inv.revoked_at = _now()
     _audit(session, company_id, actor.id, "invitation.revoked", inv.id, None)
     session.commit()

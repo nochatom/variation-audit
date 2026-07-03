@@ -76,10 +76,17 @@ class Settings(BaseSettings):
     #             allows that plus retries while capping parse/disk abuse.
     #   analysis: each request enqueues a multi-minute LLM job with real API
     #             cost; normal usage is a few runs/day, so cap cost abuse.
+    #   invitations: sends real outbound email to an admin-supplied address —
+    #             an authenticated admin account is still a viable spam/abuse
+    #             vector (compromised credentials, or relaying junk mail to
+    #             arbitrary addresses), and SMTP relay reputation is a real
+    #             cost. Bulk team onboarding is a rare, bounded event, not
+    #             everyday traffic, so this is tighter than uploads.
     rate_limit_default: str = "300/minute"
     rate_limit_auth: str = "5/minute"
     rate_limit_uploads: str = "20/minute"
     rate_limit_analysis: str = "10/hour"
+    rate_limit_invitations: str = "20/hour"
     # Multi-worker/multi-instance deployments must share one budget: set this
     # to redis://... so all processes count against the same store. The
     # in-memory default is only correct for a single process.

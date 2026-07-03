@@ -96,6 +96,14 @@ CREATE TABLE invitations (
 );
 CREATE INDEX idx_invitations_company ON invitations(company_id);
 CREATE INDEX idx_invitations_email ON invitations(email);
+-- At most one ACTIVE (not yet accepted/revoked) invitation per (company,
+-- email) — app layer (services/invitations.py:create_invitation) rejects
+-- duplicates before this is ever hit; this is the race-condition backstop.
+-- Can't exclude expired rows here too (index predicates must be immutable,
+-- now() isn't allowed) — the app layer auto-revokes expired dangling rows
+-- before insert instead, so re-inviting after expiry stays possible.
+CREATE UNIQUE INDEX idx_invitations_active_unique ON invitations(company_id, email)
+    WHERE accepted_at IS NULL AND revoked_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- Projects & documents

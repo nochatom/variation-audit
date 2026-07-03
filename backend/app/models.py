@@ -22,6 +22,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -171,6 +172,21 @@ class Invitation(Base):
     """
 
     __tablename__ = "invitations"
+
+    # Partial unique index: at most one *active* (non-accepted, non-revoked)
+    # invitation per (company, email) — backstops app-level duplicate
+    # rejection (services/invitations.py:create_invitation) against a race
+    # between two concurrent invites for the same email. Can't also exclude
+    # expired rows here (index predicates must be immutable — now() isn't
+    # allowed), so the service layer auto-revokes expired dangling rows
+    # before insert to keep this constraint satisfiable.
+    __table_args__ = (
+        Index(
+            "idx_invitations_active_unique", "company_id", "email",
+            unique=True,
+            postgresql_where=text("accepted_at IS NULL AND revoked_at IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = _pk()
     company_id: Mapped[uuid.UUID] = _company_fk()

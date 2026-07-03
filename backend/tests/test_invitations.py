@@ -50,6 +50,13 @@ class FakeMailer:
         self.sent.append(kwargs)
 
 
+class FailingMailer:
+    """Simulates an SMTP/network failure on send."""
+
+    def send_invitation(self, **kwargs):
+        raise ConnectionRefusedError("smtp connection refused")
+
+
 # -- service: create_invitation ----------------------------------------------
 def test_create_invitation_for_unknown_email_succeeds():
     """The core bug fix: no account needs to exist for this email."""
@@ -97,15 +104,91 @@ def test_create_invitation_already_member_raises():
         pass
 
 
-def test_create_invitation_revokes_stale_pending_invite():
-    stale, _ = _fixture_invitation(email="brandnew@firm.com")
+def test_create_invitation_duplicate_pending_raises_instead_of_resending():
+    """A still-pending (non-expired) invitation for the same (org, email)
+    must block a second invite with a clear error, not silently resend."""
+    still_pending, _ = _fixture_invitation(email="brandnew@firm.com")
     session = FakeSession(results=[
-        FakeResult(scalar=None),
-        FakeResult(scalars=[stale]),
+        FakeResult(scalar=None),               # _user_by_email -> no account
+        FakeResult(scalars=[still_pending]),   # one open, non-expired row
     ])
     actor = _user("admin@firm.com")
-    inv.create_invitation(session, company_id=uuid.uuid4(), actor=actor, email="brandnew@firm.com")
-    assert stale.revoked_at is not None
+    try:
+        inv.create_invitation(session, company_id=uuid.uuid4(), actor=actor, email="brandnew@firm.com")
+        assert False, "expected DuplicateInvitation"
+    except inv.DuplicateInvitation:
+        pass
+    assert still_pending.revoked_at is None  # untouched — not silently revoked
+    assert session.commits == 0  # nothing was created
+
+
+def test_create_invitation_auto_revokes_expired_dangling_invite_and_succeeds():
+    """An EXPIRED (but never accepted/revoked) invitation must not
+    permanently block re-inviting the same email — it's garbage-collected
+    on the next invite attempt instead of counting as a duplicate."""
+    expired, _ = _fixture_invitation(email="brandnew@firm.com", expired=True)
+    session = FakeSession(results=[
+        FakeResult(scalar=None),
+        FakeResult(scalars=[expired]),
+    ])
+    actor = _user("admin@firm.com")
+    row, raw = inv.create_invitation(session, company_id=uuid.uuid4(), actor=actor, email="brandnew@firm.com")
+    assert expired.revoked_at is not None  # auto-cleaned
+    assert row.email == "brandnew@firm.com"
+    assert "." in raw
+
+
+# -- service: revoke_invitation -------------------------------------------------
+def test_revoke_invitation_allows_pending():
+    row, _ = _fixture_invitation()
+    session = FakeSession(get_obj=row)
+    actor = _user("admin@firm.com")
+    inv.revoke_invitation(session, company_id=row.company_id, actor=actor, invitation_id=row.id)
+    assert row.revoked_at is not None
+
+
+def test_revoke_invitation_allows_expired():
+    """An admin must be able to dismiss/revoke an expired-but-dangling
+    invitation (it still shows in the pending list) — not just strictly
+    "pending" ones."""
+    row, _ = _fixture_invitation(expired=True)
+    session = FakeSession(get_obj=row)
+    actor = _user("admin@firm.com")
+    inv.revoke_invitation(session, company_id=row.company_id, actor=actor, invitation_id=row.id)
+    assert row.revoked_at is not None
+
+
+def test_revoke_invitation_rejects_already_accepted():
+    row, _ = _fixture_invitation(accepted=True)
+    session = FakeSession(get_obj=row)
+    actor = _user("admin@firm.com")
+    try:
+        inv.revoke_invitation(session, company_id=row.company_id, actor=actor, invitation_id=row.id)
+        assert False, "expected InvitationError"
+    except inv.InvitationError:
+        pass
+
+
+def test_revoke_invitation_rejects_already_revoked():
+    row, _ = _fixture_invitation(revoked=True)
+    session = FakeSession(get_obj=row)
+    actor = _user("admin@firm.com")
+    try:
+        inv.revoke_invitation(session, company_id=row.company_id, actor=actor, invitation_id=row.id)
+        assert False, "expected InvitationError"
+    except inv.InvitationError:
+        pass
+
+
+def test_revoke_invitation_wrong_org_404s():
+    row, _ = _fixture_invitation()
+    session = FakeSession(get_obj=row)
+    actor = _user("admin@firm.com")
+    try:
+        inv.revoke_invitation(session, company_id=uuid.uuid4(), actor=actor, invitation_id=row.id)
+        assert False, "expected InvitationNotFound"
+    except inv.InvitationNotFound:
+        pass
 
 
 # -- service: get_invitation_by_token ------------------------------------------
@@ -285,6 +368,7 @@ def test_create_invitation_endpoint_new_email_never_404s():
     assert body["email"] == "brandnew@nosuchaccount.com"
     assert body["status"] == "pending"
     assert body["accept_url"] and "/accept-invite/" in body["accept_url"]
+    assert body["email_sent"] is True
     assert len(mailer.sent) == 1
     assert mailer.sent[0]["to_email"] == "brandnew@nosuchaccount.com"
 
@@ -304,6 +388,50 @@ def test_create_invitation_endpoint_already_member_returns_409():
         f"/orgs/{cid}/invitations", json={"email": "existing@firm.com"},
     )
     assert resp.status_code == 409
+
+
+def test_create_invitation_endpoint_duplicate_returns_409_with_clear_message():
+    """Direct regression test for the audit finding: re-inviting an email
+    that already has a pending invitation must be rejected with a clear
+    validation error, not silently create a second active invitation."""
+    cid = uuid.uuid4()
+    admin = _user("admin@firm.com")
+    admin_membership = Membership(id=uuid.uuid4(), user_id=admin.id, company_id=cid, role=MembershipRole.admin)
+    still_pending, _ = _fixture_invitation(company_id=cid, email="dup@firm.com")
+    session = FakeSession(results=[
+        FakeResult(scalar=admin_membership),
+        FakeResult(scalar=None),                    # _user_by_email -> no account
+        FakeResult(scalars=[still_pending]),         # already an active invite
+    ])
+    resp = _client(session, admin, FakeMailer()).post(
+        f"/orgs/{cid}/invitations", json={"email": "dup@firm.com"},
+    )
+    assert resp.status_code == 409
+    assert "active invitation already exists" in resp.json()["detail"].lower()
+
+
+def test_create_invitation_endpoint_email_failure_surfaces_email_sent_false():
+    """Direct regression test for the audit finding: a mail delivery failure
+    must not be silently swallowed — it must be visible in the response
+    (email_sent=False) while the invitation itself still succeeds, since the
+    accept_url copy-link fallback still works without email."""
+    cid = uuid.uuid4()
+    admin = _user("admin@firm.com")
+    admin_membership = Membership(id=uuid.uuid4(), user_id=admin.id, company_id=cid, role=MembershipRole.admin)
+    org = Organization(id=cid, name="Acme Constructions")
+    session = FakeSession(results=[
+        FakeResult(scalar=admin_membership),
+        FakeResult(scalar=None),
+        FakeResult(scalars=[]),
+        FakeResult(scalar=org),
+    ])
+    resp = _client(session, admin, FailingMailer()).post(
+        f"/orgs/{cid}/invitations", json={"email": "brandnew@nosuchaccount.com"},
+    )
+    assert resp.status_code == 201  # invitation creation itself must not fail
+    body = resp.json()
+    assert body["email_sent"] is False
+    assert body["accept_url"]  # copy-link fallback still present
 
 
 def test_list_invitations_endpoint():

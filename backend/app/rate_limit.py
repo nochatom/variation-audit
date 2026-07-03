@@ -33,6 +33,7 @@ _s = get_settings()
 AUTH_LIMIT = _s.rate_limit_auth            # login / signup / refresh (token-minting)
 UPLOAD_LIMIT = _s.rate_limit_uploads       # contract + the 4 document-register uploads
 ANALYSIS_LIMIT = _s.rate_limit_analysis    # enqueues a costly multi-minute LLM job
+INVITATION_LIMIT = _s.rate_limit_invitations  # sends real outbound email
 
 limiter = Limiter(
     key_func=get_remote_address,

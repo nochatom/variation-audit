@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, InvitationOut, MemberOut } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
-import { PageHeader, Card, Chip, ErrorNote, Spinner, EmptyState } from "@/components/ui";
+import { PageHeader, Card, Chip, ErrorNote, InfoNote, Spinner, EmptyState } from "@/components/ui";
 
 export default function TeamPage() {
   const { companyId, isAdmin, me } = useApp();
   const [members, setMembers] = useState<MemberOut[] | null>(null);
   const [invitations, setInvitations] = useState<InvitationOut[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
   const [busy, setBusy] = useState(false);
@@ -30,8 +31,12 @@ export default function TeamPage() {
     if (!companyId || !trimmedEmail) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
-      await api.createInvitation(companyId, trimmedEmail, role);
+      const inv = await api.createInvitation(companyId, trimmedEmail, role);
+      if (inv.email_sent === false) {
+        setNotice(`Invitation created, but the email couldn't be sent to ${trimmedEmail} — use "Copy link" below to share it directly.`);
+      }
       setEmail("");
       await load();
     } catch (e: any) {
@@ -91,6 +96,7 @@ export default function TeamPage() {
     <div>
       <PageHeader title="Team" description="Manage members, roles, and invitations for your organization." />
       {error && <ErrorNote message={error} />}
+      {notice && <div className="mb-4"><InfoNote>{notice}</InfoNote></div>}
 
       <Card className="mb-6 p-5">
         <form onSubmit={invite} className="flex flex-wrap items-end gap-3">

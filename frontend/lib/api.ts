@@ -338,6 +338,7 @@ export type InvitationOut = {
   created_at: string;
   expires_at: string;
   accept_url: string | null;
+  email_sent: boolean | null;
 };
 export type InvitationPreview = { email: string; org_name: string; role: string; account_exists: boolean };
 export type AuditEntry = {
