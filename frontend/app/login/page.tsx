@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, storeTokens, setCompanyId } from "@/lib/api";
 import { useTheme } from "@/lib/use-theme";
@@ -116,10 +115,6 @@ export default function LoginPage() {
               {busy ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}
             </button>
           </form>
-        </div>
-
-        <div className="mt-5 text-center text-[12px] text-ip-ink-3">
-          <Link href="/landing" className="hover:text-ip-ink">← Back to site</Link>
         </div>
       </div>
     </main>

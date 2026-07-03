@@ -1,7 +1,8 @@
 import type { Config } from "tailwindcss";
 
 // Two token sets share this config:
-//  • dark Linear tokens (canvas/surface/ink/primary) — marketing landing only (fixed, no toggle)
+//  • dark Linear tokens (canvas/surface/ink/primary) — root layout body / global-error
+//    fallback only (fixed, no toggle; each page sets its own bg via ip-* tokens)
 //  • "ip" = Ironclad Precision — the enterprise application + Login/Sign Up.
 //    ip-* colors resolve from CSS custom properties (see globals.css :root / .dark)
 //    so the same utility classes (bg-ip-card, text-ip-ink, etc.) render light or
@@ -12,7 +13,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ---- dark (landing — fixed, not theme-toggled) ----
+        // ---- dark (root body / global-error fallback, fixed) ----
         canvas: "#010102",
         surface: { 1: "#0f1011", 2: "#141516", 3: "#18191a", 4: "#191a1b" },
         hairline: { DEFAULT: "#23252a", strong: "#34343a" },

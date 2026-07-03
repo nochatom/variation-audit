@@ -79,7 +79,7 @@ export default function SentryExamplePage() {
         )}
 
         <div className="mt-6 text-[12px] text-ip-ink-3">
-          <Link href="/landing" className="hover:text-ip-ink">← Back to site</Link>
+          <Link href="/dashboard" className="hover:text-ip-ink">← Back to app</Link>
         </div>
       </div>
     </main>
