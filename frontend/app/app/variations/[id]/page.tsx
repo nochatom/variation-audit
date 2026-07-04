@@ -51,7 +51,7 @@ export default function VariationDetailsPage() {
 
   return (
     <div>
-      <div className="mb-2"><Link href="/variations" className="text-[13px] text-ip-ink-3 hover:text-ip-ink">← Variations</Link></div>
+      <div className="mb-2"><Link href="/app/variations" className="text-[13px] text-ip-ink-3 hover:text-ip-ink">← Variations</Link></div>
       {error && <ErrorNote message={error} />}
       {!v && !error && <Spinner />}
 

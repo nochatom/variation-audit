@@ -18,7 +18,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
         <p className="mt-2 text-sm text-ip-ink-2">{error?.message || "An unexpected error occurred. Please try again."}</p>
         <div className="mt-6 flex justify-center gap-2">
           <button onClick={reset} className="btn-navy">Try again</button>
-          <Link href="/dashboard" className="btn-ghost">Go to Dashboard</Link>
+          <Link href="/app/dashboard" className="btn-ghost">Go to Dashboard</Link>
         </div>
       </div>
     </main>

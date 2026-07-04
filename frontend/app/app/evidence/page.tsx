@@ -77,7 +77,7 @@ export default function EvidenceLibraryPage() {
                 <h2 className="text-sm font-bold text-ip-ink">{current?.title ?? "Evidence"}</h2>
                 {current && <div className="text-[12px] text-ip-ink-3">{current.projectName}</div>}
               </div>
-              {current && <Link href={`/variations/${current.id}`} className="text-[13px] text-ip-ink-3 hover:text-ip-ink">Open variation →</Link>}
+              {current && <Link href={`/app/variations/${current.id}`} className="text-[13px] text-ip-ink-3 hover:text-ip-ink">Open variation →</Link>}
             </div>
 
             {!evidence ? (

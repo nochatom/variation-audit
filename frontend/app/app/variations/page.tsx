@@ -84,8 +84,8 @@ function VariationsInner() {
             <tbody>
               {rows.map((v) => (
                 <tr key={v.id} className="ip-row hover:bg-ip-card-2">
-                  <td className="px-4 py-3 text-sm font-semibold text-ip-ink"><Link href={`/variations/${v.id}`} className="hover:text-ip-navy">{v.title}</Link></td>
-                  <td className="px-4 py-3 text-sm"><Link href={`/projects/${v.projectId}`} className="text-ip-ink-2 hover:text-ip-navy">{v.projectName}</Link></td>
+                  <td className="px-4 py-3 text-sm font-semibold text-ip-ink"><Link href={`/app/variations/${v.id}`} className="hover:text-ip-navy">{v.title}</Link></td>
+                  <td className="px-4 py-3 text-sm"><Link href={`/app/projects/${v.projectId}`} className="text-ip-ink-2 hover:text-ip-navy">{v.projectName}</Link></td>
                   <td className="px-4 py-3"><ConfidenceBar score={v.confidence_score} /></td>
                   <td className="px-4 py-3 text-sm"><TimeBarFlag risk={v.time_bar_risk} /></td>
                   <td className="px-4 py-3 text-sm font-bold tabular-nums text-ip-ink">{aud(v.amount)}</td>

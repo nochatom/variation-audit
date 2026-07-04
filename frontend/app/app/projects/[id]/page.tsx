@@ -69,7 +69,7 @@ export default function ProjectDetails() {
     setLifecycleBusy(true);
     try {
       await api.deleteProject(projectId);
-      router.replace("/projects");
+      router.replace("/app/projects");
     } catch (e: any) {
       setError(e.message);
       setLifecycleBusy(false);
@@ -97,14 +97,14 @@ export default function ProjectDetails() {
 
   return (
     <div>
-      <div className="mb-2"><Link href="/projects" className="text-[13px] text-ip-ink-3 hover:text-ip-ink">← Projects</Link></div>
+      <div className="mb-2"><Link href="/app/projects" className="text-[13px] text-ip-ink-3 hover:text-ip-ink">← Projects</Link></div>
       <PageHeader
         title={dash?.project.name || "Project"}
         description={dash ? `${dash.project.state || "—"} · ${dash.project.status} · ${dash.document_count} documents` : undefined}
         actions={
           <>
             {archived && <Chip>archived</Chip>}
-            <Link href={`/documents?project=${projectId}`} className="btn-ghost">Documents</Link>
+            <Link href={`/app/documents?project=${projectId}`} className="btn-ghost">Documents</Link>
             <button onClick={downloadPdf} className="btn-ghost">Report PDF</button>
             <button onClick={analyze} className="btn-orange">Run analysis</button>
             {proj && (
@@ -138,7 +138,7 @@ export default function ProjectDetails() {
             <Card className="overflow-hidden lg:col-span-2">
               <div className="flex items-center justify-between border-b border-ip-line px-4 py-3">
                 <h2 className="text-sm font-bold text-ip-ink">Pending variations</h2>
-                <Link href={`/variations?project=${projectId}`} className="text-[13px] text-ip-ink-3 hover:text-ip-ink">Open in Variations →</Link>
+                <Link href={`/app/variations?project=${projectId}`} className="text-[13px] text-ip-ink-3 hover:text-ip-ink">Open in Variations →</Link>
               </div>
               {pending.length === 0 ? (
                 <div className="px-4 py-10 text-center text-[13px] text-ip-ink-3">No pending variations. Run analysis to detect more.</div>
@@ -148,7 +148,7 @@ export default function ProjectDetails() {
                   <tbody>
                     {pending.slice(0, 8).map((v) => (
                       <tr key={v.id} className="ip-row">
-                        <td className="px-4 py-3 text-sm font-semibold text-ip-ink"><Link href={`/variations/${v.id}`} className="hover:text-ip-navy">{v.title}</Link></td>
+                        <td className="px-4 py-3 text-sm font-semibold text-ip-ink"><Link href={`/app/variations/${v.id}`} className="hover:text-ip-navy">{v.title}</Link></td>
                         <td className="px-4 py-3"><ConfidenceBar score={v.confidence_score} /></td>
                         <td className="px-4 py-3 text-sm"><TimeBarFlag risk={v.time_bar_risk} /></td>
                         <td className="px-4 py-3 text-right text-sm font-bold tabular-nums text-ip-ink">{aud(v.amount)}</td>

@@ -76,7 +76,7 @@ export default function AcceptInvitePage() {
       const res = await api.acceptInvitation(token);
       setCompanyId(res.company_id);
       setStage({ kind: "done" });
-      router.replace("/dashboard");
+      router.replace("/app/dashboard");
     } catch (e: any) {
       setError(e.message || "Failed to accept invitation");
     } finally {
@@ -94,7 +94,7 @@ export default function AcceptInvitePage() {
       const me = await api.me();
       if (me.organizations[0]) setCompanyId(me.organizations[0].id);
       setStage({ kind: "done" });
-      router.replace("/dashboard");
+      router.replace("/app/dashboard");
     } catch (e: any) {
       setError(e.message || "Failed to accept invitation");
     } finally {

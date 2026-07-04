@@ -25,7 +25,7 @@ export default function DashboardPage() {
       <PageHeader
         title="Dashboard"
         description="Recovery position across the organization. Jump into a workflow to act."
-        actions={<Link href="/projects" className="btn-orange">New project</Link>}
+        actions={<Link href="/app/projects" className="btn-orange">New project</Link>}
       />
 
       {error && <ErrorNote message={error} />}
@@ -44,10 +44,10 @@ export default function DashboardPage() {
             <div className="lg:col-span-2">
               <h2 className="ip-label mb-3">Workflows</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <NavCard href="/variations" title="Review variations" body="Approve or reject detected variations across projects." meta={`${t!.pending} pending`} />
-                <NavCard href="/documents" title="Ingest documents" body="Upload RFIs, site instructions and meeting minutes." meta="RFI · SI · Minutes" />
-                <NavCard href="/analysis" title="Run analysis" body="Detect unclaimed variations from the project record." meta="AI detection" />
-                <NavCard href="/reports" title="Generate reports" body="Export a review-ready recovery report per project." meta="PDF export" />
+                <NavCard href="/app/variations" title="Review variations" body="Approve or reject detected variations across projects." meta={`${t!.pending} pending`} />
+                <NavCard href="/app/documents" title="Ingest documents" body="Upload RFIs, site instructions and meeting minutes." meta="RFI · SI · Minutes" />
+                <NavCard href="/app/analysis" title="Run analysis" body="Detect unclaimed variations from the project record." meta="AI detection" />
+                <NavCard href="/app/reports" title="Generate reports" body="Export a review-ready recovery report per project." meta="PDF export" />
               </div>
             </div>
 
@@ -56,7 +56,7 @@ export default function DashboardPage() {
               <Card className="divide-y divide-ip-line">
                 {attention.length === 0 && <div className="px-4 py-8 text-center text-[13px] text-ip-ink-3">Nothing needs attention.</div>}
                 {attention.slice(0, 6).map((p) => (
-                  <Link key={p.id} href={`/projects/${p.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-ip-card-2">
+                  <Link key={p.id} href={`/app/projects/${p.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-ip-card-2">
                     <div className="min-w-0">
                       <div className="truncate text-[13px] font-semibold text-ip-ink">{p.name}</div>
                       <div className="text-[12px] text-ip-ink-3">{p.counts.pending} pending</div>

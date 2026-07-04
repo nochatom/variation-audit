@@ -16,17 +16,17 @@ const I = (d: string) => (
 );
 
 const NAV: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: I("M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10") },
-  { label: "Projects", href: "/projects", icon: I("M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z") },
-  { label: "Documents", href: "/documents", icon: I("M7 3h7l5 5v13H5a1 1 0 01-1-1V4a1 1 0 011-1zM14 3v5h5M8 13h8M8 17h6") },
-  { label: "Analysis", href: "/analysis", icon: I("M4 19V5M4 19h16M8 16V9M12 16v-4M16 16V7M20 16v-2") },
-  { label: "Variations", href: "/variations", icon: I("M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11") },
-  { label: "Evidence", href: "/evidence", icon: I("M10 3H4a1 1 0 00-1 1v16a1 1 0 001 1h16a1 1 0 001-1v-6M14 3h7v7M21 3l-9 9") },
-  { label: "Reports", href: "/reports", icon: I("M3 3v18h18M7 14l3-3 3 3 5-6") },
-  { label: "Audit", href: "/audit", icon: I("M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"), adminOnly: true },
-  { label: "Notifications", href: "/notifications", icon: I("M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0") },
-  { label: "Team", href: "/team", icon: I("M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8"), adminOnly: true },
-  { label: "Settings", href: "/settings", icon: I("M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.9 2 2 0 11-2.8 2.8 1.7 1.7 0 00-2.9 1.2 2 2 0 11-4 0 1.7 1.7 0 00-2.9-1.2 2 2 0 11-2.8-2.8A1.7 1.7 0 003 12.6a2 2 0 010-1.2 1.7 1.7 0 00-1.2-2.9 2 2 0 112.8-2.8 1.7 1.7 0 002.9-1.2 2 2 0 014 0 1.7 1.7 0 002.9 1.2 2 2 0 112.8 2.8 1.7 1.7 0 00.4 2.4z") },
+  { label: "Dashboard", href: "/app/dashboard", icon: I("M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10") },
+  { label: "Projects", href: "/app/projects", icon: I("M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z") },
+  { label: "Documents", href: "/app/documents", icon: I("M7 3h7l5 5v13H5a1 1 0 01-1-1V4a1 1 0 011-1zM14 3v5h5M8 13h8M8 17h6") },
+  { label: "Analysis", href: "/app/analysis", icon: I("M4 19V5M4 19h16M8 16V9M12 16v-4M16 16V7M20 16v-2") },
+  { label: "Variations", href: "/app/variations", icon: I("M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11") },
+  { label: "Evidence", href: "/app/evidence", icon: I("M10 3H4a1 1 0 00-1 1v16a1 1 0 001 1h16a1 1 0 001-1v-6M14 3h7v7M21 3l-9 9") },
+  { label: "Reports", href: "/app/reports", icon: I("M3 3v18h18M7 14l3-3 3 3 5-6") },
+  { label: "Audit", href: "/app/audit", icon: I("M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"), adminOnly: true },
+  { label: "Notifications", href: "/app/notifications", icon: I("M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0") },
+  { label: "Team", href: "/app/team", icon: I("M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8"), adminOnly: true },
+  { label: "Settings", href: "/app/settings", icon: I("M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.9 2 2 0 11-2.8 2.8 1.7 1.7 0 00-2.9 1.2 2 2 0 11-4 0 1.7 1.7 0 00-2.9-1.2 2 2 0 11-2.8-2.8A1.7 1.7 0 003 12.6a2 2 0 010-1.2 1.7 1.7 0 00-1.2-2.9 2 2 0 112.8-2.8 1.7 1.7 0 002.9-1.2 2 2 0 014 0 1.7 1.7 0 002.9 1.2 2 2 0 112.8 2.8 1.7 1.7 0 00.4 2.4z") },
 ];
 
 function navTitle(pathname: string): string {
@@ -136,7 +136,7 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" /></svg>
             )}
           </button>
-          <Link href="/notifications" className="relative rounded-md p-1.5 text-ip-ink-2 hover:bg-ip-card-2" aria-label="Notifications">
+          <Link href="/app/notifications" className="relative rounded-md p-1.5 text-ip-ink-2 hover:bg-ip-card-2" aria-label="Notifications">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-5 w-5"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" /></svg>
             {unread > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-ip-orange ring-2 ring-ip-card" />}
           </Link>
@@ -154,7 +154,7 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
                   <div className="truncate text-[13px] font-semibold text-ip-ink">{me?.email}</div>
                   <div className="text-[11px] text-ip-ink-3">{org?.name}</div>
                 </div>
-                <Link href="/settings" onClick={() => setMenu(false)} className="block rounded-md px-3 py-2 text-[13px] text-ip-ink-2 hover:bg-ip-card-2 hover:text-ip-ink">
+                <Link href="/app/settings" onClick={() => setMenu(false)} className="block rounded-md px-3 py-2 text-[13px] text-ip-ink-2 hover:bg-ip-card-2 hover:text-ip-ink">
                   Settings
                 </Link>
                 <button onClick={logout} className="block w-full rounded-md px-3 py-2 text-left text-[13px] text-ip-ink-2 hover:bg-ip-card-2 hover:text-ip-ink">

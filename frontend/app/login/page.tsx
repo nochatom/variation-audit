@@ -9,7 +9,7 @@ import { useTheme } from "@/lib/use-theme";
 // prefix) — the redirect param is attacker-controllable query input, so an
 // open redirect must be structurally impossible here, not just unlikely.
 function safeRedirect(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/app/dashboard";
   return raw;
 }
 

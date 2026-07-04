@@ -61,7 +61,7 @@ export default function AnalysisPage() {
               {rows.map((d) => (
                 <tr key={d.project.id} className="ip-row">
                   <td className="px-4 py-3 text-sm font-semibold text-ip-ink">
-                    <Link href={`/projects/${d.project.id}`} className="hover:text-ip-navy">{d.project.name}</Link>
+                    <Link href={`/app/projects/${d.project.id}`} className="hover:text-ip-navy">{d.project.name}</Link>
                   </td>
                   <td className="px-4 py-3 text-sm tabular-nums text-ip-ink-2">{d.document_count}</td>
                   <td className="px-4 py-3 text-sm">{d.latest_job ? <Chip tone={statusTone(d.latest_job.status)}>{d.latest_job.status}</Chip> : <span className="text-ip-ink-3">never run</span>}</td>

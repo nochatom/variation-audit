@@ -159,7 +159,7 @@ export default function ProjectsPage() {
       {tab === "active" && data && data.projects.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {data.projects.map((p) => (
-            <Link key={p.id} href={`/projects/${p.id}`} className="ip-card group p-5 transition-colors hover:bg-ip-card-2">
+            <Link key={p.id} href={`/app/projects/${p.id}`} className="ip-card group p-5 transition-colors hover:bg-ip-card-2">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="min-w-0 flex-1 truncate font-bold tracking-tight text-ip-ink">{p.name}</h3>
                 <div className="flex shrink-0 items-center gap-1.5">
@@ -197,7 +197,7 @@ export default function ProjectsPage() {
           {archived.map((p) => (
             <div key={p.id} className="ip-card p-5 opacity-90">
               <div className="flex items-start justify-between gap-2">
-                <Link href={`/projects/${p.id}`} className="min-w-0 flex-1 truncate font-bold tracking-tight text-ip-ink hover:text-ip-navy">{p.name}</Link>
+                <Link href={`/app/projects/${p.id}`} className="min-w-0 flex-1 truncate font-bold tracking-tight text-ip-ink hover:text-ip-navy">{p.name}</Link>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <Chip>archived</Chip>
                   <ProjectActionsMenu
