@@ -12,7 +12,10 @@ from app.models import (
     Evidence,
     Membership,
     MembershipRole,
+    PlanTier,
     SourceType,
+    Subscription,
+    SubscriptionStatus,
     User,
     Variation,
 )
@@ -91,9 +94,27 @@ def test_org_audit_requires_admin():
 def test_org_audit_admin_ok():
     user, cid = _user(), uuid.uuid4()
     admin = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid, role=MembershipRole.admin)
-    session = FakeSession(results=[FakeResult(scalar=admin), FakeResult(scalars=[_audit(cid)])])
+    sub = Subscription(id=uuid.uuid4(), company_id=cid, plan=PlanTier.pro,
+                       status=SubscriptionStatus.active)
+    session = FakeSession(results=[
+        FakeResult(scalar=admin),
+        FakeResult(scalar=sub),           # enforce_feature("audit_log") -> get_or_create_subscription
+        FakeResult(scalars=[_audit(cid)]),
+    ])
     resp = _client(session, user).get(f"/audit?company_id={cid}")
     assert resp.status_code == 200 and resp.json()[0]["action"] == "review.confirmed"
+
+
+def test_org_audit_403_for_free_plan():
+    """The org-wide audit trail is a paid-plan feature (.25) — Free orgs get
+    a clear 403 rather than seeing an empty (or real) audit trail."""
+    user, cid = _user(), uuid.uuid4()
+    admin = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid, role=MembershipRole.admin)
+    sub = Subscription(id=uuid.uuid4(), company_id=cid, plan=PlanTier.free,
+                       status=SubscriptionStatus.active)
+    session = FakeSession(results=[FakeResult(scalar=admin), FakeResult(scalar=sub)])
+    resp = _client(session, user).get(f"/audit?company_id={cid}")
+    assert resp.status_code == 403
 
 
 def test_variation_evidence_endpoint():

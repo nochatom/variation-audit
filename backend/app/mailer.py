@@ -44,6 +44,25 @@ class SmtpMailer:
                 smtp.login(self.username, self.password)
             smtp.send_message(msg)
 
+    def send_password_reset(self, *, to_email: str, reset_url: str) -> None:
+        import smtplib
+
+        msg = EmailMessage()
+        msg["Subject"] = "Reset your VariationIQ password"
+        msg["From"] = self.from_addr
+        msg["To"] = to_email
+        msg.set_content(
+            f"Reset your VariationIQ password:\n{reset_url}\n\n"
+            f"This link expires in 1 hour. If you didn't request this, you can ignore it — "
+            f"your password won't change unless you click the link and set a new one."
+        )
+        with smtplib.SMTP(self.host, self.port, timeout=10) as smtp:
+            if self.use_tls:
+                smtp.starttls()
+            if self.username and self.password:
+                smtp.login(self.username, self.password)
+            smtp.send_message(msg)
+
 
 class ConsoleMailer:
     """Logs the invitation instead of sending it. Dev/test fallback when no
@@ -59,6 +78,16 @@ class ConsoleMailer:
                 "org_name": org_name,
                 "inviter_name": inviter_name,
                 "accept_url": accept_url,
+            },
+        )
+
+    def send_password_reset(self, *, to_email: str, reset_url: str) -> None:
+        security_logger.info(
+            "password reset email (console mailer — no VA_SMTP_HOST configured)",
+            extra={
+                "event": "password_reset_email_console",
+                "to_email": to_email,
+                "reset_url": reset_url,
             },
         )
 

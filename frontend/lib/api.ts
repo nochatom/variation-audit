@@ -10,20 +10,33 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 const TOKEN_KEY = "va_token";
 const REFRESH_KEY = "va_refresh_token";
 const COMPANY_KEY = "va_company_id";
+const REMEMBER_KEY = "va_remember";
+
+// "Remember me" unchecked -> tokens live in sessionStorage (cleared when the
+// browser closes) instead of localStorage. The flag itself is always in
+// localStorage (it's not sensitive) so every tab/reload agrees on which
+// storage to read from.
+function rememberEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem(REMEMBER_KEY) !== "0";
+}
+function tokenStorage(): Storage {
+  return rememberEnabled() ? window.localStorage : window.sessionStorage;
+}
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_KEY);
+  return tokenStorage().getItem(TOKEN_KEY);
 }
 export function setToken(t: string) {
-  window.localStorage.setItem(TOKEN_KEY, t);
+  tokenStorage().setItem(TOKEN_KEY, t);
 }
 export function getRefreshToken(): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(REFRESH_KEY);
+  return tokenStorage().getItem(REFRESH_KEY);
 }
 export function setRefreshToken(t: string) {
-  window.localStorage.setItem(REFRESH_KEY, t);
+  tokenStorage().setItem(REFRESH_KEY, t);
 }
 export function getCompanyId(): string | null {
   if (typeof window === "undefined") return null;
@@ -32,8 +45,14 @@ export function getCompanyId(): string | null {
 export function setCompanyId(id: string) {
   window.localStorage.setItem(COMPANY_KEY, id);
 }
-/** Store both halves of a token pair (login/signup/refresh response). */
-export function storeTokens(t: { access_token: string; refresh_token: string }) {
+/** Store both halves of a token pair (login/signup/refresh/invitation
+ * response). `remember` only matters on the initial sign-in (it decides
+ * localStorage vs sessionStorage); omit it on refresh so the original choice
+ * sticks for the rest of the session. */
+export function storeTokens(t: { access_token: string; refresh_token: string }, remember?: boolean) {
+  if (remember !== undefined) {
+    window.localStorage.setItem(REMEMBER_KEY, remember ? "1" : "0");
+  }
   setToken(t.access_token);
   setRefreshToken(t.refresh_token);
 }
@@ -42,6 +61,9 @@ export function logout() {
   window.localStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(REFRESH_KEY);
   window.localStorage.removeItem(COMPANY_KEY);
+  window.localStorage.removeItem(REMEMBER_KEY);
+  window.sessionStorage.removeItem(TOKEN_KEY);
+  window.sessionStorage.removeItem(REFRESH_KEY);
 }
 
 export class ApiError extends Error {
@@ -53,7 +75,7 @@ export class ApiError extends Error {
 }
 
 // Endpoints that must never trigger the auto-refresh-and-retry loop below.
-const NO_REFRESH_PATHS = ["/auth/login", "/auth/signup", "/auth/refresh"];
+const NO_REFRESH_PATHS = ["/auth/login", "/auth/signup", "/auth/refresh", "/auth/google"];
 
 // De-dupes concurrent refresh attempts: if several requests 401 at once (a
 // just-expired access token), only ONE /auth/refresh call should fire. Every
@@ -96,7 +118,7 @@ async function parseErrorDetail(res: Response): Promise<string> {
   return detail;
 }
 
-async function request<T>(path: string, opts: RequestInit = {}, _retried = false): Promise<T> {
+export async function request<T>(path: string, opts: RequestInit = {}, _retried = false): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -162,6 +184,19 @@ export const api = {
       body: JSON.stringify({ email, password, org_name, full_name }),
     }),
   me: () => request<Me>("/auth/me"),
+  /** Exchanges a Supabase Google-login session for this app's own token pair
+   * (.25) — an additional entry point into the existing session system, not
+   * a separate one. Same TokenResponse shape as login/signup. */
+  googleLogin: (supabaseAccessToken: string) =>
+    request<TokenResponse>("/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ supabase_access_token: supabaseAccessToken }),
+    }),
+  /** Always resolves (backend responds 204 regardless of whether the email exists). */
+  forgotPassword: (email: string) =>
+    request<void>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+  resetPassword: (token: string, new_password: string) =>
+    request<void>("/auth/reset-password", { method: "POST", body: JSON.stringify({ token, new_password }) }),
 
   /** Revoke this session's refresh token server-side, then clear local storage. */
   async logout(): Promise<void> {

@@ -94,6 +94,26 @@ class BasisQuality(str, enum.Enum):
     none = "none"
 
 
+class PlanTier(str, enum.Enum):
+    free = "free"
+    pro = "pro"
+    enterprise = "enterprise"
+
+
+class SubscriptionStatus(str, enum.Enum):
+    active = "active"
+    trialing = "trialing"
+    past_due = "past_due"     # payment failed; inside the grace period, access unaffected
+    suspended = "suspended"   # grace period expired with no successful payment
+    canceled = "canceled"
+
+
+class InvoiceStatus(str, enum.Enum):
+    paid = "paid"
+    open = "open"
+    void = "void"
+
+
 # --------------------------------------------------------------------------
 # Reusable column helpers
 # --------------------------------------------------------------------------
@@ -135,7 +155,11 @@ class User(Base):
     id: Mapped[uuid.UUID] = _pk()
     email: Mapped[str] = mapped_column(CITEXT, nullable=False, unique=True)
     full_name: Mapped[str | None] = mapped_column(Text)
-    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    # Nullable: an SSO-only account (e.g. a future Supabase-authenticated
+    # user) genuinely has no local password — this is not
+    # optional-but-usually-set, some real users will have NULL here
+    # permanently until/unless they set one.
+    password_hash: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
@@ -230,6 +254,123 @@ class RefreshToken(Base):
     user: Mapped[User] = relationship()
 
 
+class PasswordResetToken(Base):
+    """A short-lived, single-use password reset token. Same opaque-token-hash
+    shape as RefreshToken/Invitation — only the SHA-256 hash is ever stored.
+    used_at (not a boolean) records when it was consumed, for audit."""
+
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[uuid.UUID] = _pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    created_at: Mapped[datetime] = _created()
+    expires_at: Mapped[datetime] = mapped_column(nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column()
+
+    user: Mapped[User] = relationship()
+
+
+# --------------------------------------------------------------------------
+# Billing & subscriptions (.23)
+# --------------------------------------------------------------------------
+class Subscription(Base):
+    """One row per organization — created lazily (Free/active) the first time
+    billing is viewed, so no signup-flow change was needed. `stripe_customer_id`
+    /`stripe_subscription_id` are populated once a Stripe Checkout session for
+    that org completes (see app/billing/provider.py, services/billing.py); both
+    stay NULL for an org that has never gone through Checkout (the common case
+    today, since no plan currently has a live Stripe Price configured)."""
+
+    __tablename__ = "subscriptions"
+
+    id: Mapped[uuid.UUID] = _pk()
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False, unique=True, index=True,
+    )
+    plan: Mapped[PlanTier] = mapped_column(nullable=False, default=PlanTier.free)
+    status: Mapped[SubscriptionStatus] = mapped_column(nullable=False, default=SubscriptionStatus.active)
+    current_period_end: Mapped[datetime | None] = mapped_column()
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    stripe_customer_id: Mapped[str | None] = mapped_column(Text)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(Text)
+    # Set when a recurring payment fails (invoice.payment_failed) — status
+    # becomes past_due and access is NOT cut immediately; a lazy check
+    # (services/billing.py:_apply_grace_period_expiry) flips status to
+    # suspended once this passes, and clears both on a subsequent
+    # invoice.paid. NULL whenever status isn't past_due.
+    grace_period_expires_at: Mapped[datetime | None] = mapped_column()
+    # NULL = use PLAN_LIMITS[plan]["seats"] (the common case). Set only for a
+    # negotiated deal that overrides the plan default — seat-based billing
+    # groundwork (.24), not yet wired to a per-seat Stripe price.
+    included_seats: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
+
+    organization: Mapped[Organization] = relationship()
+
+
+class StripeEvent(Base):
+    """Records every Stripe webhook event id we've processed (.24) — the
+    idempotency guard for services/billing.py:handle_webhook_event. Stripe
+    retries webhook deliveries on anything other than a 2xx response, and
+    the same event can genuinely be delivered more than once even without a
+    failure; `id` (Stripe's own event id, globally unique) as the primary
+    key means a concurrent duplicate delivery hits a unique-violation on
+    insert rather than double-applying the event."""
+
+    __tablename__ = "stripe_events"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    processed_at: Mapped[datetime] = _created()
+
+
+class PaymentMethod(Base):
+    """A card on file, mirrored from Stripe (never holds a raw card number —
+    only the last4/brand/expiry Stripe returns, plus its own payment method
+    id). Card capture itself always happens inside Stripe Checkout/Billing
+    Portal, never on a form we host — raw card data must never reach our
+    backend."""
+
+    __tablename__ = "payment_methods"
+
+    id: Mapped[uuid.UUID] = _pk()
+    company_id: Mapped[uuid.UUID] = _company_fk()
+    brand: Mapped[str] = mapped_column(Text, nullable=False)
+    last4: Mapped[str] = mapped_column(String(4), nullable=False)
+    exp_month: Mapped[int] = mapped_column(Integer, nullable=False)
+    exp_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    stripe_payment_method_id: Mapped[str | None] = mapped_column(Text, unique=True)
+    created_at: Mapped[datetime] = _created()
+
+
+class Invoice(Base):
+    """Mirrored from Stripe's `invoice.paid`/`invoice.finalized` webhook
+    events (see services/billing.py:handle_webhook_event) — this table is
+    never written to directly from a user-facing request; it exists so
+    invoice history renders instantly without a live Stripe API call, and
+    survives if Stripe is briefly unreachable."""
+
+    __tablename__ = "invoices"
+
+    id: Mapped[uuid.UUID] = _pk()
+    company_id: Mapped[uuid.UUID] = _company_fk()
+    plan: Mapped[PlanTier] = mapped_column(nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="AUD")
+    status: Mapped[InvoiceStatus] = mapped_column(nullable=False, default=InvoiceStatus.paid)
+    period_start: Mapped[datetime] = mapped_column(nullable=False)
+    period_end: Mapped[datetime] = mapped_column(nullable=False)
+    stripe_invoice_id: Mapped[str | None] = mapped_column(Text, unique=True)
+    hosted_invoice_url: Mapped[str | None] = mapped_column(Text)  # Stripe-hosted PDF link
+    created_at: Mapped[datetime] = _created()
+
+
 # --------------------------------------------------------------------------
 # Projects & documents
 # --------------------------------------------------------------------------
@@ -273,6 +414,11 @@ class Document(Base):
     source: Mapped[str | None] = mapped_column(Text)
     storage_key: Mapped[str] = mapped_column(Text, nullable=False)  # S3 ap-southeast-2 key
     content_hash: Mapped[str | None] = mapped_column(Text)
+    # Nullable: rows created before this column existed have no recorded
+    # size. Used only for plan storage-limit enforcement (services/billing.py)
+    # — treated as 0 when NULL, which undercounts pre-existing docs rather
+    # than overcounting, the safer direction for a limit check.
+    size_bytes: Mapped[int | None] = mapped_column()
     created_at: Mapped[datetime] = _created()
 
     project: Mapped[Project] = relationship(back_populates="documents")

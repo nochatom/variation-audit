@@ -25,6 +25,9 @@ class FakeResult:
     def scalar_one_or_none(self):
         return self._scalar
 
+    def scalar_one(self):
+        return self._scalar
+
     def scalars(self):
         return FakeScalars(self._scalars)
 
@@ -62,6 +65,9 @@ class FakeSession:
 
     def commit(self):
         self.commits += 1
+
+    def rollback(self):
+        pass
 
     def refresh(self, _obj):
         self.refreshes += 1

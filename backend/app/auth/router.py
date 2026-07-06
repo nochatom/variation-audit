@@ -8,11 +8,16 @@ from sqlalchemy.orm import Session
 
 from app.auth import refresh_tokens, service
 from app.auth.deps import get_current_user, get_db
-from app.auth.tokens import create_access_token
+from app.auth.supabase_jwt import SupabaseNotConfigured, verify_supabase_token
+from app.auth.tokens import TokenError, create_access_token
+from app.config import get_settings
 from app.logging_config import security_logger
+from app.mailer import get_mailer
 from app.models import Membership, Organization, User
 from app.rate_limit import AUTH_LIMIT as AUTH_RATE_LIMIT
 from app.rate_limit import limiter
+from app.services import oauth_google
+from app.services import password_reset as password_reset_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -52,6 +57,23 @@ class RefreshResponse(BaseModel):
 
 class LogoutRequest(BaseModel):
     refresh_token: str
+
+
+class GoogleLoginRequest(BaseModel):
+    # An access token obtained from a Supabase client-side OAuth session
+    # (supabase.auth.signInWithOAuth({provider: "google"})) — verified here
+    # via JWKS, then discarded; only this app's own TokenResponse is used
+    # afterward. See app/auth/supabase_jwt.py.
+    supabase_access_token: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 class OrgOut(BaseModel):
@@ -98,6 +120,77 @@ def login(request: Request, response: Response, req: LoginRequest,
     security_logger.info("login succeeded",
                          extra={"event": "login_succeeded", "user_id": str(user.id), "email": user.email})
     return _token_for(session, user)
+
+
+@router.post("/google", response_model=TokenResponse)
+@limiter.limit(AUTH_RATE_LIMIT)
+def google_login(request: Request, response: Response, req: GoogleLoginRequest,
+                 session: Session = Depends(get_db)) -> TokenResponse:
+    """Google sign-in via Supabase (.25) — an ADDITIONAL entry point into the
+    existing session system, not a replacement for it. The Supabase token is
+    verified via JWKS and then exchanged for this app's own access+refresh
+    token pair (the same TokenResponse shape signup/login already return);
+    nothing downstream of this endpoint needs to know Google was involved.
+    """
+    try:
+        claims = verify_supabase_token(req.supabase_access_token)
+    except SupabaseNotConfigured:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Google login is not configured")
+    except TokenError:
+        security_logger.warning("google login rejected: invalid supabase token",
+                                extra={"event": "google_login_invalid_token"})
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid or expired Google session")
+
+    try:
+        user, is_new = oauth_google.login_or_signup_with_google(session, claims)
+    except oauth_google.UnverifiedEmail:
+        security_logger.warning("google login rejected: unverified email",
+                                extra={"event": "google_login_unverified_email"})
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Google account email is not verified")
+
+    if not user.is_active:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "account is disabled")
+
+    security_logger.info("google login succeeded", extra={
+        "event": "google_signup_succeeded" if is_new else "google_login_succeeded",
+        "user_id": str(user.id), "email": user.email,
+    })
+    return _token_for(session, user)
+
+
+@router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(AUTH_RATE_LIMIT)
+def forgot_password(request: Request, response: Response, req: ForgotPasswordRequest,
+                    session: Session = Depends(get_db), mailer=Depends(get_mailer)) -> None:
+    """Always 204 regardless of whether the email exists — no
+    user-enumeration signal via response shape or timing-sensitive content."""
+    raw_token = password_reset_service.create_reset_token(
+        session, email=req.email, expire_minutes=get_settings().password_reset_expire_minutes,
+    )
+    if raw_token is not None:
+        base = get_settings().frontend_base_url.rstrip("/")
+        reset_url = f"{base}/reset-password/{raw_token}"
+        try:
+            mailer.send_password_reset(to_email=req.email, reset_url=reset_url)
+        except Exception:  # noqa: BLE001 — best-effort; response is 204 either way
+            security_logger.warning("password reset email send failed",
+                                    extra={"event": "password_reset_email_failed"})
+    security_logger.info("forgot-password requested", extra={"event": "forgot_password_requested"})
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(AUTH_RATE_LIMIT)
+def reset_password(request: Request, response: Response, req: ResetPasswordRequest,
+                   session: Session = Depends(get_db)) -> None:
+    try:
+        user = password_reset_service.reset_password(
+            session, raw_token=req.token, new_password=req.new_password,
+        )
+    except password_reset_service.ResetTokenError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid or expired reset link")
+    security_logger.info("password reset completed", extra={
+        "event": "password_reset_completed", "user_id": str(user.id),
+    })
 
 
 @router.get("/me", response_model=MeResponse)

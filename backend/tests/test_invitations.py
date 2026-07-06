@@ -13,7 +13,16 @@ from app.auth.deps import get_current_user, get_db
 from app.auth.security import hash_password
 from app.main import app
 from app.mailer import get_mailer
-from app.models import Invitation, Membership, MembershipRole, Organization, User
+from app.models import (
+    Invitation,
+    Membership,
+    MembershipRole,
+    Organization,
+    PlanTier,
+    Subscription,
+    SubscriptionStatus,
+    User,
+)
 from app.services import invitations as inv
 from tests.fakes import FakeResult, FakeSession
 
@@ -24,6 +33,15 @@ def _now():
 
 def _user(email="invitee@firm.com"):
     return User(id=uuid.uuid4(), email=email, password_hash="x", is_active=True)
+
+
+def _free_sub(company_id):
+    """A Free-plan subscription with room under its seat limit — used to
+    satisfy the seat-limit check the invitation-create endpoint now runs
+    before delegating to inv_service.create_invitation (see
+    app/routers/invitations.py, app/services/billing.py:enforce_seat_limit)."""
+    return Subscription(id=uuid.uuid4(), company_id=company_id, plan=PlanTier.free,
+                        status=SubscriptionStatus.active)
 
 
 def _fixture_invitation(*, company_id=None, email="invitee@firm.com",
@@ -352,7 +370,9 @@ def test_create_invitation_endpoint_new_email_never_404s():
     org = Organization(id=cid, name="Acme Constructions")
     session = FakeSession(
         results=[
-            FakeResult(scalar=admin_membership),  # require_admin
+            FakeResult(scalar=admin_membership),        # require_admin
+            FakeResult(scalar=_free_sub(cid)),           # enforce_seat_limit: get_or_create_subscription
+            FakeResult(scalars=[admin_membership]),      # enforce_seat_limit: seat count
             FakeResult(scalar=None),               # _user_by_email -> no account
             FakeResult(scalars=[]),                # no stale invite
             FakeResult(scalar=org),                # _org_name lookup
@@ -381,6 +401,8 @@ def test_create_invitation_endpoint_already_member_returns_409():
     existing_membership = Membership(id=uuid.uuid4(), user_id=existing.id, company_id=cid, role=MembershipRole.member)
     session = FakeSession(results=[
         FakeResult(scalar=admin_membership),
+        FakeResult(scalar=_free_sub(cid)),           # enforce_seat_limit: get_or_create_subscription
+        FakeResult(scalars=[admin_membership]),      # enforce_seat_limit: seat count
         FakeResult(scalar=existing),
         FakeResult(scalar=existing_membership),
     ])
@@ -400,6 +422,8 @@ def test_create_invitation_endpoint_duplicate_returns_409_with_clear_message():
     still_pending, _ = _fixture_invitation(company_id=cid, email="dup@firm.com")
     session = FakeSession(results=[
         FakeResult(scalar=admin_membership),
+        FakeResult(scalar=_free_sub(cid)),           # enforce_seat_limit: get_or_create_subscription
+        FakeResult(scalars=[admin_membership]),      # enforce_seat_limit: seat count
         FakeResult(scalar=None),                    # _user_by_email -> no account
         FakeResult(scalars=[still_pending]),         # already an active invite
     ])
@@ -421,6 +445,8 @@ def test_create_invitation_endpoint_email_failure_surfaces_email_sent_false():
     org = Organization(id=cid, name="Acme Constructions")
     session = FakeSession(results=[
         FakeResult(scalar=admin_membership),
+        FakeResult(scalar=_free_sub(cid)),           # enforce_seat_limit: get_or_create_subscription
+        FakeResult(scalars=[admin_membership]),      # enforce_seat_limit: seat count
         FakeResult(scalar=None),
         FakeResult(scalars=[]),
         FakeResult(scalar=org),

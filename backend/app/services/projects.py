@@ -163,6 +163,7 @@ def add_document(
         doc_timestamp=_parse_dt(occurred_at),
         source=source,
         storage_key=storage_key,
+        size_bytes=len(content.encode("utf-8")),  # plan storage-limit enforcement (.24)
     )
     session.add(document)
     session.commit()

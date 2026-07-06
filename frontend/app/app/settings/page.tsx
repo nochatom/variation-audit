@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useApp } from "@/lib/app-context";
 import { PageHeader, Card, Chip } from "@/components/ui";
 
 export default function SettingsPage() {
-  const { me, companyId, setCompany, logout } = useApp();
+  const { me, companyId, isAdmin, setCompany, logout } = useApp();
 
   return (
     <div>
@@ -40,6 +41,16 @@ export default function SettingsPage() {
           </ul>
         </Card>
       </div>
+
+      {isAdmin && (
+        <Card className="mt-6 flex items-center justify-between p-5">
+          <div>
+            <h2 className="text-sm font-bold text-ip-ink">Billing &amp; subscription</h2>
+            <p className="mt-1 text-[13px] text-ip-ink-2">Manage your organization&apos;s plan, usage, and payment details.</p>
+          </div>
+          <Link href="/app/settings/billing" className="btn-navy">Manage billing</Link>
+        </Card>
+      )}
 
       <Card className="mt-6 flex items-center justify-between p-5">
         <div>

@@ -153,10 +153,17 @@ def _project_client_n(n: int, contract_text: str | None = None):
     return TestClient(app), project
 
 
-def test_uploads_rate_limited_after_20_per_minute():
+def test_uploads_rate_limited_after_20_per_minute(monkeypatch):
+    from app.routers import projects as projects_router
+
     limiter.reset()
     try:
         client, project = _project_client_n(25)
+        # This test is about per-IP rate limiting, not plan usage limits —
+        # bypass the (separately unit-tested) plan-limit checks so 20
+        # uploads in a minute don't trip the Free plan's document/storage caps.
+        monkeypatch.setattr(projects_router.billing_service, "enforce_document_limit", lambda *a, **k: None)
+        monkeypatch.setattr(projects_router.billing_service, "enforce_storage_limit", lambda *a, **k: None)
         csv = b"rfi_number,subject,question\nR1,Subject,Question\n"
         statuses = [
             client.post(f"/projects/{project.id}/rfis",
@@ -182,6 +189,10 @@ def test_analysis_rate_limited_after_10_per_hour(monkeypatch):
             projects_router.jobs, "enqueue_analysis",
             lambda *a, **k: SimpleNamespace(id=uuid.uuid4(), status=JobStatus.queued),
         )
+        # This test is about per-IP rate limiting, not plan usage limits —
+        # bypass the (separately unit-tested) plan-limit check so 10 calls
+        # in an hour don't trip the Free plan's 5-analysis-run/month cap.
+        monkeypatch.setattr(projects_router.billing_service, "enforce_analysis_limit", lambda *a, **k: None)
         statuses = [client.post(f"/projects/{project.id}/analyze").status_code for _ in range(11)]
         assert statuses[:10] == [202] * 10
         assert statuses[10] == 429

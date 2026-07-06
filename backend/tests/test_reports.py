@@ -12,10 +12,13 @@ from app.models import (
     ConfidenceBand,
     Evidence,
     Membership,
+    PlanTier,
     Project,
     ProjectStatus,
     ReviewStatus,
     SourceType,
+    Subscription,
+    SubscriptionStatus,
     User,
     ValueEstimate,
     Variation,
@@ -161,12 +164,15 @@ def test_report_pdf_endpoint_content_type():
     cid = uuid.uuid4()
     project = _project(cid)
     membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid)
+    sub = Subscription(id=uuid.uuid4(), company_id=cid, plan=PlanTier.pro,
+                       status=SubscriptionStatus.active)
     v, ve, ev = _variation(cid, project.id, 4200)
     job = AnalysisJob(id=uuid.uuid4(), company_id=cid, project_id=project.id,
                       request_id=uuid.uuid4())
     job.baseline = {"inclusions": [], "exclusions": []}
     session = FakeSession(results=[
         FakeResult(scalar=membership),
+        FakeResult(scalar=sub),           # enforce_feature("exports") -> get_or_create_subscription
         FakeResult(scalar=job),
         FakeResult(scalars=[v]),
         FakeResult(scalars=[ve]),
@@ -176,3 +182,20 @@ def test_report_pdf_endpoint_content_type():
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/pdf"
     assert resp.content[:5] == b"%PDF-"
+
+
+def test_report_pdf_endpoint_403_for_free_plan():
+    """PDF export is a paid-plan feature (.25) — a Free-plan org gets a clear
+    403, not a silently-successful export."""
+    user = _user()
+    cid = uuid.uuid4()
+    project = _project(cid)
+    membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid)
+    sub = Subscription(id=uuid.uuid4(), company_id=cid, plan=PlanTier.free,
+                       status=SubscriptionStatus.active)
+    session = FakeSession(results=[
+        FakeResult(scalar=membership),
+        FakeResult(scalar=sub),
+    ], get_obj=project)
+    resp = _client(session, user).get(f"/projects/{project.id}/report.pdf")
+    assert resp.status_code == 403

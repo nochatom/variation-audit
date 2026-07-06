@@ -30,6 +30,7 @@ from app.models import Invitation, MembershipRole, User
 from app.rate_limit import AUTH_LIMIT as AUTH_RATE_LIMIT
 from app.rate_limit import INVITATION_LIMIT
 from app.rate_limit import limiter
+from app.services import billing as billing_service
 from app.services import invitations as inv_service
 
 org_router = APIRouter(prefix="/orgs/{company_id}/invitations", tags=["invitations"])
@@ -108,6 +109,11 @@ def create_invitation(request: Request, response: Response, company_id: uuid.UUI
                       session: Session = Depends(get_db),
                       mailer=Depends(get_mailer)) -> InvitationOut:
     require_admin(session, user, company_id)
+    try:
+        billing_service.enforce_seat_limit(session, company_id)
+    except billing_service.PlanLimitExceeded as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED,
+                            {"error_code": exc.code, "message": str(exc)})
     try:
         inv, raw_token = inv_service.create_invitation(
             session, company_id=company_id, actor=user, email=req.email, role=req.role,

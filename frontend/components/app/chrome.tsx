@@ -29,7 +29,17 @@ const NAV: NavItem[] = [
   { label: "Settings", href: "/app/settings", icon: I("M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.9 2 2 0 11-2.8 2.8 1.7 1.7 0 00-2.9 1.2 2 2 0 11-4 0 1.7 1.7 0 00-2.9-1.2 2 2 0 11-2.8-2.8A1.7 1.7 0 003 12.6a2 2 0 010-1.2 1.7 1.7 0 00-1.2-2.9 2 2 0 112.8-2.8 1.7 1.7 0 002.9-1.2 2 2 0 014 0 1.7 1.7 0 002.9 1.2 2 2 0 112.8 2.8 1.7 1.7 0 00.4 2.4z") },
 ];
 
+// Nested settings routes (not their own NAV entry) get a more specific
+// topbar title than the generic "Settings" match below — otherwise the
+// topbar disagrees with the page's own <h1> (e.g. "Settings" shown while
+// viewing "Billing & subscription").
+const NESTED_TITLES: { prefix: string; title: string }[] = [
+  { prefix: "/app/settings/billing", title: "Billing & subscription" },
+];
+
 function navTitle(pathname: string): string {
+  const nested = NESTED_TITLES.find((n) => pathname === n.prefix || pathname.startsWith(n.prefix + "/"));
+  if (nested) return nested.title;
   const item = NAV.find((n) => pathname === n.href || pathname.startsWith(n.href + "/"));
   return item?.label ?? "VariationIQ";
 }
@@ -54,10 +64,14 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   const body = (
     <div className="flex h-full flex-col bg-ip-card">
-      <div className="flex h-14 items-center gap-2.5 border-b border-ip-line px-5">
+      <Link
+        href="/"
+        className="flex h-14 items-center gap-2.5 border-b border-ip-line px-5 cursor-pointer transition hover:opacity-80"
+        aria-label="VariationIQ home"
+      >
         <span className="grid h-7 w-7 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
         <span className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</span>
-      </div>
+      </Link>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
         {items.map((n) => {

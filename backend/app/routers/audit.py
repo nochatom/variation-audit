@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import ensure_member, get_current_user, get_db, require_admin
 from app.models import User, Variation
 from app.services import audit as audit_service
+from app.services import billing as billing_service
 
 router = APIRouter(tags=["audit"])
 
@@ -62,6 +63,10 @@ def org_audit(company_id: uuid.UUID, entity_type: str | None = None, limit: int 
               user: User = Depends(get_current_user),
               session: Session = Depends(get_db)) -> list[AuditOut]:
     require_admin(session, user, company_id)
+    try:
+        billing_service.enforce_feature(session, company_id, "audit_log")
+    except billing_service.FeatureNotAvailable as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
     rows = audit_service.list_audit(session, company_id, entity_type=entity_type, limit=limit)
     return [_audit_out(a) for a in rows]
 

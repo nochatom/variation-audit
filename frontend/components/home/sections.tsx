@@ -14,6 +14,7 @@ export function Nav() {
           <a href="#preview" className="transition-colors hover:text-ip-ink">Product</a>
           <a href="#how" className="transition-colors hover:text-ip-ink">How it works</a>
           <a href="#capabilities" className="transition-colors hover:text-ip-ink">Capabilities</a>
+          <Link href="/pricing" className="transition-colors hover:text-ip-ink">Pricing</Link>
         </nav>
         <div className="flex items-center gap-2">
           <Link href="/login" className="rounded-md px-3 py-1.5 text-sm font-medium text-ip-ink-2 transition-colors hover:text-ip-ink">
@@ -90,7 +91,7 @@ function ScreenshotPreview() {
             <span className="h-2.5 w-2.5 rounded-full bg-ip-line-strong" />
           </div>
           <div className="rounded-md border border-ip-line bg-ip-bg px-3 py-1 text-[11px] text-ip-ink-3">
-            app.variationiq.com.au
+            https://variationiq.com
           </div>
           <span className="w-10" />
         </div>
@@ -325,16 +326,76 @@ export function CtaBanner() {
 }
 
 /* ---------------- footer ---------------- */
+const FOOTER_COLUMNS: { label: string; links: { title: string; href: string }[] }[] = [
+  {
+    label: "Product",
+    links: [
+      { title: "Product preview", href: "#preview" },
+      { title: "How it works", href: "#how" },
+      { title: "Capabilities", href: "#capabilities" },
+      { title: "Pricing", href: "/pricing" },
+    ],
+  },
+  {
+    label: "Company",
+    links: [{ title: "About", href: "/about" }],
+  },
+  {
+    label: "Legal",
+    links: [
+      { title: "Privacy Policy", href: "/privacy" },
+      { title: "Terms of Service", href: "/terms" },
+    ],
+  },
+];
+
 export function SiteFooter() {
   return (
     <footer className="relative border-t border-ip-line">
-      <div className="mx-auto flex max-w-[1440px] flex-col items-start justify-between gap-4 px-6 py-10 sm:flex-row sm:items-center sm:px-12 lg:px-16">
-        <div className="flex items-center gap-2.5">
-          <span className="grid h-6 w-6 place-items-center rounded-sm bg-ip-navy-fill text-xs font-bold text-white">V</span>
-          <span className="text-sm font-semibold tracking-tight text-ip-ink">VariationIQ</span>
-          <span className="hidden text-[12px] text-ip-ink-3 sm:inline">· AI revenue recovery for Australian construction</span>
+      <div className="mx-auto max-w-[1440px] px-6 py-12 sm:px-12 lg:px-16">
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <div className="col-span-2 sm:col-span-1">
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-7 w-7 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
+              <span className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</span>
+            </div>
+            <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-ip-ink-3">
+              AI revenue recovery for Australian construction — surfacing unclaimed variations from your project
+              records before the time bar closes.
+            </p>
+          </div>
+
+          {FOOTER_COLUMNS.map((col) => (
+            <div key={col.label}>
+              <h3 className="text-[12px] font-semibold uppercase tracking-wide text-ip-ink-3">{col.label}</h3>
+              <ul className="mt-3 space-y-2.5">
+                {col.links.map((link) => (
+                  <li key={link.title}>
+                    <a href={link.href} className="text-[13px] text-ip-ink-2 transition-colors hover:text-ip-ink">
+                      {link.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          <div>
+            <h3 className="text-[12px] font-semibold uppercase tracking-wide text-ip-ink-3">Contact</h3>
+            <ul className="mt-3 space-y-2.5">
+              <li>
+                <a href="mailto:hello@variationiq.com" className="text-[13px] text-ip-ink-2 transition-colors hover:text-ip-ink">
+                  hello@variationiq.com
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
-        <p className="text-[12px] text-ip-ink-3">© 2026 VariationIQ · Estimates only — not legal advice.</p>
+
+        <div className="mt-10 flex flex-col gap-2 border-t border-ip-line pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[12px] text-ip-ink-3">© {new Date().getFullYear()} VariationIQ · Estimates only — not legal advice.</p>
+          <p className="text-[12px] text-ip-ink-3">Sydney, Australia</p>
+        </div>
       </div>
     </footer>
   );

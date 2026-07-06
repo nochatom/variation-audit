@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import ensure_member, get_current_user, get_db
 from app.models import Project, ReviewStatus, User
 from app.reports_pdf import render_report_pdf
+from app.services import billing as billing_service
 from app.services import reports as report_service
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["reports"])
@@ -36,6 +37,10 @@ def report_pdf(project_id: uuid.UUID, review_status: ReviewStatus | None = Revie
                user: User = Depends(get_current_user),
                session: Session = Depends(get_db)) -> Response:
     project = _load(session, user, project_id)
+    try:
+        billing_service.enforce_feature(session, project.company_id, "exports")
+    except billing_service.FeatureNotAvailable as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
     data = report_service.build_report(session, company_id=project.company_id,
                                        project=project, status=review_status)
     pdf = render_report_pdf(data)

@@ -44,7 +44,9 @@ CREATE TABLE users (
     id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     email          citext NOT NULL UNIQUE,
     full_name      text,
-    password_hash  text NOT NULL,
+    -- Nullable: an SSO-only account (e.g. a future Supabase-authenticated
+    -- user) genuinely has no local password.
+    password_hash  text,
     is_active      boolean NOT NULL DEFAULT true,
     created_at     timestamptz NOT NULL DEFAULT now(),
     updated_at     timestamptz NOT NULL DEFAULT now()
@@ -76,6 +78,19 @@ CREATE TABLE refresh_tokens (
 );
 CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
 
+-- Short-lived, single-use password reset tokens (.22 auth). Same
+-- opaque-token-hash shape as refresh_tokens/invitations — only the SHA-256
+-- hash is ever stored. used_at (not a boolean) records when consumed.
+CREATE TABLE password_reset_tokens (
+    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash   text NOT NULL UNIQUE,
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    expires_at   timestamptz NOT NULL,
+    used_at      timestamptz
+);
+CREATE INDEX idx_password_reset_tokens_user ON password_reset_tokens(user_id);
+
 -- Organization invitations (.19a). Email-addressed, not user-addressed: a row
 -- is created whether or not the email already belongs to a User. Status is
 -- derived from accepted_at/revoked_at/expires_at (same convention as
@@ -104,6 +119,69 @@ CREATE INDEX idx_invitations_email ON invitations(email);
 -- before insert instead, so re-inviting after expiry stays possible.
 CREATE UNIQUE INDEX idx_invitations_active_unique ON invitations(company_id, email)
     WHERE accepted_at IS NULL AND revoked_at IS NULL;
+
+-- ---------------------------------------------------------------------------
+-- Billing & subscriptions (.23). subscriptions is created lazily (Free/
+-- active) the first time an org's billing page is viewed. payment_methods
+-- and invoices are mirrored from Stripe webhook events — never written from
+-- a user-facing request, and never hold a raw card number.
+-- ---------------------------------------------------------------------------
+CREATE TABLE subscriptions (
+    id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id             uuid NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
+    plan                   text NOT NULL DEFAULT 'free',
+    status                 text NOT NULL DEFAULT 'active',
+    current_period_end     timestamptz,
+    cancel_at_period_end   boolean NOT NULL DEFAULT false,
+    stripe_customer_id     text,
+    stripe_subscription_id text,
+    -- Grace period (.24): set when a recurring payment fails; a lazy check
+    -- flips status to 'suspended' once this passes, cleared on next
+    -- invoice.paid. included_seats NULL = use the plan default (seat-based
+    -- billing groundwork, not yet wired to a per-seat Stripe price).
+    grace_period_expires_at timestamptz,
+    included_seats         integer,
+    created_at             timestamptz NOT NULL DEFAULT now(),
+    updated_at             timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_subscriptions_company ON subscriptions(company_id);
+
+-- Webhook idempotency ledger (.24): Stripe's own event id as PK means a
+-- concurrent duplicate delivery hits a unique-violation on insert rather
+-- than double-applying the event.
+CREATE TABLE stripe_events (
+    id            text PRIMARY KEY,
+    event_type    text NOT NULL,
+    processed_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE payment_methods (
+    id                        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id                uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    brand                     text NOT NULL,
+    last4                     text NOT NULL,
+    exp_month                 integer NOT NULL,
+    exp_year                  integer NOT NULL,
+    is_default                boolean NOT NULL DEFAULT true,
+    stripe_payment_method_id  text UNIQUE,
+    created_at                timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_payment_methods_company ON payment_methods(company_id);
+
+CREATE TABLE invoices (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id          uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    plan                text NOT NULL,
+    amount              numeric(10,2) NOT NULL,
+    currency            text NOT NULL DEFAULT 'AUD',
+    status              text NOT NULL DEFAULT 'paid',
+    period_start        timestamptz NOT NULL,
+    period_end          timestamptz NOT NULL,
+    stripe_invoice_id   text UNIQUE,
+    hosted_invoice_url  text,
+    created_at          timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_invoices_company ON invoices(company_id, created_at);
 
 -- ---------------------------------------------------------------------------
 -- Projects & documents
@@ -136,6 +214,7 @@ CREATE TABLE documents (
     source        text,                                         -- email thread / file / system
     storage_key   text NOT NULL,                                -- S3 ap-southeast-2 object key
     content_hash  text,                                         -- dedup / integrity
+    size_bytes    integer,                                      -- plan storage-limit enforcement (.24); NULL = unknown, treated as 0
     created_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_documents_project ON documents(project_id);

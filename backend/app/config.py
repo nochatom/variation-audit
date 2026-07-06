@@ -52,6 +52,43 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     smtp_from: str = "VariationIQ <noreply@variationiq.example>"
 
+    password_reset_expire_minutes: int = 60
+
+    # Supabase Auth — used ONLY as an additional Google-login entry point
+    # (see app/auth/supabase_jwt.py, app/services/oauth_google.py). The
+    # existing email/password + JWT + refresh-token system is untouched and
+    # remains the sole session mechanism: a successful Google sign-in via
+    # Supabase is exchanged for this app's own token pair, never used
+    # directly as a session. Unset -> POST /auth/google reports 503, same
+    # "not configured" pattern as VA_STRIPE_SECRET_KEY.
+    supabase_url: str | None = None
+    supabase_jwt_aud: str = "authenticated"
+
+    # Billing (.23). Unset stripe_secret_key -> NullBillingProvider: the
+    # billing UI still renders (subscription defaults to Free/active, usage
+    # is always real), but checkout/portal actions report "not configured"
+    # instead of fabricating a payment flow (see app/billing/provider.py).
+    # Price IDs are per-plan and deliberately have no default — a plan with
+    # no configured price cannot be self-serve-purchased until product/
+    # pricing sets one, rather than silently using a wrong/placeholder price.
+    stripe_secret_key: str | None = None
+    stripe_webhook_secret: str | None = None
+    # Monthly price IDs (existing fields, kept as-is for backward compat).
+    stripe_price_pro: str | None = None
+    stripe_price_enterprise: str | None = None
+    # Annual price IDs (.25) — additive; monthly checkout keeps working
+    # unchanged when these are unset. Enterprise has no self-serve annual
+    # price (Contact Sales handles custom/annual terms directly).
+    stripe_price_pro_annual: str | None = None
+    # Seat-overage price (.25) — a metered/per-unit price billed for seats
+    # beyond a paid plan's included count. Unset -> overage seats are simply
+    # not billed (enforce_seat_limit falls back to a hard block instead).
+    stripe_price_seat_overage: str | None = None
+    # Grace period (.24): days a subscription stays `past_due` (access
+    # unaffected) after a recurring payment fails before lazily flipping to
+    # `suspended`. Cleared immediately on the next successful payment.
+    billing_grace_period_days: int = 7
+
     # Auth (.2) — REQUIRED, no insecure default. Set VA_JWT_SECRET (32+ random
     # bytes, e.g. `openssl rand -hex 32`) in every environment, including local
     # dev (.env, git-ignored) and tests (see tests/conftest.py).
@@ -82,11 +119,16 @@ class Settings(BaseSettings):
     #             arbitrary addresses), and SMTP relay reputation is a real
     #             cost. Bulk team onboarding is a rare, bounded event, not
     #             everyday traffic, so this is tighter than uploads.
+    #   billing:  checkout/portal/cancel/resume each mint a real Stripe
+    #             session or mutate a subscription — money-adjacent actions
+    #             an admin account (or a compromised one) shouldn't be able
+    #             to hammer, same category as auth/invitations above.
     rate_limit_default: str = "300/minute"
     rate_limit_auth: str = "5/minute"
     rate_limit_uploads: str = "20/minute"
     rate_limit_analysis: str = "10/hour"
     rate_limit_invitations: str = "20/hour"
+    rate_limit_billing: str = "10/minute"
     # Multi-worker/multi-instance deployments must share one budget: set this
     # to redis://... so all processes count against the same store. The
     # in-memory default is only correct for a single process.

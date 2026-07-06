@@ -34,6 +34,7 @@ AUTH_LIMIT = _s.rate_limit_auth            # login / signup / refresh (token-min
 UPLOAD_LIMIT = _s.rate_limit_uploads       # contract + the 4 document-register uploads
 ANALYSIS_LIMIT = _s.rate_limit_analysis    # enqueues a costly multi-minute LLM job
 INVITATION_LIMIT = _s.rate_limit_invitations  # sends real outbound email
+BILLING_LIMIT = _s.rate_limit_billing      # checkout/portal/cancel/resume (Stripe session/mutation)
 
 limiter = Limiter(
     key_func=get_remote_address,

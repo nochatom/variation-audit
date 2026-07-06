@@ -269,6 +269,51 @@ def accept_for_existing_user(session: Session, *, raw_token: str, user: User) ->
     return membership
 
 
+def accept_pending_invitations_for_email(session: Session, *, user: User, email: str,
+                                         via: str = "direct") -> list[Membership]:
+    """Accept every still-pending invitation addressed to `email` on behalf
+    of `user` (callers must already have verified `user`'s email matches —
+    e.g. only after a trusted identity provider confirms it).
+
+    Used by the Google-login path (.25): a first-time Google sign-in for an
+    address that already has a pending invitation joins the inviting org(s)
+    instead of getting a stray brand-new Organization — the same end state
+    as using the invitation link, just via a different front door. Returns
+    an empty list (no commit) if there's nothing pending, so callers can
+    fall back to their own "no invitation — create a new org" logic.
+    """
+    now = _now()
+    pending = session.execute(
+        select(Invitation).where(
+            Invitation.email == email,
+            Invitation.accepted_at.is_(None),
+            Invitation.revoked_at.is_(None),
+            Invitation.expires_at >= now,
+        )
+    ).scalars().all()
+    if not pending:
+        return []
+
+    memberships: list[Membership] = []
+    for inv in pending:
+        existing = _membership(session, inv.company_id, user.id)
+        if existing is not None:
+            inv.accepted_at = now
+            inv.accepted_by = user.id
+            _audit(session, inv.company_id, user.id, "invitation.accepted", inv.id, {"via": via})
+            memberships.append(existing)
+            continue
+        membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=inv.company_id, role=inv.role)
+        session.add(membership)
+        inv.accepted_at = now
+        inv.accepted_by = user.id
+        _audit(session, inv.company_id, user.id, "invitation.accepted", inv.id,
+              {"role": inv.role.value, "via": via})
+        memberships.append(membership)
+    session.commit()
+    return memberships
+
+
 def register_and_accept(session: Session, *, raw_token: str, password: str,
                         full_name: str | None) -> tuple[User, Membership]:
     """Accept by creating a brand-new account for the invited email (no

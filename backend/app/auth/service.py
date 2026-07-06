@@ -54,6 +54,10 @@ def authenticate(session: Session, *, email: str, password: str) -> User | None:
     user = _user_by_email(session, email)
     if user is None or not user.is_active:
         return None
+    # An OAuth-only account (see OAuthIdentity) has no password to check
+    # against — fail closed rather than passing None into verify_password.
+    if user.password_hash is None:
+        return None
     if not verify_password(password, user.password_hash):
         return None
     return user

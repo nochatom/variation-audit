@@ -67,6 +67,15 @@ def test_authenticate_success_and_failure():
     assert service.authenticate(bad, email="x@y.co", password="wrong") is None
 
 
+def test_authenticate_fails_closed_for_passwordless_account():
+    """An account with no local password (e.g. provisioned via a future SSO
+    integration) must never authenticate via the password endpoint — this
+    must fail closed, not crash or fall through to a truthy comparison."""
+    user = User(id=uuid.uuid4(), email="sso@y.co", password_hash=None, is_active=True)
+    session = FakeSession(results=[FakeResult(scalar=user)])
+    assert service.authenticate(session, email="sso@y.co", password="anything") is None
+
+
 # -- endpoints (TestClient + get_db override) ------------------------------
 def _client_with(session) -> TestClient:
     def _override_db():

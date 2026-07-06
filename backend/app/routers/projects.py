@@ -12,6 +12,7 @@ from app import parsing
 from app.auth.deps import ensure_member, get_current_user, get_db, require_admin
 from app.models import Membership, Project, ProjectStatus, SourceType, User
 from app.rate_limit import ANALYSIS_LIMIT, UPLOAD_LIMIT, limiter
+from app.services import billing as billing_service
 from app.services import jobs
 from app.services import projects as project_service
 from app.storage import build_loader, get_store
@@ -97,6 +98,11 @@ def _out(p) -> ProjectOut:
 def create_project(req: CreateProjectRequest, user: User = Depends(get_current_user),
                    session: Session = Depends(get_db)) -> ProjectOut:
     ensure_member(session, user, req.company_id)
+    try:
+        billing_service.enforce_project_limit(session, req.company_id)
+    except billing_service.PlanLimitExceeded as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED,
+                            {"error_code": exc.code, "message": str(exc)})
     project = project_service.create_project(
         session, company_id=req.company_id, created_by=user.id, name=req.name,
         contract_text=req.contract_text, scope_text=req.scope_text, state=req.state,
@@ -113,6 +119,18 @@ def list_projects(company_id: uuid.UUID, archived: bool = False,
     ensure_member(session, user, company_id)
     return [_out(p) for p in
             project_service.list_projects(session, company_id, archived=archived)]
+
+
+def _check_upload_limits(session: Session, company_id: uuid.UUID, rows: list[dict]) -> None:
+    """Server-side plan-limit enforcement (.24) for a batch of parsed rows
+    about to become Document rows — document count and storage size."""
+    total_bytes = sum(len(r["text"].encode("utf-8")) for r in rows)
+    try:
+        billing_service.enforce_document_limit(session, company_id, additional=len(rows))
+        billing_service.enforce_storage_limit(session, company_id, additional_bytes=total_bytes)
+    except billing_service.PlanLimitExceeded as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED,
+                            {"error_code": exc.code, "message": str(exc)})
 
 
 def _load_project(session, user, project_id):
@@ -203,6 +221,7 @@ async def upload_comms(request: Request, response: Response,
                        session: Session = Depends(get_db)) -> CommsUploadResponse:
     project = _load_project(session, user, project_id)
     rows = parsing.parse_comms_csv(await _read_capped(file, MAX_CSV_BYTES))
+    _check_upload_limits(session, project.company_id, rows)
     store = build_loader()
     for r in rows:
         project_service.add_document(
@@ -228,6 +247,7 @@ async def upload_rfis(request: Request, response: Response,
     """Ingest an RFI register CSV — one source_type=rfi Document per RFI row."""
     project = _load_project(session, user, project_id)
     rows = parsing.parse_rfi_csv(await _read_capped(file, MAX_CSV_BYTES))
+    _check_upload_limits(session, project.company_id, rows)
     for r in rows:
         project_service.add_document(
             session, store, company_id=project.company_id, project_id=project.id,
@@ -253,6 +273,7 @@ async def upload_site_instructions(request: Request, response: Response,
     """Ingest a site-instruction register CSV — one source_type=site_instruction Document per row."""
     project = _load_project(session, user, project_id)
     rows = parsing.parse_site_instructions_csv(await _read_capped(file, MAX_CSV_BYTES))
+    _check_upload_limits(session, project.company_id, rows)
     for r in rows:
         project_service.add_document(
             session, store, company_id=project.company_id, project_id=project.id,
@@ -278,6 +299,7 @@ async def upload_meeting_minutes(request: Request, response: Response,
     """Ingest a meeting-minutes register CSV — one source_type=meeting_note Document per item."""
     project = _load_project(session, user, project_id)
     rows = parsing.parse_meeting_minutes_csv(await _read_capped(file, MAX_CSV_BYTES))
+    _check_upload_limits(session, project.company_id, rows)
     for r in rows:
         project_service.add_document(
             session, store, company_id=project.company_id, project_id=project.id,
@@ -302,6 +324,11 @@ def analyze(request: Request, response: Response, project_id: uuid.UUID,
     if not (project.contract_text or "").strip():
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
                             "project has no contract_text; upload a contract before analyzing")
+    try:
+        billing_service.enforce_analysis_limit(session, project.company_id)
+    except billing_service.PlanLimitExceeded as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED,
+                            {"error_code": exc.code, "message": str(exc)})
     job = jobs.enqueue_analysis(
         session, company_id=project.company_id, project_id=project.id, created_by=user.id,
     )

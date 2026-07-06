@@ -20,6 +20,8 @@ from app.logging_config import configure_logging
 from app.rate_limit import limiter
 from app.request_logging import RequestLoggingMiddleware
 from app.routers.audit import router as audit_router
+from app.routers.billing import router as billing_router
+from app.routers.billing import webhook_router as billing_webhook_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.invitations import org_router as org_invitations_router
 from app.routers.invitations import public_router as invitations_router
@@ -72,6 +74,8 @@ app.include_router(reports_router)
 app.include_router(dashboard_router)
 app.include_router(notifications_router)
 app.include_router(audit_router)
+app.include_router(billing_router)
+app.include_router(billing_webhook_router)
 
 
 # Exempt from rate limiting: load balancers and uptime monitors probe this
