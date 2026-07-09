@@ -47,6 +47,108 @@ def test_oversized_rfi_csv_upload_rejected():
     assert resp.status_code == 413
 
 
+# -- upload parse hardening (.26 security fixes) ------------------------------
+def test_contract_upload_malformed_pdf_returns_400_not_500():
+    """A corrupt (or fake) PDF must be a clean 400 — previously pypdf's
+    exception propagated as an unhandled 500."""
+    client, project = _project_client()
+    resp = client.post(f"/projects/{project.id}/contract",
+                       files={"file": ("contract.pdf", b"not a real pdf", "application/pdf")})
+    assert resp.status_code == 400
+
+
+def test_contract_upload_pdf_name_with_non_pdf_content_type_rejected():
+    client, project = _project_client()
+    resp = client.post(f"/projects/{project.id}/contract",
+                       files={"file": ("contract.pdf", b"<html>", "text/html")})
+    assert resp.status_code == 400
+
+
+def test_contract_upload_oversized_extracted_text_rejected():
+    """The upload path must not bypass the 500KB contract_text cap the JSON
+    create path enforces."""
+    client, project = _project_client()
+    big_text = b"a" * 600_000   # under the 20MB raw cap, over the text cap
+    resp = client.post(f"/projects/{project.id}/contract",
+                       files={"file": ("contract.txt", big_text, "text/plain")})
+    assert resp.status_code == 413
+
+
+def _valid_pdf_bytes() -> bytes:
+    """A real (blank single-page) PDF generated with the same library the
+    parser uses — genuinely valid, not a handcrafted approximation."""
+    import io
+    from pypdf import PdfWriter
+
+    buf = io.BytesIO()
+    w = PdfWriter()
+    w.add_blank_page(width=200, height=200)
+    w.write(buf)
+    return buf.getvalue()
+
+
+def _upload_client():
+    """_project_client plus the extra queued results the contract-upload
+    storage check consumes (subscription lookup -> lazily-created Free sub,
+    then the aggregated storage-bytes scalar)."""
+    user = User(id=uuid.uuid4(), email="ca@firm.com", password_hash="x", is_active=True)
+    cid = uuid.uuid4()
+    project = Project(id=uuid.uuid4(), company_id=cid, name="Tower A",
+                      status=ProjectStatus.in_progress)
+    membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid)
+    session = FakeSession(results=[FakeResult(scalar=membership, scalars=[membership]),
+                                   FakeResult(scalar=None),
+                                   FakeResult(scalar=0)],
+                          get_obj=project)
+
+    def _db():
+        yield session
+    app.dependency_overrides[get_db] = _db
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_store] = lambda: FakeStore()
+    return TestClient(app), project
+
+
+def test_contract_upload_valid_pdf_accepted():
+    client, project = _upload_client()
+    resp = client.post(f"/projects/{project.id}/contract",
+                       files={"file": ("contract.pdf", _valid_pdf_bytes(), "application/pdf")})
+    assert resp.status_code == 200
+
+
+def test_contract_upload_valid_pdf_wrong_content_type_rejected():
+    client, project = _project_client()
+    resp = client.post(f"/projects/{project.id}/contract",
+                       files={"file": ("contract.pdf", _valid_pdf_bytes(), "text/html")})
+    assert resp.status_code == 400
+
+
+def test_contract_upload_pdf_content_type_but_junk_bytes_rejected():
+    """Correct content type must not be enough — magic bytes are checked."""
+    client, project = _project_client()
+    resp = client.post(f"/projects/{project.id}/contract",
+                       files={"file": ("contract.pdf", b"MZ\x90\x00 definitely not pdf", "application/pdf")})
+    assert resp.status_code == 400
+
+
+def test_contract_upload_pdf_header_but_malformed_body_rejected():
+    """Magic bytes alone must not be enough either — the parser pass catches
+    a file that fakes the %PDF- header but has no valid structure."""
+    client, project = _project_client()
+    resp = client.post(f"/projects/{project.id}/contract",
+                       files={"file": ("contract.pdf", b"%PDF-1.7\ngarbage" * 3, "application/pdf")})
+    assert resp.status_code == 400
+
+
+def test_mailer_header_values_strip_crlf():
+    """Org/user names are user input that flows into email headers — CR/LF
+    must be stripped so a crafted name can't inject additional headers."""
+    from app.mailer import _header_safe
+
+    assert _header_safe("Evil\r\nBcc: victim@x.com") == "EvilBcc: victim@x.com"
+    assert _header_safe("Normal Org Pty Ltd") == "Normal Org Pty Ltd"
+
+
 # -- project input validation -------------------------------------------------
 def test_create_project_rejects_invalid_state():
     client, _ = _project_client()

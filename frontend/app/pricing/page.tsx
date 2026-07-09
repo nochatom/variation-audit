@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Nav, SiteFooter } from "@/components/home/sections";
-import { Chip } from "@/components/ui";
 
 /* ---------------- pricing data ---------------- */
 type Plan = {
@@ -294,8 +293,13 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
       }`}
     >
       {plan.highlighted && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <Chip tone="navy">Most Popular</Chip>
+        // Quiet outlined label, not a filled button-like pill — opaque card
+        // background because the badge straddles the card border (a
+        // translucent bg would show the line through it), with a ring in the
+        // page background to carve a clean notch where it crosses.
+        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill border border-ip-navy/25 bg-ip-card px-2.5 py-[3px] text-[10px] font-semibold uppercase tracking-[0.08em] text-ip-navy ring-4 ring-ip-bg">
+          <span className="h-1 w-1 rounded-full bg-ip-navy" aria-hidden />
+          Most Popular
         </span>
       )}
       <h3 className="text-lg font-bold tracking-tight text-ip-ink">{plan.label}</h3>
@@ -305,7 +309,10 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
         {plan.tier === "enterprise" ? (
           <span className="text-2xl font-bold text-ip-ink">Contact Sales</span>
         ) : price === 0 ? (
-          <span className="text-2xl font-bold text-ip-ink">Free</span>
+          <>
+            <span className="text-3xl font-bold tabular-nums text-ip-ink">A$0</span>
+            <p className="mt-1 text-[12px] text-ip-ink-3">Forever</p>
+          </>
         ) : (
           <>
             <span className="text-3xl font-bold tabular-nums text-ip-ink">AUD {price!.toLocaleString()}</span>

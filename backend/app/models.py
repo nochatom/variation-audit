@@ -114,6 +114,19 @@ class InvoiceStatus(str, enum.Enum):
     void = "void"
 
 
+class AgentJobStatus(str, enum.Enum):
+    """Lifecycle of one app/agents/ scaffold run (app/agents/jobs.py,
+    app/agents/worker.py). Separate from JobStatus (the production
+    worker->engine AnalysisJob) — this is the additive ADK scaffold's own
+    queue, deliberately not sharing a table with the engine pipeline."""
+
+    pending = "pending"
+    queued = "queued"
+    processing = "processing"
+    completed = "completed"
+    failed = "failed"
+
+
 # --------------------------------------------------------------------------
 # Reusable column helpers
 # --------------------------------------------------------------------------
@@ -463,6 +476,66 @@ class AnalysisJob(Base):
     finished_at: Mapped[datetime | None] = mapped_column()
 
     variations: Mapped[list[Variation]] = relationship(back_populates="job")
+
+
+class AgentAnalysisJob(Base):
+    """Queue + lifecycle tracking for one app/agents/ (ADK scaffold) run.
+
+    Deliberately a separate table from AnalysisJob: that one is the
+    production worker's contract with the external engine service
+    (request_id, engine_job_id, baseline rollups, etc.); this one tracks the
+    additive multi-agent scaffold's own execution — same DB-backed
+    SKIP-LOCKED queue pattern as job_worker.py (see app/agents/worker.py),
+    just a different table so neither pipeline's concerns leak into the
+    other's schema.
+    """
+
+    __tablename__ = "agent_analysis_jobs"
+    __table_args__ = (
+        CheckConstraint("progress_percent BETWEEN 0 AND 100", name="ck_agent_job_progress_range"),
+        Index("idx_agent_jobs_queue", "status", "created_at"),  # FOR UPDATE SKIP LOCKED claim
+    )
+
+    id: Mapped[uuid.UUID] = _pk()
+    company_id: Mapped[uuid.UUID] = _company_fk()
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    status: Mapped[AgentJobStatus] = mapped_column(nullable=False, default=AgentJobStatus.pending, index=True)
+    current_agent: Mapped[str | None] = mapped_column(Text)
+    progress_percent: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    # Elapsed-time / progress-so-far linear extrapolation, recomputed on
+    # every agent-completion callback (app/agents/worker.py) — a rough ETA,
+    # not a scheduling guarantee.
+    estimated_remaining_seconds: Mapped[int | None] = mapped_column(Integer)
+    result: Mapped[dict | None] = mapped_column(JSONB)          # FinalResult.model_dump() on success
+    error_code: Mapped[str | None] = mapped_column(Text)        # AI_AUTH_ERROR / AI_RATE_LIMIT_ERROR / ...
+    error_message: Mapped[str | None] = mapped_column(Text)
+    # Per-LLM-call observability (app/agents/reliable_llm.py's consolidated
+    # metrics, one dict per logical call: agent/provider/model/tokens/
+    # latency_ms/number_of_retries/fallback_used). Never prompt/response
+    # content, never credentials.
+    llm_calls: Mapped[list | None] = mapped_column(JSONB)
+    # Worker heartbeat (production hardening): worker_id identifies which
+    # process claimed the job; heartbeat_at is refreshed every 30-60s while
+    # that process is actively working it (see app/agents/worker.py's
+    # _heartbeat_loop) — reclaim_stale_jobs() keys off heartbeat_at, not a
+    # fixed wall-clock timeout, so a job is only recovered once its actual
+    # worker has genuinely gone silent. last_progress_at is distinct: it
+    # only moves when an agent actually finishes, for observability on
+    # "is this job moving" vs. "is the worker process alive."
+    worker_id: Mapped[str | None] = mapped_column(Text, index=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column()
+    last_progress_at: Mapped[datetime | None] = mapped_column()
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
+    started_at: Mapped[datetime | None] = mapped_column()
+    completed_at: Mapped[datetime | None] = mapped_column()
+
+    project: Mapped[Project] = relationship()
 
 
 # --------------------------------------------------------------------------

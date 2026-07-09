@@ -12,6 +12,12 @@ const SENTRY_DSN =
   "https://062ca873e45ee9f89035b98c4d5e8361@o4511662990819328.ingest.de.sentry.io/4511662992785488";
 const SENTRY_INGEST_ORIGIN = `https://${new URL(SENTRY_DSN).host}`;
 
+// Google login via Supabase — lib/supabase/client.ts calls Supabase
+// directly from the browser (signInWithOAuth, exchangeCodeForSession), so
+// its origin must be in connect-src or the strict CSP below blocks those
+// fetches with "Failed to fetch".
+const SUPABASE_ORIGIN = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+
 // script-src needs 'unsafe-inline': Next.js App Router embeds its own inline
 // RSC-hydration payload scripts (<script>self.__next_f.push(...)</script>) in
 // every page, including statically prerendered ones. A per-request nonce
@@ -26,7 +32,7 @@ const CSP = [
   "style-src 'self'",
   "img-src 'self' data:",
   "font-src 'self'",
-  `connect-src 'self' ${API_ORIGIN} ${SENTRY_INGEST_ORIGIN}`,
+  `connect-src 'self' ${API_ORIGIN} ${SENTRY_INGEST_ORIGIN}${SUPABASE_ORIGIN ? ` ${SUPABASE_ORIGIN}` : ""}`,
   // Session Replay's compression runs in a Worker constructed from a blob:
   // URL (new Blob([...]) + URL.createObjectURL) — without this, CSP falls
   // back through child-src to default-src 'self', which does NOT cover

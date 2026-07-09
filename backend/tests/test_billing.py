@@ -93,14 +93,23 @@ def test_get_usage_counts_real_rows_against_plan_limits():
 
 
 # -- start_checkout ------------------------------------------------------------
-def test_start_checkout_raises_when_plan_not_configured():
+def test_start_checkout_raises_when_plan_not_configured(monkeypatch):
+    # Explicitly empty, not just absent — a real deployment's backend/.env
+    # may itself set VA_STRIPE_PRICE_PRO, and pydantic-settings falls back to
+    # reading that file once the env var is merely deleted.
+    monkeypatch.setenv("VA_STRIPE_PRICE_PRO", "")
+    from app.config import get_settings
+    get_settings.cache_clear()
     cid = uuid.uuid4()
     actor = User(id=uuid.uuid4(), email="admin@example.com", password_hash="x", is_active=True)
     sub = Subscription(id=uuid.uuid4(), company_id=cid, plan=PlanTier.free,
                        status=SubscriptionStatus.active)
     session = FakeSession(results=[FakeResult(scalar=sub)])
-    with pytest.raises(billing_service.PlanNotConfigured):
-        billing_service.start_checkout(session, cid, actor, PlanTier.pro)
+    try:
+        with pytest.raises(billing_service.PlanNotConfigured):
+            billing_service.start_checkout(session, cid, actor, PlanTier.pro)
+    finally:
+        get_settings.cache_clear()
 
 
 def test_start_checkout_rejects_free_plan():
@@ -401,12 +410,18 @@ def test_cancel_endpoint_returns_409_when_already_free():
     assert resp.status_code == 409
 
 
-def test_checkout_endpoint_409_when_plan_not_configured():
+def test_checkout_endpoint_409_when_plan_not_configured(monkeypatch):
+    monkeypatch.setenv("VA_STRIPE_PRICE_PRO", "")
+    from app.config import get_settings
+    get_settings.cache_clear()
     user = User(id=uuid.uuid4(), email="admin@example.com", password_hash="x", is_active=True)
     cid = uuid.uuid4()
     membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid, role=MembershipRole.admin)
     sub = Subscription(id=uuid.uuid4(), company_id=cid, plan=PlanTier.free,
                        status=SubscriptionStatus.active)
     session = FakeSession(results=[FakeResult(scalar=membership), FakeResult(scalar=sub)])
-    resp = _client(session, user).post(f"/orgs/{cid}/billing/checkout", json={"plan": "pro"})
-    assert resp.status_code == 409
+    try:
+        resp = _client(session, user).post(f"/orgs/{cid}/billing/checkout", json={"plan": "pro"})
+        assert resp.status_code == 409
+    finally:
+        get_settings.cache_clear()

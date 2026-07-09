@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { api, storeTokens, setCompanyId, TokenResponse } from "@/lib/api";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { useTheme } from "@/lib/use-theme";
 import { ErrorNote } from "@/components/ui";
 
@@ -53,10 +53,15 @@ function LoginForm() {
     setError(null);
     setBusy(true);
     try {
-      const tok =
-        mode === "login"
-          ? await api.login(email.trim(), password)
-          : await api.signup(email.trim(), password, orgName.trim());
+      if (mode === "signup") {
+        // Signup is non-enumerating: it always returns a generic 202, so
+        // tokens come from the follow-up login with the same credentials.
+        // For a genuinely new account this logs straight in; if the email
+        // already had an account, the login below fails with the same
+        // "invalid credentials" any wrong password gets.
+        await api.signup(email.trim(), password, orgName.trim());
+      }
+      const tok = await api.login(email.trim(), password);
       await completeAuth(tok, remember);
     } catch (err: any) {
       setError(err.message || "Failed");
@@ -69,10 +74,18 @@ function LoginForm() {
     setError(null);
     setBusy(true);
     try {
-      const supabase = getSupabaseClient();
+      const supabase = createSupabaseClient();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          // Google silently re-approves (no visible screen) once a session +
+          // prior consent exist for this client — standard OAuth behavior,
+          // not a bug. Forcing the account chooser here is a deliberate UX
+          // choice so the user always sees/confirms which account they're
+          // using, rather than the default silent-reauth fast path.
+          queryParams: { prompt: "select_account" },
+        },
       });
       if (oauthError) throw oauthError;
       // Browser navigates to Google now; nothing left to do here.
@@ -97,13 +110,13 @@ function LoginForm() {
         )}
       </button>
       <div className="w-full max-w-sm">
-        <div className="mb-7 flex items-center gap-2.5">
+        <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationIQ home">
           <span className="grid h-8 w-8 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
           <div>
             <h1 className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</h1>
             <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>
           </div>
-        </div>
+        </Link>
 
         <div className="ip-card-lg p-6">
           <div className="mb-5 flex gap-1 rounded-md border border-ip-line bg-ip-card p-1 text-sm">

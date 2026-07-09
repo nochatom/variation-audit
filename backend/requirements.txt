@@ -11,9 +11,14 @@ httpx>=0.27                # engine client
 python-dotenv>=1.0
 bcrypt>=4.2                # password hashing (.2 auth)
 PyJWT>=2.9                 # access tokens (.2 auth)
-cryptography>=43.0          # PyJWT JWKS verification of Supabase-issued tokens (Google login, .25)
+cryptography>=43.0          # PyJWT JWKS verification of Supabase-issued tokens (Google login)
 email-validator>=2.2       # pydantic EmailStr
 python-multipart>=0.0.9    # file uploads (.3)
 pypdf>=5.0                 # PDF text extraction (.3)
 reportlab>=4.2             # report PDF generation (.15)
 slowapi>=0.1.9              # per-IP rate limiting on every endpoint
+stripe>=10.0                # billing (.23) — Checkout, Billing Portal, webhooks
+google-adk>=2.4,<3.0          # multi-agent orchestration scaffold (app/agents/). Pinned <3.0: 2.4
+                              # deprecates Sequential/ParallelAgent in favor of Workflow, which can't
+                              # yet be used as an LlmAgent sub-agent — see app/agents/orchestrator.py.
+litellm>=1.50                # provider-agnostic model layer for the ADK scaffold (Gemini/Claude/OpenAI)

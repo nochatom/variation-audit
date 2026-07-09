@@ -45,13 +45,13 @@ export default function ForgotPasswordPage() {
         )}
       </button>
       <div className="w-full max-w-sm">
-        <div className="mb-7 flex items-center gap-2.5">
+        <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationIQ home">
           <span className="grid h-8 w-8 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
           <div>
             <h1 className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</h1>
             <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>
           </div>
-        </div>
+        </Link>
 
         <div className="ip-card-lg p-6">
           {sent ? (

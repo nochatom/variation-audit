@@ -35,7 +35,24 @@ def test_create_reset_token_unknown_email_returns_none():
     session = FakeSession(results=[FakeResult(scalar=None)])
     token = password_reset_service.create_reset_token(session, email="nobody@example.com", expire_minutes=60)
     assert token is None
-    assert session.commits == 0
+    # Timing parity: the not-found branch performs the SAME commit round trip
+    # as the exists branch (but writes nothing) so response latency doesn't
+    # reveal whether the account exists.
+    assert session.commits == 1
+    assert session.added_of(PasswordResetToken) == []
+
+
+def test_create_reset_token_commit_parity_between_branches():
+    """Both branches must end with exactly one commit — equivalent observable
+    DB work whether or not the account exists."""
+    unknown = FakeSession(results=[FakeResult(scalar=None)])
+    password_reset_service.create_reset_token(unknown, email="nobody@example.com", expire_minutes=60)
+
+    user = User(id=uuid.uuid4(), email="user@example.com", password_hash="hash", is_active=True)
+    known = FakeSession(results=[FakeResult(scalar=user)])
+    password_reset_service.create_reset_token(known, email="user@example.com", expire_minutes=60)
+
+    assert unknown.commits == known.commits == 1
 
 
 def test_create_reset_token_known_email_returns_raw_token():

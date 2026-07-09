@@ -1,13 +1,14 @@
 """Auth endpoints: signup, login, me."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import refresh_tokens, service
 from app.auth.deps import get_current_user, get_db
+from app.auth.security import hash_password
 from app.auth.supabase_jwt import SupabaseNotConfigured, verify_supabase_token
 from app.auth.tokens import TokenError, create_access_token
 from app.config import get_settings
@@ -28,6 +29,15 @@ class SignupRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     org_name: str = Field(min_length=1, max_length=200)
     full_name: str | None = Field(default=None, max_length=200)
+
+
+class SignupAccepted(BaseModel):
+    # Deliberately the SAME body whether the email was new or already
+    # registered — the signup response must not be a user-enumeration oracle.
+    # The frontend follows up with a normal /auth/login using the same
+    # credentials (succeeds for a genuinely new account; fails with the
+    # generic "invalid credentials" otherwise).
+    message: str
 
 
 class LoginRequest(BaseModel):
@@ -90,23 +100,52 @@ class MeResponse(BaseModel):
 
 
 # ---- endpoints -----------------------------------------------------------
-@router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+_SIGNUP_ACCEPTED_MESSAGE = "Account request received — signing you in."
+
+
+@router.post("/signup", response_model=SignupAccepted, status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(AUTH_RATE_LIMIT)
 def signup(request: Request, response: Response, req: SignupRequest,
-           session: Session = Depends(get_db)) -> TokenResponse:
+           background_tasks: BackgroundTasks,
+           session: Session = Depends(get_db), mailer=Depends(get_mailer)) -> SignupAccepted:
+    """Always 202 with an identical body, whether or not the email was
+    already registered — the old 409 was a deterministic user-enumeration
+    oracle. If the account already exists, the legitimate owner is told by
+    email (sent in the background, so response timing doesn't leak it
+    either); the caller just proceeds to /auth/login, which fails with the
+    same generic message any wrong credential gets."""
     try:
         user, org, _m = service.signup(
             session, email=req.email, password=req.password,
             full_name=req.full_name, org_name=req.org_name,
         )
+        security_logger.info("signup succeeded", extra={
+            "event": "signup_succeeded", "user_id": str(user.id), "email": user.email, "org_id": str(org.id),
+        })
     except service.EmailAlreadyExists:
-        security_logger.info("signup rejected: email already registered",
+        # Timing parity with the success path: pay the same bcrypt hash the
+        # success path pays, and end with the same commit round trip
+        # service.signup() performs. The residual difference (three row
+        # INSERTs flushing inside that commit) is sub-millisecond — far
+        # below network jitter.
+        hash_password(req.password)
+        session.commit()
+        base = get_settings().frontend_base_url.rstrip("/")
+        background_tasks.add_task(_send_best_effort, mailer.send_account_exists_notice,
+                                  to_email=req.email, login_url=f"{base}/login")
+        security_logger.info("signup for already-registered email — owner notified",
                              extra={"event": "signup_conflict", "email": req.email})
-        raise HTTPException(status.HTTP_409_CONFLICT, "email already registered")
-    security_logger.info("signup succeeded", extra={
-        "event": "signup_succeeded", "user_id": str(user.id), "email": user.email, "org_id": str(org.id),
-    })
-    return _token_for(session, user)
+    return SignupAccepted(message=_SIGNUP_ACCEPTED_MESSAGE)
+
+
+def _send_best_effort(send_fn, **kwargs) -> None:
+    """Background email wrapper: a mail failure after the response has been
+    sent must be logged, never raised into the ASGI error path."""
+    try:
+        send_fn(**kwargs)
+    except Exception:  # noqa: BLE001
+        security_logger.warning("background email send failed",
+                                extra={"event": "background_email_failed"})
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -126,7 +165,7 @@ def login(request: Request, response: Response, req: LoginRequest,
 @limiter.limit(AUTH_RATE_LIMIT)
 def google_login(request: Request, response: Response, req: GoogleLoginRequest,
                  session: Session = Depends(get_db)) -> TokenResponse:
-    """Google sign-in via Supabase (.25) — an ADDITIONAL entry point into the
+    """Google sign-in via Supabase — an ADDITIONAL entry point into the
     existing session system, not a replacement for it. The Supabase token is
     verified via JWKS and then exchanged for this app's own access+refresh
     token pair (the same TokenResponse shape signup/login already return);
@@ -161,21 +200,29 @@ def google_login(request: Request, response: Response, req: GoogleLoginRequest,
 @router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit(AUTH_RATE_LIMIT)
 def forgot_password(request: Request, response: Response, req: ForgotPasswordRequest,
+                    background_tasks: BackgroundTasks,
                     session: Session = Depends(get_db), mailer=Depends(get_mailer)) -> None:
-    """Always 204 regardless of whether the email exists — no
-    user-enumeration signal via response shape or timing-sensitive content."""
+    """Always 204 regardless of whether the email exists. The email is sent
+    AFTER the response (BackgroundTasks): a synchronous SMTP round-trip only
+    on the account-exists path made response latency an enumeration signal."""
     raw_token = password_reset_service.create_reset_token(
         session, email=req.email, expire_minutes=get_settings().password_reset_expire_minutes,
     )
     if raw_token is not None:
         base = get_settings().frontend_base_url.rstrip("/")
         reset_url = f"{base}/reset-password/{raw_token}"
-        try:
-            mailer.send_password_reset(to_email=req.email, reset_url=reset_url)
-        except Exception:  # noqa: BLE001 — best-effort; response is 204 either way
-            security_logger.warning("password reset email send failed",
-                                    extra={"event": "password_reset_email_failed"})
+        background_tasks.add_task(_send_best_effort, mailer.send_password_reset,
+                                  to_email=req.email, reset_url=reset_url)
+    else:
+        # Timing parity: schedule the same-shaped (no-op) background task so
+        # both branches do identical pre-response work — create_reset_token
+        # already equalizes the DB/token work internally.
+        background_tasks.add_task(_send_best_effort, _noop_send)
     security_logger.info("forgot-password requested", extra={"event": "forgot_password_requested"})
+
+
+def _noop_send(**_kwargs) -> None:
+    """Parity placeholder for the no-account branch of forgot-password."""
 
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)

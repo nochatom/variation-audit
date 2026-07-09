@@ -6,6 +6,13 @@
   html {
     color-scheme: dark;
   }
+  /* Animate same-page anchor navigation (marketing nav section links).
+     Guarded so users who ask for reduced motion get an instant jump. */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
   html.dark {
     color-scheme: dark;
   }

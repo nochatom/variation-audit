@@ -1,4 +1,4 @@
-"""Verifies Supabase-issued access tokens via JWKS (.25 — Google login only).
+"""Verifies Supabase-issued access tokens via JWKS (Google login only).
 
 This is deliberately separate from app/auth/tokens.py's HS256
 create_access_token/decode_token, which mint and verify THIS app's own
@@ -20,6 +20,7 @@ from jwt import PyJWKClient
 
 from app.auth.tokens import TokenError
 from app.config import get_settings
+from app.logging_config import security_logger
 
 
 class SupabaseNotConfigured(Exception):
@@ -36,8 +37,8 @@ class SupabaseClaims:
 @lru_cache
 def _jwks_client(supabase_url: str) -> PyJWKClient:
     # Cached per supabase_url (effectively a singleton — settings don't
-    # change at runtime) so key fetches are cached across requests, not
-    # repeated on every call; PyJWKClient itself also caches by kid.
+    # change at runtime), so PyJWKClient's own key-set cache persists across
+    # requests within the process, not just within a single call.
     return PyJWKClient(f"{supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json")
 
 
@@ -51,6 +52,11 @@ def verify_supabase_token(token: str) -> SupabaseClaims:
         payload = jwt.decode(
             token, signing_key.key, algorithms=["ES256", "RS256"],
             audience=settings.supabase_jwt_aud,
+            # Pin the issuer to OUR Supabase project — a validly-signed token
+            # must also have been minted by this project's auth server, and a
+            # token with no iss claim at all is rejected outright.
+            issuer=f"{settings.supabase_url.rstrip('/')}/auth/v1",
+            options={"require": ["iss"]},
         )
     except jwt.PyJWTError as exc:
         raise TokenError(str(exc)) from exc
@@ -60,10 +66,26 @@ def verify_supabase_token(token: str) -> SupabaseClaims:
     if not sub or not email:
         raise TokenError("Supabase token missing sub/email claim")
 
+    # TEMPORARY diagnostic (.27 investigation): log the claim shape (keys +
+    # user_metadata keys only, never values — this can contain PII) so we
+    # can see exactly where Google-OAuth logins carry email_verified. Remove
+    # once the real claim path is confirmed and hardcoded below.
+    security_logger.info("supabase token claim shape (diagnostic)", extra={
+        "event": "supabase_claim_shape_diagnostic",
+        "top_level_keys": sorted(payload.keys()),
+        "user_metadata_keys": sorted((payload.get("user_metadata") or {}).keys()),
+        "app_metadata_keys": sorted((payload.get("app_metadata") or {}).keys()),
+        "top_level_email_verified": payload.get("email_verified"),
+        "user_metadata_email_verified": (payload.get("user_metadata") or {}).get("email_verified"),
+        "provider": (payload.get("app_metadata") or {}).get("provider"),
+    })
+
     return SupabaseClaims(
         sub=sub, email=email,
-        # Supabase includes this claim directly for both password and OAuth
-        # users (Google won't complete OAuth for an unverified email in the
-        # first place) — default True only if genuinely absent.
-        email_verified=payload.get("email_verified", True),
+        # Fail closed: a token without an explicit email_verified claim is
+        # treated as UNVERIFIED. Supabase always emits this claim for both
+        # password and OAuth users, so a legitimate token never hits the
+        # default — only a malformed/unexpected one does, and that must not
+        # be allowed to link into an existing account by email.
+        email_verified=payload.get("email_verified", False),
     )

@@ -178,15 +178,20 @@ export type Me = {
 export const api = {
   login: (email: string, password: string) =>
     request<TokenResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  /** Non-enumerating: always resolves with a generic message, whether or not
+   * the email already has an account (the backend emails the owner in that
+   * case). Callers obtain tokens with a follow-up login() using the same
+   * credentials — it fails with the generic "invalid credentials" if the
+   * account already existed. */
   signup: (email: string, password: string, org_name: string, full_name?: string) =>
-    request<TokenResponse>("/auth/signup", {
+    request<{ message: string }>("/auth/signup", {
       method: "POST",
       body: JSON.stringify({ email, password, org_name, full_name }),
     }),
   me: () => request<Me>("/auth/me"),
   /** Exchanges a Supabase Google-login session for this app's own token pair
-   * (.25) — an additional entry point into the existing session system, not
-   * a separate one. Same TokenResponse shape as login/signup. */
+   * — an additional entry point into the existing session system, not a
+   * separate one. Same TokenResponse shape as login/signup. */
   googleLogin: (supabaseAccessToken: string) =>
     request<TokenResponse>("/auth/google", {
       method: "POST",

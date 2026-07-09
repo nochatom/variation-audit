@@ -92,15 +92,36 @@ def test_health():
     assert TestClient(app).get("/health").json()["status"] == "ok"
 
 
-def test_signup_endpoint_returns_token():
-    client = _client_with(FakeSession(results=[FakeResult(scalar=None)]))
-    resp = client.post("/auth/signup", json={
+def test_signup_endpoint_is_non_enumerating():
+    """Signup must return an IDENTICAL response whether the email is new or
+    already registered — the old 201-with-tokens vs 409 split was a
+    deterministic user-enumeration oracle. The frontend now follows signup
+    with a normal login to obtain tokens."""
+    fresh = _client_with(FakeSession(results=[FakeResult(scalar=None)]))
+    r_new = fresh.post("/auth/signup", json={
         "email": "new@firm.com.au", "password": "pw123456", "org_name": "Acme"})
-    assert resp.status_code == 201
-    body = resp.json()
-    assert body["token_type"] == "bearer"
-    assert decode_token(body["access_token"])["sub"] == body["user_id"]
-    assert body["refresh_token"] and "." in body["refresh_token"]
+    assert r_new.status_code == 202
+    assert "message" in r_new.json()
+    assert "access_token" not in r_new.json()
+    app.dependency_overrides.clear()
+
+    existing = User(id=uuid.uuid4(), email="new@firm.com.au",
+                    password_hash=hash_password("other"), is_active=True)
+    dup = _client_with(FakeSession(results=[FakeResult(scalar=existing)]))
+    r_dup = dup.post("/auth/signup", json={
+        "email": "new@firm.com.au", "password": "pw123456", "org_name": "Acme"})
+    assert r_dup.status_code == r_new.status_code
+    assert r_dup.json() == r_new.json()   # byte-identical body, no oracle
+
+
+def test_signup_existing_email_creates_no_account():
+    existing = User(id=uuid.uuid4(), email="taken@firm.com",
+                    password_hash=hash_password("pw"), is_active=True)
+    session = FakeSession(results=[FakeResult(scalar=existing)])
+    client = _client_with(session)
+    client.post("/auth/signup", json={
+        "email": "taken@firm.com", "password": "pw123456", "org_name": "Acme"})
+    assert session.added_of(User) == []   # nothing written for the duplicate
 
 
 def test_login_endpoint_success_and_bad_password():

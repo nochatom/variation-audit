@@ -116,11 +116,30 @@ def test_add_member_endpoint_admin_ok():
     admin_m = _membership(user.id, cid, MembershipRole.admin)
     target = User(id=uuid.uuid4(), email="new@firm.com", password_hash="x")
     # require_admin: ensure_member execute -> admin_m
+    # enforce_seat_limit: subscription lookup -> None (lazily created Free);
+    #                     seat count -> 1 existing member (under Free's 3)
     # add_member: user-by-email -> target ; existing membership -> None
     session = FakeSession(results=[FakeResult(scalar=admin_m),
+                                   FakeResult(scalar=None),
+                                   FakeResult(scalars=[admin_m.id]),
                                    FakeResult(scalar=target),
                                    FakeResult(scalar=None)])
     resp = _client(session, user).post(f"/orgs/{cid}/members",
                                        json={"email": "new@firm.com", "role": "member"})
     assert resp.status_code == 201
     assert resp.json()["role"] == "member"
+
+
+def test_add_member_endpoint_blocked_at_seat_limit():
+    """Direct member-add must enforce the plan seat cap exactly like the
+    invitation flow does — it was previously a way around it."""
+    user, cid = _user(), uuid.uuid4()
+    admin_m = _membership(user.id, cid, MembershipRole.admin)
+    seat_ids = [uuid.uuid4(), uuid.uuid4(), uuid.uuid4()]   # Free plan cap = 3, already full
+    session = FakeSession(results=[FakeResult(scalar=admin_m),
+                                   FakeResult(scalar=None),
+                                   FakeResult(scalars=seat_ids)])
+    resp = _client(session, user).post(f"/orgs/{cid}/members",
+                                       json={"email": "new@firm.com", "role": "member"})
+    assert resp.status_code == 402
+    assert resp.json()["detail"]["error_code"] == "seat_limit_exceeded"

@@ -407,20 +407,46 @@ def enforce_analysis_limit(session: Session, company_id: uuid.UUID) -> None:
                                 f"plan limit of {limit} analysis runs/month reached")
 
 
+def storage_bytes_used(session: Session, company_id: uuid.UUID) -> int:
+    """The single authoritative measure of an org's persisted storage. Sums
+    ALL customer data that occupies storage: document blob sizes
+    (Document.size_bytes) PLUS the contract/scope text persisted on Project
+    rows (their byte length via octet_length).
+
+    Computed live from current rows every time, so it is inherently correct
+    across every operation with no separate bookkeeping to keep in sync — an
+    upload, a contract/scope replacement, a document delete, or a project
+    delete all change the underlying rows and are therefore reflected on the
+    next call. This is why there is no persisted "usage counter" column to
+    drift out of sync.
+
+    Aggregated in SQL (one round trip, two coalesced sums) rather than
+    pulling rows into Python: this sums a company's entire history —
+    unbounded and only growing — so it must not scale with row count.
+    """
+    doc_bytes = (
+        select(func.coalesce(func.sum(Document.size_bytes), 0))
+        .where(Document.company_id == company_id)
+        .scalar_subquery()
+    )
+    text_bytes = (
+        select(func.coalesce(func.sum(
+            func.coalesce(func.octet_length(Project.contract_text), 0)
+            + func.coalesce(func.octet_length(Project.scope_text), 0)
+        ), 0))
+        .where(Project.company_id == company_id)
+        .scalar_subquery()
+    )
+    return int(session.execute(select(doc_bytes + text_bytes)).scalar_one() or 0)
+
+
 def enforce_storage_limit(session: Session, company_id: uuid.UUID, *, additional_bytes: int = 0) -> None:
     sub = get_or_create_subscription(session, company_id)
     _check_not_suspended(sub)
     limit_mb = PLAN_LIMITS[sub.plan]["storage_mb"]
     if limit_mb is None:
         return
-    # Aggregated in SQL rather than fetching every Document row into Python:
-    # unlike the monthly, plan-bounded counts above, this sums a company's
-    # entire document history — unbounded and only growing, so it must not
-    # scale with row count.
-    total = session.execute(
-        select(func.coalesce(func.sum(Document.size_bytes), 0)).where(Document.company_id == company_id)
-    ).scalar_one() or 0
-    total += additional_bytes
+    total = storage_bytes_used(session, company_id) + additional_bytes
     if total > limit_mb * 1024 * 1024:
         raise PlanLimitExceeded("storage_limit_exceeded", f"plan storage limit of {limit_mb}MB reached")
 
@@ -445,8 +471,12 @@ def enforce_seat_limit(session: Session, company_id: uuid.UUID, *, additional: i
 
 
 def _seat_overage_available(sub: Subscription) -> bool:
+    # Falsy check (not `is not None`) — an env var defined but empty
+    # (VA_STRIPE_PRICE_SEAT_OVERAGE=) must count as "not configured", same
+    # as every other Stripe price lookup in this module (e.g. start_checkout's
+    # `if not price_id`), not be sent to Stripe's API as a blank price ID.
     return (sub.plan != PlanTier.free and sub.stripe_subscription_id is not None
-            and get_settings().stripe_price_seat_overage is not None)
+            and bool(get_settings().stripe_price_seat_overage))
 
 
 def _sync_seat_overage(sub: Subscription, billable_seats: int) -> None:

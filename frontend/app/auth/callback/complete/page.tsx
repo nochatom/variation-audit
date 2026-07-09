@@ -1,34 +1,35 @@
 "use client";
 
-// Google login via Supabase (.25): Google redirects here with a PKCE `code`
-// after the user approves consent. This page exchanges that code for a
-// Supabase session, then immediately hands the resulting access token to
-// this app's own backend (POST /auth/google) to obtain the SAME token pair
-// email/password login already produces — from that point on this page's
-// Supabase session is never touched again; the existing JWT/refresh-token
-// system takes over exactly as it does for email/password.
+// Google login via Supabase, step 2: app/auth/callback/route.ts has already
+// exchanged the PKCE code server-side and set the Supabase session cookie.
+// This page reads that session (via the same cookie-based SSR client) and
+// hands its access token to this app's own backend (POST /auth/google) to
+// obtain the SAME token pair email/password login already produces — from
+// that point on, this page's Supabase session is never touched again; the
+// existing JWT/refresh-token system takes over exactly as it does for
+// email/password.
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, storeTokens, setCompanyId } from "@/lib/api";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { createClient } from "@/lib/supabase/client";
 
-export default function AuthCallbackPage() {
+export default function AuthCallbackCompletePage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const ran = useRef(false);
 
   useEffect(() => {
-    if (ran.current) return; // StrictMode/dev double-invoke guard — a PKCE code is single-use
+    if (ran.current) return; // StrictMode/dev double-invoke guard
     ran.current = true;
 
     (async () => {
       try {
-        const supabase = getSupabaseClient();
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(window.location.href);
-        if (exchangeError || !data.session) throw exchangeError ?? new Error("no Supabase session returned");
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("no Supabase session found");
 
-        const tok = await api.googleLogin(data.session.access_token);
+        const tok = await api.googleLogin(session.access_token);
         // Google login has no "remember me" step of its own — treated as
         // remembered, matching how most SaaS Google-login flows behave.
         storeTokens(tok, true);

@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     smtp_username: str | None = None
     smtp_password: str | None = None
     smtp_use_tls: bool = True
-    smtp_from: str = "VariationIQ <noreply@variationiq.example>"
+    smtp_from: str = "VariationIQ <hello@variationiq.com>"
 
     password_reset_expire_minutes: int = 60
 
@@ -133,6 +133,22 @@ class Settings(BaseSettings):
     # to redis://... so all processes count against the same store. The
     # in-memory default is only correct for a single process.
     rate_limit_storage_uri: str = "memory://"
+
+    # Multi-agent scaffold (app/agents/) — additive, not wired into the
+    # production worker->engine pipeline. agent_model_provider selects which
+    # model app/agents/model_provider.py resolves for every LlmAgent:
+    #   "openai" / "glm" / "gemini" -> routed through NVIDIA NIM's
+    #     OpenAI-compatible endpoint (build.nvidia.com), each with its own
+    #     key and model slug (nvidia_nim_*_api_key below). "gemini" here is
+    #     an NVIDIA-hosted stand-in model, not the real Google Gemini API.
+    #   "claude" -> ADK's native LiteLlm/Anthropic path (VA_ANTHROPIC_AGENT_API_KEY).
+    # Unset keys -> agent construction still works, but a live run fails
+    # clearly at the model call, same "not configured" pattern as Stripe above.
+    agent_model_provider: str = "openai"
+    anthropic_agent_api_key: str | None = None
+    nvidia_nim_openai_api_key: str | None = None
+    nvidia_nim_glm_api_key: str | None = None
+    nvidia_nim_gemini_api_key: str | None = None
 
 
 @lru_cache

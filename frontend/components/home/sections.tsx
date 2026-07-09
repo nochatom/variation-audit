@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FileCheck2, Files, Gavel, Inbox, Link2, ScanSearch, ShieldAlert } from "lucide-react";
 import { Chip, ConfidenceBar, StatCard, TimeBarFlag, aud } from "@/components/ui";
 
 /* ---------------- nav ---------------- */
@@ -6,14 +7,17 @@ export function Nav() {
   return (
     <header className="sticky top-0 z-30 h-14 border-b border-ip-line bg-ip-bg/85 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-6 sm:px-12 lg:px-16">
-        <div className="flex items-center gap-2.5">
+        <Link href="/" className="flex items-center gap-2.5" aria-label="VariationIQ home">
           <span className="grid h-7 w-7 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
           <span className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</span>
-        </div>
+        </Link>
         <nav className="hidden items-center gap-8 text-sm text-ip-ink-2 md:flex">
-          <a href="#preview" className="transition-colors hover:text-ip-ink">Product</a>
-          <a href="#how" className="transition-colors hover:text-ip-ink">How it works</a>
-          <a href="#capabilities" className="transition-colors hover:text-ip-ink">Capabilities</a>
+          {/* Root-relative (/#id), not bare #id — this nav renders on every
+              marketing page, and a bare hash silently no-ops anywhere the
+              target section doesn't exist (e.g. /pricing). */}
+          <Link href="/#preview" className="transition-colors hover:text-ip-ink">Product</Link>
+          <Link href="/#how" className="transition-colors hover:text-ip-ink">How it works</Link>
+          <Link href="/#capabilities" className="transition-colors hover:text-ip-ink">Capabilities</Link>
           <Link href="/pricing" className="transition-colors hover:text-ip-ink">Pricing</Link>
         </nav>
         <div className="flex items-center gap-2">
@@ -235,22 +239,27 @@ export function HowItWorks() {
 /* ---------------- section: capabilities (feature cards + trades) ---------------- */
 export function Features() {
   const caps = [
-    { title: "Multi-source ingestion", body: "RFIs, site instructions, meeting minutes and project comms — parsed and normalised, not just stored." },
-    { title: "AI variation detection", body: "Finds out-of-scope and unclaimed work across the entire project record, clustered with its rationale." },
-    { title: "AUD value & time-bar risk", body: "Recoverable estimates in AUD, plus Security of Payment notice deadlines flagged before they lapse." },
-    { title: "Evidence-linked audit trail", body: "Every finding traces back to the exact source document, with an immutable record of each review decision." },
+    { title: "Multi-source ingestion", body: "RFIs, site instructions, meeting minutes and project comms — parsed and normalised, not just stored.", icon: Inbox },
+    { title: "AI variation detection", body: "Finds out-of-scope and unclaimed work across the entire project record, clustered with its rationale.", icon: ScanSearch },
+    { title: "AUD value & time-bar risk", body: "Recoverable estimates in AUD, plus Security of Payment notice deadlines flagged before they lapse.", icon: ShieldAlert },
+    { title: "Evidence-linked audit trail", body: "Every finding traces back to the exact source document, with an immutable record of each review decision.", icon: Link2 },
   ];
   const trades = ["General Contractors", "Electrical", "Plumbing", "HVAC", "Civil Engineering", "Large builders"];
   return (
     <section id="capabilities" className="relative border-b border-ip-line">
       <div className="mx-auto max-w-[1440px] px-6 py-24 sm:px-12 lg:px-16">
         <SectionHeading eyebrow="Capabilities" title="A revenue-recovery engine, not another document store." />
-        <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {caps.map((c) => (
-            <div key={c.title} className="ip-card p-6">
-              <div className="grid h-10 w-10 place-items-center rounded-lg border border-ip-line bg-ip-navy/10 text-ip-navy">◆</div>
-              <h3 className="mt-4 text-base font-semibold tracking-tight text-ip-ink">{c.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-ip-ink-2">{c.body}</p>
+            <div
+              key={c.title}
+              className="group rounded-xl border border-ip-line bg-ip-card p-7 shadow-ip-card transition-all duration-200 hover:-translate-y-0.5 hover:border-ip-line-strong hover:shadow-ip-pop"
+            >
+              <div className="grid h-11 w-11 place-items-center rounded-lg border border-ip-navy/15 bg-ip-navy/8 text-ip-navy transition-colors duration-200 group-hover:bg-ip-navy/12">
+                <c.icon className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+              </div>
+              <h3 className="mt-5 text-base font-semibold leading-snug tracking-tight text-ip-ink">{c.title}</h3>
+              <p className="mt-2.5 text-sm leading-relaxed text-ip-ink-2">{c.body}</p>
             </div>
           ))}
         </div>
@@ -273,26 +282,29 @@ export function Features() {
 /* ---------------- section: product capabilities (factual, no metrics/claims) ---------------- */
 export function ProductCapabilities() {
   const items = [
-    { title: "Australia-wide Security of Payment awareness", body: "Notice periods and time-bar logic account for state and territory SoP regimes." },
-    { title: "Four supported document sources", body: "RFIs, site instructions, meeting minutes and project communications." },
-    { title: "Every variation linked to supporting evidence", body: "Each finding traces back to the source document it was detected from." },
+    { title: "Australia-wide Security of Payment awareness", body: "Notice periods and time-bar logic account for state and territory SoP regimes.", icon: Gavel },
+    { title: "Four supported document sources", body: "RFIs, site instructions, meeting minutes and project communications.", icon: Files },
+    { title: "Every variation linked to supporting evidence", body: "Each finding traces back to the source document it was detected from.", icon: FileCheck2 },
   ];
   return (
     <section className="relative border-b border-ip-line">
       <div className="mx-auto max-w-[1440px] px-6 py-20 sm:px-12 lg:px-16">
-        <div className="ip-card-lg p-8 sm:p-10">
-          <p className="ip-label mb-7">Product capabilities</p>
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
-            {items.map((i) => (
-              <div key={i.title} className="flex gap-3">
-                <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border border-ip-line bg-ip-navy/10 text-[12px] text-ip-navy">✓</span>
-                <div>
-                  <div className="text-sm font-semibold text-ip-ink">{i.title}</div>
-                  <div className="mt-1.5 text-[13px] leading-relaxed text-ip-ink-3">{i.body}</div>
-                </div>
+        <p className="ip-label mb-7">Product capabilities</p>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+          {items.map((i) => (
+            <div
+              key={i.title}
+              className="group rounded-xl border border-ip-line bg-ip-card p-6 shadow-ip-card transition-all duration-200 hover:-translate-y-0.5 hover:border-ip-line-strong hover:shadow-ip-pop"
+            >
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-ip-navy/15 bg-ip-navy/8 text-ip-navy transition-colors duration-200 group-hover:bg-ip-navy/12">
+                  <i.icon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
+                </span>
+                <div className="text-sm font-semibold leading-snug text-ip-ink">{i.title}</div>
               </div>
-            ))}
-          </div>
+              <p className="mt-3 text-[13px] leading-relaxed text-ip-ink-3">{i.body}</p>
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -330,9 +342,9 @@ const FOOTER_COLUMNS: { label: string; links: { title: string; href: string }[] 
   {
     label: "Product",
     links: [
-      { title: "Product preview", href: "#preview" },
-      { title: "How it works", href: "#how" },
-      { title: "Capabilities", href: "#capabilities" },
+      { title: "Product preview", href: "/#preview" },
+      { title: "How it works", href: "/#how" },
+      { title: "Capabilities", href: "/#capabilities" },
       { title: "Pricing", href: "/pricing" },
     ],
   },
@@ -355,10 +367,10 @@ export function SiteFooter() {
       <div className="mx-auto max-w-[1440px] px-6 py-12 sm:px-12 lg:px-16">
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div className="col-span-2 sm:col-span-1">
-            <div className="flex items-center gap-2.5">
+            <Link href="/" className="flex items-center gap-2.5" aria-label="VariationIQ home">
               <span className="grid h-7 w-7 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
               <span className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</span>
-            </div>
+            </Link>
             <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-ip-ink-3">
               AI revenue recovery for Australian construction — surfacing unclaimed variations from your project
               records before the time bar closes.
@@ -371,9 +383,9 @@ export function SiteFooter() {
               <ul className="mt-3 space-y-2.5">
                 {col.links.map((link) => (
                   <li key={link.title}>
-                    <a href={link.href} className="text-[13px] text-ip-ink-2 transition-colors hover:text-ip-ink">
+                    <Link href={link.href} className="text-[13px] text-ip-ink-2 transition-colors hover:text-ip-ink">
                       {link.title}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>

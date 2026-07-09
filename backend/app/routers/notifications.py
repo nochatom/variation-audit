@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -31,7 +31,10 @@ def _out(n) -> NotificationOut:
 
 
 @router.get("", response_model=list[NotificationOut])
-def list_notifications(unread: bool = False, limit: int = 50,
+def list_notifications(unread: bool = False,
+                       # Clamped: an attacker-controlled limit must not be able
+                       # to force an arbitrarily large result set into memory.
+                       limit: int = Query(50, ge=1, le=200),
                        user: User = Depends(get_current_user),
                        session: Session = Depends(get_db)) -> list[NotificationOut]:
     rows = notif_service.list_for_user(session, user, unread_only=unread, limit=limit)

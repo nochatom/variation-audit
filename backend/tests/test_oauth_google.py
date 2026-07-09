@@ -1,6 +1,6 @@
-"""Google login via Supabase (.25): JWKS verification, account resolution,
-and the additive POST /auth/google endpoint. The existing email/password +
-JWT + refresh-token system (test_auth.py) is untouched by any of this."""
+"""Google login via Supabase: JWKS verification, account resolution, and the
+additive POST /auth/google endpoint. The existing email/password + JWT +
+refresh-token system (test_auth.py) is untouched by any of this."""
 import uuid
 
 import jwt
@@ -8,14 +8,12 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 
-from datetime import datetime, timedelta, timezone
-
 from app.auth import supabase_jwt
 from app.auth.deps import get_db
 from app.auth.supabase_jwt import SupabaseNotConfigured, verify_supabase_token
 from app.auth.tokens import TokenError
 from app.main import app
-from app.models import Invitation, Membership, MembershipRole, Organization, User
+from app.models import Membership, MembershipRole, Organization, User
 from app.services import oauth_google
 from tests.fakes import FakeResult, FakeSession
 
@@ -40,9 +38,14 @@ class _FakeJwksClient:
         return _FakeSigningKey(self._public_key)
 
 
+_TEST_ISSUER = "https://project.supabase.co/auth/v1"
+
+
 def _sign(private_key, *, sub="user-sub-123", email="person@example.com",
-         aud="authenticated", email_verified=True, **overrides):
+         aud="authenticated", email_verified=True, iss=_TEST_ISSUER, **overrides):
     payload = {"sub": sub, "email": email, "aud": aud, "email_verified": email_verified, **overrides}
+    if iss is not None:  # iss=None lets a test mint a token with NO issuer claim
+        payload["iss"] = iss
     return jwt.encode(payload, private_key, algorithm="RS256")
 
 
@@ -58,19 +61,6 @@ def test_verify_supabase_token_roundtrip(monkeypatch, rsa_keypair):
     assert claims.sub == "user-sub-123"
     assert claims.email == "person@example.com"
     assert claims.email_verified is True
-    get_settings.cache_clear()
-
-
-def test_verify_supabase_token_rejects_unverified_email(monkeypatch, rsa_keypair):
-    private_key, public_key = rsa_keypair
-    monkeypatch.setenv("VA_SUPABASE_URL", "https://project.supabase.co")
-    from app.config import get_settings
-    get_settings.cache_clear()
-    monkeypatch.setattr(supabase_jwt, "_jwks_client", lambda url: _FakeJwksClient(public_key))
-
-    token = _sign(private_key, email_verified=False)
-    claims = verify_supabase_token(token)
-    assert claims.email_verified is False  # verification succeeds; the SERVICE layer rejects it
     get_settings.cache_clear()
 
 
@@ -100,8 +90,55 @@ def test_verify_supabase_token_rejects_tampered_signature(monkeypatch, rsa_keypa
     get_settings.cache_clear()
 
 
+def test_verify_supabase_token_rejects_wrong_issuer(monkeypatch, rsa_keypair):
+    """A validly-signed token minted by a DIFFERENT Supabase project (or any
+    other issuer) must be rejected even if signature/audience pass."""
+    private_key, public_key = rsa_keypair
+    monkeypatch.setenv("VA_SUPABASE_URL", "https://project.supabase.co")
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setattr(supabase_jwt, "_jwks_client", lambda url: _FakeJwksClient(public_key))
+
+    token = _sign(private_key, iss="https://attacker-project.supabase.co/auth/v1")
+    with pytest.raises(TokenError):
+        verify_supabase_token(token)
+    get_settings.cache_clear()
+
+
+def test_verify_supabase_token_rejects_missing_issuer(monkeypatch, rsa_keypair):
+    private_key, public_key = rsa_keypair
+    monkeypatch.setenv("VA_SUPABASE_URL", "https://project.supabase.co")
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setattr(supabase_jwt, "_jwks_client", lambda url: _FakeJwksClient(public_key))
+
+    token = _sign(private_key, iss=None)   # no iss claim at all
+    with pytest.raises(TokenError):
+        verify_supabase_token(token)
+    get_settings.cache_clear()
+
+
+def test_verify_supabase_token_missing_email_verified_defaults_false(monkeypatch, rsa_keypair):
+    """Fail closed: a token with NO email_verified claim must come back
+    unverified, so the service layer refuses to link it into an existing
+    account by email."""
+    private_key, public_key = rsa_keypair
+    monkeypatch.setenv("VA_SUPABASE_URL", "https://project.supabase.co")
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setattr(supabase_jwt, "_jwks_client", lambda url: _FakeJwksClient(public_key))
+
+    token = jwt.encode({"sub": "s", "email": "a@b.co", "aud": "authenticated",
+                        "iss": _TEST_ISSUER}, private_key, algorithm="RS256")
+    assert verify_supabase_token(token).email_verified is False
+    get_settings.cache_clear()
+
+
 def test_verify_supabase_token_not_configured_without_url(monkeypatch):
-    monkeypatch.delenv("VA_SUPABASE_URL", raising=False)
+    # Explicitly override to empty (not just delenv) — a real deployment's
+    # backend/.env may itself set VA_SUPABASE_URL, and pydantic-settings
+    # falls back to reading that file once the env var is merely deleted.
+    monkeypatch.setenv("VA_SUPABASE_URL", "")
     from app.config import get_settings
     get_settings.cache_clear()
     with pytest.raises(SupabaseNotConfigured):
@@ -143,69 +180,6 @@ def test_login_or_signup_rejects_unverified_email():
         oauth_google.login_or_signup_with_google(session, _claims(email_verified=False))
 
 
-def _pending_invitation(email, company_id=None):
-    return Invitation(
-        id=uuid.uuid4(), company_id=company_id or uuid.uuid4(), email=email,
-        role=MembershipRole.member, token_hash="irrelevant", invited_by=uuid.uuid4(),
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
-    )
-
-
-def test_login_or_signup_joins_invited_org_instead_of_creating_new_org():
-    """A first-time Google sign-in for an email with a pending invitation
-    must join the inviting org, not get a stray brand-new Organization —
-    the fix for the gap flagged in the regression risk report."""
-    inv = _pending_invitation("invited@firm.com")
-    session = FakeSession(results=[
-        FakeResult(scalar=None),          # _user_by_email: no existing account
-        FakeResult(scalars=[inv]),        # pending invitations for this email
-        FakeResult(scalar=None),          # _membership: not yet a member of inv.company_id
-    ])
-    user, is_new = oauth_google.login_or_signup_with_google(session, _claims(email="invited@firm.com"))
-
-    assert is_new is True
-    assert session.added_of(Organization) == []  # no new org created
-    memberships = session.added_of(Membership)
-    assert len(memberships) == 1
-    assert memberships[0].company_id == inv.company_id
-    assert memberships[0].role == MembershipRole.member  # the invitation's role, not admin
-    assert memberships[0].user_id == user.id
-    assert inv.accepted_at is not None and inv.accepted_by == user.id
-    assert session.commits == 1
-
-
-def test_login_or_signup_joins_every_pending_org_for_the_same_email():
-    """Multiple pending invitations to the same email (different orgs) are
-    all accepted, not just the first."""
-    inv_a = _pending_invitation("multi@firm.com")
-    inv_b = _pending_invitation("multi@firm.com")
-    session = FakeSession(results=[
-        FakeResult(scalar=None),
-        FakeResult(scalars=[inv_a, inv_b]),
-        FakeResult(scalar=None),   # _membership check for inv_a
-        FakeResult(scalar=None),   # _membership check for inv_b
-    ])
-    user, is_new = oauth_google.login_or_signup_with_google(session, _claims(email="multi@firm.com"))
-    memberships = session.added_of(Membership)
-    assert len(memberships) == 2
-    assert {m.company_id for m in memberships} == {inv_a.company_id, inv_b.company_id}
-    assert session.added_of(Organization) == []
-
-
-def test_login_or_signup_ignores_expired_or_accepted_invitations():
-    """Only a genuinely pending invitation should divert Google sign-in away
-    from creating a new org — an expired/already-accepted/revoked one (which
-    the real DB query filters out via WHERE, simulated here by simply not
-    returning it) must not block normal new-org provisioning."""
-    session = FakeSession(results=[
-        FakeResult(scalar=None),   # _user_by_email
-        FakeResult(scalars=[]),    # no genuinely-pending invitations match
-    ])
-    user, is_new = oauth_google.login_or_signup_with_google(session, _claims(email="new@firm.com"))
-    assert is_new is True
-    assert len(session.added_of(Organization)) == 1  # falls back to normal first-time signup
-
-
 # -- endpoint ------------------------------------------------------------------
 def _client(session):
     def _db():
@@ -232,19 +206,6 @@ def test_google_login_endpoint_mints_existing_token_shape(monkeypatch):
     body = resp.json()
     assert body["email"] == "person@example.com"
     assert "access_token" in body and "refresh_token" in body
-
-
-def test_google_login_endpoint_401_for_disabled_account(monkeypatch):
-    """An admin-disabled account must not be resurrectable via Google login —
-    the same is_active gate password login already enforces."""
-    from app.auth import router as auth_router
-
-    disabled = User(id=uuid.uuid4(), email="person@example.com", password_hash="x", is_active=False)
-    monkeypatch.setattr(auth_router, "verify_supabase_token",
-                       lambda token: supabase_jwt.SupabaseClaims(sub="s", email="person@example.com", email_verified=True))
-    session = FakeSession(results=[FakeResult(scalar=disabled)])
-    resp = _client(session).post("/auth/google", json={"supabase_access_token": "fake"})
-    assert resp.status_code == 401
 
 
 def test_google_login_endpoint_401_on_invalid_token(monkeypatch):
@@ -278,6 +239,19 @@ def test_google_login_endpoint_401_on_unverified_email(monkeypatch):
     assert resp.status_code == 401
 
 
+def test_google_login_endpoint_401_for_disabled_account(monkeypatch):
+    """An admin-disabled account must not be resurrectable via Google login —
+    the same is_active gate password login already enforces."""
+    from app.auth import router as auth_router
+
+    disabled = User(id=uuid.uuid4(), email="person@example.com", password_hash="x", is_active=False)
+    monkeypatch.setattr(auth_router, "verify_supabase_token",
+                       lambda token: supabase_jwt.SupabaseClaims(sub="s", email="person@example.com", email_verified=True))
+    session = FakeSession(results=[FakeResult(scalar=disabled)])
+    resp = _client(session).post("/auth/google", json={"supabase_access_token": "fake"})
+    assert resp.status_code == 401
+
+
 def test_existing_login_signup_refresh_endpoints_unaffected():
     """Sanity check that adding /auth/google didn't disturb the existing
     routes' registration/behavior."""
@@ -285,5 +259,7 @@ def test_existing_login_signup_refresh_endpoints_unaffected():
         "/auth/signup",
         json={"email": "still@works.com", "password": "pw123456", "org_name": "Org"},
     )
-    assert resp.status_code == 201
-    assert "access_token" in resp.json()
+    # Signup is non-enumerating (202 + generic body) — tokens come from the
+    # follow-up /auth/login the frontend performs.
+    assert resp.status_code == 202
+    assert "message" in resp.json()

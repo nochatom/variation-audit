@@ -51,14 +51,24 @@ def create_reset_token(session: Session, *, email: str, expire_minutes: int) -> 
     """Returns the raw token, or None if no account exists for this email —
     the caller (router) must not let that distinction leak to the client
     (always respond the same way regardless), it's only used internally to
-    decide whether to actually send an email."""
+    decide whether to actually send an email.
+
+    Timing parity: BOTH branches generate a token secret, hash it, and end
+    with a session.commit() (a DB round trip), so the account-exists path
+    isn't distinguishable by the latency of work the not-found path skips.
+    The only residual difference is the single-row INSERT itself flushing
+    inside the commit — sub-millisecond, well below network jitter."""
     user = _user_by_email(session, email)
-    if user is None:
-        return None
 
     secret = secrets.token_urlsafe(32)
+    token_hash = _hash(secret)
+
+    if user is None:
+        session.commit()   # same commit round trip as the exists path
+        return None
+
     token = PasswordResetToken(
-        id=uuid.uuid4(), user_id=user.id, token_hash=_hash(secret),
+        id=uuid.uuid4(), user_id=user.id, token_hash=token_hash,
         expires_at=_now() + timedelta(minutes=expire_minutes),
     )
     session.add(token)

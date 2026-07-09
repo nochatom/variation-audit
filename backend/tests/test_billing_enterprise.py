@@ -164,10 +164,36 @@ def test_enforce_storage_limit_over_limit_raises():
     free_limit_bytes = 500 * 1024 * 1024
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.free)),
-        FakeResult(scalar=free_limit_bytes - 100),  # nearly at the 500MB cap (SQL-aggregated sum)
+        # storage_bytes_used() is ONE combined execute (doc blobs + project
+        # contract/scope text) → one scalar, nearly at the 500MB cap.
+        FakeResult(scalar=free_limit_bytes - 100),
     ])
     with pytest.raises(billing_service.PlanLimitExceeded) as ei:
         billing_service.enforce_storage_limit(session, cid, additional_bytes=1_000)
+    assert ei.value.code == "storage_limit_exceeded"
+
+
+def test_storage_bytes_used_is_single_authoritative_calc():
+    """storage_bytes_used is the one source of truth used by enforcement —
+    it resolves to a single aggregated scalar (documents + project text),
+    computed live so it needs no separate usage counter to keep in sync."""
+    cid = uuid.uuid4()
+    session = FakeSession(results=[FakeResult(scalar=1_234_567)])
+    assert billing_service.storage_bytes_used(session, cid) == 1_234_567
+
+
+def test_enforce_storage_limit_counts_project_text_toward_quota():
+    """Regression for the review finding: contract/scope text persisted on
+    Project rows must count toward the quota, not just Document blobs. Here
+    the docs+text sum already exceeds Free's 500MB even with additional=0."""
+    cid = uuid.uuid4()
+    over = 500 * 1024 * 1024 + 1
+    session = FakeSession(results=[
+        FakeResult(scalar=_sub(cid, plan=PlanTier.free)),
+        FakeResult(scalar=over),   # combined doc + contract/scope bytes
+    ])
+    with pytest.raises(billing_service.PlanLimitExceeded) as ei:
+        billing_service.enforce_storage_limit(session, cid)
     assert ei.value.code == "storage_limit_exceeded"
 
 
@@ -331,17 +357,23 @@ def test_enforce_seat_limit_blocks_free_even_with_overage_configured(monkeypatch
     get_settings.cache_clear()
 
 
-def test_enforce_seat_limit_blocks_pro_without_overage_price_configured():
+def test_enforce_seat_limit_blocks_pro_without_overage_price_configured(monkeypatch):
     """No VA_STRIPE_PRICE_SEAT_OVERAGE set -> overage isn't billable yet, so
     the plan limit still hard-blocks (matches pre-.25 behaviour)."""
+    monkeypatch.setenv("VA_STRIPE_PRICE_SEAT_OVERAGE", "")
+    from app.config import get_settings
+    get_settings.cache_clear()
     cid = uuid.uuid4()
     sub = _sub(cid, plan=PlanTier.pro, stripe_subscription_id="sub_abc")
     session = FakeSession(results=[
         FakeResult(scalar=sub),
         FakeResult(scalars=list(range(15))),
     ])
-    with pytest.raises(billing_service.PlanLimitExceeded):
-        billing_service.enforce_seat_limit(session, cid)
+    try:
+        with pytest.raises(billing_service.PlanLimitExceeded):
+            billing_service.enforce_seat_limit(session, cid)
+    finally:
+        get_settings.cache_clear()
 
 
 def test_enforce_seat_limit_allows_overage_for_paid_plan_with_live_subscription(monkeypatch):
@@ -458,14 +490,20 @@ def test_start_checkout_selects_annual_price(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_start_checkout_annual_not_configured_raises():
+def test_start_checkout_annual_not_configured_raises(monkeypatch):
+    monkeypatch.setenv("VA_STRIPE_PRICE_PRO_ANNUAL", "")
+    from app.config import get_settings
+    get_settings.cache_clear()
     cid = uuid.uuid4()
     actor = User(id=uuid.uuid4(), email="admin@example.com", password_hash="x", is_active=True)
     sub = Subscription(id=uuid.uuid4(), company_id=cid, plan=PlanTier.free,
                        status=SubscriptionStatus.active)
     session = FakeSession(results=[FakeResult(scalar=sub)])
-    with pytest.raises(billing_service.PlanNotConfigured):
-        billing_service.start_checkout(session, cid, actor, PlanTier.pro, "annual")
+    try:
+        with pytest.raises(billing_service.PlanNotConfigured):
+            billing_service.start_checkout(session, cid, actor, PlanTier.pro, "annual")
+    finally:
+        get_settings.cache_clear()
 
 
 # ============================================================================

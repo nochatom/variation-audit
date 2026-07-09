@@ -80,8 +80,10 @@ export function UpgradeModal({
           return (
             <div key={p.tier} className={`rounded-md border p-4 ${isCurrent ? "border-ip-navy" : "border-ip-line"}`}>
               <div className="text-sm font-bold text-ip-ink">{p.label}</div>
-              <div className="mt-1 text-[13px] font-semibold text-ip-ink">
-                {p.tier === "enterprise" ? "Contact sales" : price === 0 ? "Free" : (
+              <div className="mt-1 text-[13px] font-semibold tabular-nums text-ip-ink">
+                {p.tier === "enterprise" ? "Contact sales" : price === 0 ? (
+                  <>A$0 <span className="font-normal text-ip-ink-3">Forever</span></>
+                ) : (
                   <>AUD {price!.toLocaleString()} <span className="font-normal text-ip-ink-3">/ {interval === "monthly" ? "mo" : "yr"}</span></>
                 )}
               </div>

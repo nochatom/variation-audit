@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user, get_db, require_admin
 from app.models import MembershipRole, User
+from app.services import billing as billing_service
 from app.services import orgs as org_service
 
 router = APIRouter(prefix="/orgs/{company_id}/members", tags=["organizations"])
@@ -45,6 +46,13 @@ def add_member(company_id: uuid.UUID, req: AddMemberRequest,
                user: User = Depends(get_current_user),
                session: Session = Depends(get_db)) -> MemberOut:
     require_admin(session, user, company_id)
+    # Same plan-seat enforcement as the invitation flow — without this,
+    # direct add was a way around the seat cap.
+    try:
+        billing_service.enforce_seat_limit(session, company_id)
+    except billing_service.PlanLimitExceeded as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED,
+                            {"error_code": exc.code, "message": str(exc)})
     try:
         m = org_service.add_member(session, company_id=company_id, actor=user,
                                    email=req.email, role=req.role)

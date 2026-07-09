@@ -12,6 +12,14 @@ from email.message import EmailMessage
 from app.logging_config import security_logger
 
 
+def _header_safe(value: str) -> str:
+    """Strip CR/LF (and other header-breaking control chars) from a value
+    before it's embedded in an email header. Org/user names are
+    user-controlled input; a name containing a newline must never be able to
+    inject additional headers into outbound mail."""
+    return "".join(ch for ch in value if ch not in "\r\n\x00").strip()
+
+
 class SmtpMailer:
     """Sends mail via SMTP (STARTTLS by default)."""
 
@@ -29,7 +37,8 @@ class SmtpMailer:
         import smtplib  # imported lazily so non-SMTP deployments needn't touch it
 
         msg = EmailMessage()
-        msg["Subject"] = f"{inviter_name} invited you to join {org_name} on VariationIQ"
+        msg["Subject"] = (f"{_header_safe(inviter_name)} invited you to join "
+                          f"{_header_safe(org_name)} on VariationIQ")
         msg["From"] = self.from_addr
         msg["To"] = to_email
         msg.set_content(
@@ -63,6 +72,31 @@ class SmtpMailer:
                 smtp.login(self.username, self.password)
             smtp.send_message(msg)
 
+    def send_account_exists_notice(self, *, to_email: str, login_url: str) -> None:
+        """Sent when someone tries to sign up with an email that already has
+        an account — the signup response itself is deliberately identical in
+        both cases (no user-enumeration signal), so this email is how the
+        legitimate owner finds out and gets routed to login/reset."""
+        import smtplib
+
+        msg = EmailMessage()
+        msg["Subject"] = "You already have a VariationIQ account"
+        msg["From"] = self.from_addr
+        msg["To"] = to_email
+        msg.set_content(
+            f"Someone (probably you) tried to create a VariationIQ account with this email, "
+            f"but an account already exists.\n\n"
+            f"Sign in here:\n{login_url}\n\n"
+            f"Forgot your password? Use \"Forgot password?\" on the sign-in page.\n"
+            f"If this wasn't you, no action is needed — no new account was created."
+        )
+        with smtplib.SMTP(self.host, self.port, timeout=10) as smtp:
+            if self.use_tls:
+                smtp.starttls()
+            if self.username and self.password:
+                smtp.login(self.username, self.password)
+            smtp.send_message(msg)
+
 
 class ConsoleMailer:
     """Logs the invitation instead of sending it. Dev/test fallback when no
@@ -88,6 +122,16 @@ class ConsoleMailer:
                 "event": "password_reset_email_console",
                 "to_email": to_email,
                 "reset_url": reset_url,
+            },
+        )
+
+    def send_account_exists_notice(self, *, to_email: str, login_url: str) -> None:
+        security_logger.info(
+            "account-exists notice email (console mailer — no VA_SMTP_HOST configured)",
+            extra={
+                "event": "account_exists_email_console",
+                "to_email": to_email,
+                "login_url": login_url,
             },
         )
 

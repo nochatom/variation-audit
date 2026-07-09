@@ -27,6 +27,23 @@ MAX_CONTRACT_BYTES = 20 * 1024 * 1024   # 20MB — contract/scope PDFs
 MAX_CSV_BYTES = 10 * 1024 * 1024        # 10MB — register CSV uploads
 
 
+def _parse_or_400(parse_fn, *args):
+    """Malformed uploads (corrupt PDF, broken CSV, wrong file renamed to
+    .pdf) must be a clean 400, not an unhandled 500 with a stack trace in
+    the logs — the parser libraries raise a wide variety of exception types
+    on hostile input, so this deliberately catches broadly."""
+    try:
+        return parse_fn(*args)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "could not parse the uploaded file — check it is a valid, uncorrupted file")
+
+
+# Content types browsers legitimately send for the contract upload. A .pdf
+# filename with a non-PDF content type is rejected before parsing.
+_PDF_CONTENT_TYPES = {"application/pdf", "application/x-pdf", "application/octet-stream"}
+
+
 async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
     """Read an upload, rejecting it (413) if it exceeds max_bytes.
 
@@ -200,7 +217,38 @@ async def upload_contract(request: Request, response: Response,
                           user: User = Depends(get_current_user),
                           session: Session = Depends(get_db)) -> ProjectOut:
     project = _load_project(session, user, project_id)
-    text = parsing.extract_text(file.filename or "", await _read_capped(file, MAX_CONTRACT_BYTES))
+    is_pdf = (file.filename or "").lower().endswith(".pdf")
+    if is_pdf and file.content_type and file.content_type not in _PDF_CONTENT_TYPES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "file has a .pdf name but a non-PDF content type")
+    data = await _read_capped(file, MAX_CONTRACT_BYTES)
+    # Magic-byte validation — content type and filename are both
+    # caller-controlled, so neither is trusted on its own: a PDF must
+    # actually start with the %PDF- header. (No stream-reset needed: the
+    # capped read above buffered the full body, and `data` is what gets
+    # parsed.) The pypdf parse inside extract_text then validates real
+    # structure; _parse_or_400 turns any parser failure into a clean 400.
+    if is_pdf and not data.startswith(b"%PDF-"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "file is not a valid PDF (missing PDF header)")
+    text = _parse_or_400(parsing.extract_text, file.filename or "", data)
+    # Bound the EXTRACTED text too, not just the raw upload — the JSON create
+    # path caps contract_text at MAX_TEXT_LEN, and this path must not be a
+    # way around that cap (or around the plan storage quota).
+    if len(text) > MAX_TEXT_LEN:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE,
+                            f"extracted text exceeds the {MAX_TEXT_LEN // 1000}KB limit")
+    # This upload REPLACES the project's existing contract/scope text (already
+    # counted in current usage), so the added storage is only the delta — the
+    # new text's byte size minus what's being overwritten. Without this a
+    # same-size re-upload would be double-counted and wrongly rejected.
+    old_bytes = len(((project.scope_text if is_scope else project.contract_text) or "").encode("utf-8"))
+    delta = max(0, len(text.encode("utf-8")) - old_bytes)
+    try:
+        billing_service.enforce_storage_limit(session, project.company_id, additional_bytes=delta)
+    except billing_service.PlanLimitExceeded as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED,
+                            {"error_code": exc.code, "message": str(exc)})
     if is_scope:
         project_service.set_contract(session, project, scope_text=text)
     else:
@@ -220,7 +268,7 @@ async def upload_comms(request: Request, response: Response,
                        user: User = Depends(get_current_user),
                        session: Session = Depends(get_db)) -> CommsUploadResponse:
     project = _load_project(session, user, project_id)
-    rows = parsing.parse_comms_csv(await _read_capped(file, MAX_CSV_BYTES))
+    rows = _parse_or_400(parsing.parse_comms_csv, await _read_capped(file, MAX_CSV_BYTES))
     _check_upload_limits(session, project.company_id, rows)
     store = build_loader()
     for r in rows:
@@ -246,7 +294,7 @@ async def upload_rfis(request: Request, response: Response,
                       store=Depends(get_store)) -> RfiUploadResponse:
     """Ingest an RFI register CSV — one source_type=rfi Document per RFI row."""
     project = _load_project(session, user, project_id)
-    rows = parsing.parse_rfi_csv(await _read_capped(file, MAX_CSV_BYTES))
+    rows = _parse_or_400(parsing.parse_rfi_csv, await _read_capped(file, MAX_CSV_BYTES))
     _check_upload_limits(session, project.company_id, rows)
     for r in rows:
         project_service.add_document(
@@ -272,7 +320,7 @@ async def upload_site_instructions(request: Request, response: Response,
                                    store=Depends(get_store)) -> SiteInstructionUploadResponse:
     """Ingest a site-instruction register CSV — one source_type=site_instruction Document per row."""
     project = _load_project(session, user, project_id)
-    rows = parsing.parse_site_instructions_csv(await _read_capped(file, MAX_CSV_BYTES))
+    rows = _parse_or_400(parsing.parse_site_instructions_csv, await _read_capped(file, MAX_CSV_BYTES))
     _check_upload_limits(session, project.company_id, rows)
     for r in rows:
         project_service.add_document(
@@ -298,7 +346,7 @@ async def upload_meeting_minutes(request: Request, response: Response,
                                  store=Depends(get_store)) -> MeetingMinutesUploadResponse:
     """Ingest a meeting-minutes register CSV — one source_type=meeting_note Document per item."""
     project = _load_project(session, user, project_id)
-    rows = parsing.parse_meeting_minutes_csv(await _read_capped(file, MAX_CSV_BYTES))
+    rows = _parse_or_400(parsing.parse_meeting_minutes_csv, await _read_capped(file, MAX_CSV_BYTES))
     _check_upload_limits(session, project.company_id, rows)
     for r in rows:
         project_service.add_document(

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -59,7 +59,10 @@ def _load_variation(session, user, variation_id) -> Variation:
 
 # -- org audit trail (admin only) -----------------------------------------
 @router.get("/audit", response_model=list[AuditOut])
-def org_audit(company_id: uuid.UUID, entity_type: str | None = None, limit: int = 100,
+def org_audit(company_id: uuid.UUID, entity_type: str | None = None,
+              # Clamped: an attacker-controlled limit must not be able to
+              # force an arbitrarily large result set into memory.
+              limit: int = Query(100, ge=1, le=500),
               user: User = Depends(get_current_user),
               session: Session = Depends(get_db)) -> list[AuditOut]:
     require_admin(session, user, company_id)

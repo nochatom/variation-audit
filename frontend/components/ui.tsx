@@ -97,13 +97,20 @@ export function ConfidenceBar({ score }: { score: number }) {
 }
 
 export function TimeBarFlag({ risk }: { risk: boolean }) {
+  // Semantic status color: red = time-bar risk (ip-risk), green = on track
+  // (ip-recovery, the same token used elsewhere for positive/recovered
+  // value) — reuses the existing design-system tokens so this stays
+  // consistent with every other risk/positive indicator in the app.
   return risk ? (
     <span className="inline-flex items-center gap-1 font-semibold text-ip-risk">
       <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 6l7 12H5l7-12zm-1 3v4h2v-4h-2zm0 5v2h2v-2h-2z" /></svg>
       at risk
     </span>
   ) : (
-    <span className="text-ip-ink-3">—</span>
+    <span className="inline-flex items-center gap-1 font-semibold text-ip-recovery">
+      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+      on track
+    </span>
   );
 }
 
