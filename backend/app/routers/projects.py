@@ -1,6 +1,7 @@
 """Project endpoints: create/list/get, contract & comms upload, analyze."""
 from __future__ import annotations
 
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
@@ -18,6 +19,7 @@ from app.services import projects as project_service
 from app.storage import build_loader, get_store
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+logger = logging.getLogger("va.projects.router")
 
 # Australian states/territories — mirrors the frontend's <select> (defense in
 # depth: validated server-side too, since the API is reachable directly).
@@ -254,6 +256,90 @@ async def upload_contract(request: Request, response: Response,
     else:
         project_service.set_contract(session, project, contract_text=text)
     return _out(project)
+
+
+class DocumentUploadResponse(BaseModel):
+    id: str
+    project_id: str
+    source_type: str
+    storage_key: str
+    size_bytes: int
+
+
+@router.post("/{project_id}/documents", response_model=DocumentUploadResponse,
+             status_code=status.HTTP_201_CREATED)
+@limiter.limit(UPLOAD_LIMIT)
+async def upload_document(request: Request, response: Response,
+                          project_id: uuid.UUID, file: UploadFile = File(...),
+                          user: User = Depends(get_current_user),
+                          session: Session = Depends(get_db),
+                          store=Depends(get_store)) -> DocumentUploadResponse:
+    """Upload a single arbitrary supporting document (PDF or text) — stored
+    in object storage (Supabase Storage's private `project-documents`
+    bucket in production, via app.storage.build_loader()) and registered as
+    a Document row (source_type=document — the one SourceType value with no
+    other upload path). Distinct from /comms, /rfis, /site-instructions,
+    /meeting-minutes, which each ingest a structured CSV register of many
+    rows in one call; this is for a single standalone file.
+
+    Reuses the exact same validation, parsing, and persistence pattern as
+    /contract (magic-byte PDF check, extract_text, MAX_TEXT_LEN cap) and
+    project_service.add_document() (the same function every CSV-register
+    endpoint already uses) — no new service-layer logic.
+    """
+    project = _load_project(session, user, project_id)
+
+    filename = file.filename or ""
+    is_pdf = filename.lower().endswith(".pdf")
+    if is_pdf and file.content_type and file.content_type not in _PDF_CONTENT_TYPES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "file has a .pdf name but a non-PDF content type")
+
+    data = await _read_capped(file, MAX_CONTRACT_BYTES)
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "uploaded file is empty")
+    # Magic-byte validation — same rationale as /contract: filename and
+    # content-type are both caller-controlled, neither is trusted alone.
+    if is_pdf and not data.startswith(b"%PDF-"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "file is not a valid PDF (missing PDF header)")
+
+    text = _parse_or_400(parsing.extract_text, filename, data)
+    if len(text) > MAX_TEXT_LEN:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE,
+                            f"extracted text exceeds the {MAX_TEXT_LEN // 1000}KB limit")
+
+    try:
+        billing_service.enforce_document_limit(session, project.company_id, additional=1)
+        billing_service.enforce_storage_limit(session, project.company_id,
+                                              additional_bytes=len(text.encode("utf-8")))
+    except billing_service.PlanLimitExceeded as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED,
+                            {"error_code": exc.code, "message": str(exc)})
+
+    try:
+        document = project_service.add_document(
+            session, store, company_id=project.company_id, project_id=project.id,
+            source_type=SourceType.document, content=text, source=filename or None,
+        )
+    except Exception:
+        # Object storage (Supabase Storage / S3) is an external dependency —
+        # a transient failure there must be a clean 502, not an unhandled
+        # 500 with a stack trace, and must be logged with enough context to
+        # investigate without ever logging the file's content.
+        logger.exception(
+            "document upload to object storage failed",
+            extra={"project_id": str(project.id), "company_id": str(project.company_id),
+                  "uploaded_filename": filename},
+        )
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY,
+                            "failed to store the uploaded document — please try again")
+
+    return DocumentUploadResponse(
+        id=str(document.id), project_id=str(project.id),
+        source_type=document.source_type.value, storage_key=document.storage_key,
+        size_bytes=document.size_bytes or 0,
+    )
 
 
 class CommsUploadResponse(BaseModel):

@@ -1,11 +1,62 @@
 """Document content loaders (DocumentLoader implementations).
 
 The worker needs raw document text given a storage_key. Production uses S3
-(ap-southeast-2); dev/tests can read from a local directory.
+(ap-southeast-2) or Supabase Storage; dev/tests can read from a local
+directory.
 """
 from __future__ import annotations
 
 import os
+
+
+class SupabaseStorageLoader:
+    """Loads/stores document content in a private Supabase Storage bucket
+    via direct REST calls to Supabase's Storage API — no supabase-py SDK
+    dependency, matching this codebase's existing lightweight pattern for
+    Supabase integration (see app/auth/supabase_jwt.py's raw JWKS fetch).
+
+    Requires the service_role key (not the anon key): the bucket is
+    private, and this loader only ever runs in a trusted server context
+    (worker, API backend) — never exposed to a browser.
+    """
+
+    def __init__(self, project_url: str, service_role_key: str, bucket: str, client=None):
+        import httpx  # already a dependency (app/engine/client.py)
+
+        self.bucket = bucket
+        self._base_url = f"{project_url.rstrip('/')}/storage/v1"
+        # `client` is injectable so tests can pass an httpx.Client wired to
+        # an httpx.MockTransport instead of hitting the real network —
+        # production code always uses the default (a real client).
+        self._client = client if client is not None else httpx.Client(
+            headers={
+                "Authorization": f"Bearer {service_role_key}",
+                "apikey": service_role_key,
+            },
+            timeout=30.0,
+        )
+
+    def load(self, storage_key: str) -> str:
+        resp = self._client.get(f"{self._base_url}/object/{self.bucket}/{storage_key}")
+        resp.raise_for_status()
+        return resp.content.decode("utf-8", errors="replace")
+
+    def put(self, storage_key: str, data: bytes | str) -> str:
+        body = data.encode("utf-8") if isinstance(data, str) else data
+        resp = self._client.post(
+            f"{self._base_url}/object/{self.bucket}/{storage_key}",
+            content=body,
+            headers={"Content-Type": "application/octet-stream", "x-upsert": "true"},
+        )
+        resp.raise_for_status()
+        return storage_key
+
+    def delete(self, storage_key: str) -> None:
+        resp = self._client.delete(f"{self._base_url}/object/{self.bucket}/{storage_key}")
+        if resp.status_code not in (200, 404):
+            # A missing key is idempotent-success, same contract as S3/local
+            # below; anything else (auth failure, network error) is real.
+            resp.raise_for_status()
 
 
 class S3DocumentLoader:
@@ -60,12 +111,15 @@ class LocalDocumentLoader:
 
 
 def build_loader():
-    """Pick a loader from settings: local dir if configured, else S3."""
+    """Pick a loader from settings: local dir (dev/tests) if configured,
+    else Supabase Storage if configured, else S3 (the original default)."""
     from app.config import get_settings
 
     s = get_settings()
     if s.local_doc_dir:
         return LocalDocumentLoader(s.local_doc_dir)
+    if s.supabase_url and s.supabase_service_role_key:
+        return SupabaseStorageLoader(s.supabase_url, s.supabase_service_role_key, s.supabase_storage_bucket)
     return S3DocumentLoader(s.s3_bucket, s.s3_region, s.s3_endpoint_url)
 
 

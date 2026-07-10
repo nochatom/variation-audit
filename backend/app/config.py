@@ -71,6 +71,17 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_jwt_aud: str = "authenticated"
 
+    # Supabase Storage — an additional object-storage backend for
+    # app/storage.py's DocumentLoader, alongside the existing S3/local-dir
+    # options (build_loader() prefers this when configured; see storage.py).
+    # service_role key is required (not the anon key): the bucket is
+    # private, and the backend is a trusted server context, same trust
+    # level as this app's own DB connection string — never exposed to the
+    # browser. Unset -> build_loader() falls back to S3/local exactly as
+    # before, so this is purely additive.
+    supabase_service_role_key: str | None = None
+    supabase_storage_bucket: str = "project-documents"
+
     # Billing (.23). Unset stripe_secret_key -> NullBillingProvider: the
     # billing UI still renders (subscription defaults to Free/active, usage
     # is always real), but checkout/portal actions report "not configured"
