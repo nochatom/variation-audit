@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.agents import circuit_breaker, provider_health
 from app.agents.errors import AIProviderError
 from app.agents.run import analyze_project_with_agents
 from app.models import AgentAnalysisJob, AgentJobStatus
@@ -179,12 +180,51 @@ def _make_progress_callback(job: AgentAnalysisJob, session: Session):
     return on_agent_complete
 
 
+def _make_llm_call_sink(job: AgentAnalysisJob, llm_calls: list[dict], session_factory):
+    """Per-call telemetry sink handed to ReliableLlm via run.py's
+    on_llm_call — feeds provider_health.record() and
+    circuit_breaker.record_outcome() (Phase 4's actual behavior change:
+    the circuit breaker now receives real outcomes, including failures,
+    for the first time).
+
+    Deliberately best-effort: llm_calls.append() always happens first and
+    unconditionally — the per-job metrics list worker.py already persisted
+    before Phase 4 — so a telemetry failure can never cause a call to go
+    unrecorded there. provider_health/circuit_breaker recording runs in
+    its own short-lived session (never the job's own `session` — the same
+    reasoning as the heartbeat loop: two "parallel" agent branches must
+    never share one SQLAlchemy Session) and any exception is caught and
+    logged, never re-raised — a telemetry outage must not fail the agent
+    run or the job.
+    """
+
+    def on_llm_call(metrics: dict) -> None:
+        llm_calls.append(metrics)
+        if session_factory is None:
+            return
+        try:
+            with session_factory() as telemetry_session:
+                provider_health.record(telemetry_session, metrics)
+                circuit_breaker.record_outcome(
+                    telemetry_session, metrics.get("provider"),
+                    success=metrics.get("success", True),
+                    error_code=metrics.get("error_code"),
+                )
+        except Exception:  # noqa: BLE001 - telemetry must never fail the job
+            logger.exception("provider telemetry recording failed", extra={
+                "job_id": str(job.id), "provider": metrics.get("provider"),
+            })
+
+    return on_llm_call
+
+
 async def _process_job_async(
     session: Session, job: AgentAnalysisJob, worker_id: str,
     session_factory, heartbeat_interval_s: float,
 ) -> None:
     llm_calls: list[dict] = []
     on_agent_complete = _make_progress_callback(job, session)
+    on_llm_call = _make_llm_call_sink(job, llm_calls, session_factory)
 
     heartbeat_task = None
     if session_factory is not None:
@@ -199,7 +239,7 @@ async def _process_job_async(
             user_id=str(job.created_by) if job.created_by else "system",
             job_id=str(job.id),
             on_agent_complete=on_agent_complete,
-            on_llm_call=llm_calls.append,
+            on_llm_call=on_llm_call,
         )
     except AIProviderError as exc:
         fail_job(session, job, exc.code, str(exc), llm_calls=llm_calls)

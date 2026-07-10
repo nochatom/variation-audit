@@ -209,40 +209,15 @@ def test_human_review_gate_passes_through_when_clean():
 
 
 # --------------------------------------------------------------------------
-# model_provider.py
+# model_provider.py — superseded by tests/test_model_provider_phase4.py
+# (Phase 4 replaced the static agent_model_provider selection this file's
+# tests exercised with ProviderRouter-based dynamic selection; get_model()
+# no longer reads settings via a module-level `get_settings` name at all,
+# so the old monkeypatch target here no longer exists). See that file for
+# the equivalent and expanded coverage: backward compatibility (Gate 1),
+# every-role resolution, no-provider-available (Gate 3), and proof that
+# get_model() genuinely delegates to ProviderRouter.
 # --------------------------------------------------------------------------
-class _FakeAgentSettings:
-    agent_model_provider = "openai"
-    anthropic_agent_api_key = None
-    nvidia_nim_openai_api_key = "key-openai"
-    nvidia_nim_glm_api_key = "key-glm"
-    nvidia_nim_gemini_api_key = "key-gemini"
-
-
-@pytest.mark.parametrize("provider", ["openai", "glm", "gemini", "claude"])
-def test_get_model_returns_reliable_llm_for_every_known_provider(monkeypatch, provider):
-    from app.agents import model_provider
-    from app.agents.reliable_llm import ReliableLlm
-
-    settings = _FakeAgentSettings()
-    settings.agent_model_provider = provider
-    monkeypatch.setattr(model_provider, "get_settings", lambda: settings)
-    model = model_provider.get_model("variation_detection")
-
-    assert isinstance(model, ReliableLlm)
-    # every non-openai provider gets an openai-role fallback; openai itself doesn't
-    assert (model._fallback is not None) == (provider != "openai")
-
-
-def test_get_model_rejects_unknown_provider(monkeypatch):
-    from app.agents import model_provider
-
-    settings = _FakeAgentSettings()
-    settings.agent_model_provider = "bogus"
-    monkeypatch.setattr(model_provider, "get_settings", lambda: settings)
-
-    with pytest.raises(ValueError):
-        model_provider.get_model("variation_detection")
 
 
 # --------------------------------------------------------------------------

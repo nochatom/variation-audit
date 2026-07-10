@@ -2,114 +2,193 @@
 scaffold.
 
 Every LlmAgent constructor asks for a model by role via get_model() and
-never hardcodes a provider — switching providers is a config change
-(VA_AGENT_MODEL_PROVIDER), not a code change. What get_model() actually
-returns is a ReliableLlm (app/agents/reliable_llm.py): a BaseLlm that wraps
-the selected primary model with an explicit timeout, retry-with-backoff,
-and fallback to a secondary NVIDIA NIM model — the NVIDIA-hosted
-google/gemma-4-31b-it model measured a 60-90s+ cold-start after idle in
-this session's live verification, and a bare LiteLlm has no timeout or
-retry behavior of its own.
+never hardcodes a provider — model_provider.py is the ONLY file that
+changed for Phase 4 (plus a one-line worker.py telemetry addition); every
+other agent/orchestrator file is unmodified. What get_model() returns is
+still a ReliableLlm (app/agents/reliable_llm.py) — its retry/timeout/
+fallback/schema-validation/metrics behavior is completely untouched.
 
-Current setup routes "openai"/"glm"/"gemini" through NVIDIA NIM's
-OpenAI-compatible endpoint (build.nvidia.com) — litellm has a native
-`nvidia_nim/<model-slug>` provider that resolves the endpoint itself; each
-role uses its own NVIDIA API key since the three were issued separately
-(see .env). "gemini" here is an NVIDIA-hosted stand-in model, not the real
-Google Gemini API — there's no VA_GOOGLE_API_KEY in this project.
-"claude" still goes through litellm's native Anthropic path (reads
-VA_ANTHROPIC_AGENT_API_KEY), unused today but kept for a real Claude key.
+Selection is now dynamic (docs/decisions/26-provider-router.md): role ->
+ROLE_REQUIREMENTS (capability_requirements.py) -> ProviderRouter.select()
+-> top-2 ProviderSelections -> primary/fallback ReliableLlm, using the
+DB-backed health/circuit sources (provider_health.py, circuit_breaker.py)
+so a provider that's actually tripped its circuit is genuinely excluded in
+production, not just structurally capable of being excluded.
 
-Missing credentials fail at the first live model call, not at construction
-time — matching this codebase's existing "unset -> feature reports
-not-configured, doesn't crash" pattern (e.g. NullBillingProvider).
+Backward compatibility (Phase 4 merge gate): with VA_AGENT_ROUTING_POLICY=
+highest_priority and the current registry seed (only nvidia_nim/
+openai/gpt-oss-120b enabled), this produces the exact same LiteLlm
+model/api_key/timeout the old static agent_model_provider selection did —
+see tests/test_model_provider_phase4.py's backward-compat test, which runs
+both implementations side by side and asserts identical output.
+
+If ProviderRouter.select() finds no viable candidate (every provider
+disabled, or every candidate's circuit open), it raises
+NoProviderAvailableError — get_model() lets it propagate unchanged. Never
+silently falls back to an undefined provider.
 """
 from __future__ import annotations
 
-from app.config import get_settings
+import logging
+import time
+from functools import lru_cache
 
-# NVIDIA-catalog model slug per role. Defaults picked for each role's intent
-# (openai -> OpenAI's open-weight gpt-oss; glm -> Z.ai's GLM; gemini ->
-# Google's open-weight Gemma, the closest NVIDIA-hosted stand-in) and
-# confirmed live against https://integrate.api.nvidia.com/v1/models —
-# override by editing here if your NVIDIA account has a different model
-# selected, or if NVIDIA retires one of these (they do this on notice; a
-# retired slug fails with a clear 410 Gone at the model call, not silently).
-_NVIDIA_NIM_MODEL_SLUGS = {
-    "openai": "openai/gpt-oss-120b",
-    "glm": "z-ai/glm-5.2",
-    "gemini": "google/gemma-4-31b-it",
+from app.agents.capability_requirements import ROLE_REQUIREMENTS
+from app.agents.provider_selection import ProviderSelection
+
+logger = logging.getLogger("app.agents.model_provider")
+
+# In-process short-circuit for the telemetry DB itself (see
+# _ResilientHealthSource/_ResilientCircuitSource below): one agent
+# construction calls these up to twice per role (health + circuit) across
+# up to 7 roles — without this, a genuinely unreachable telemetry DB would
+# pay a fresh multi-second connect timeout on every single one of those
+# calls. Once any call fails, skip attempting a new connection for this
+# many seconds and degrade immediately instead.
+_TELEMETRY_DB_RETRY_AFTER_S = 30.0
+_telemetry_db_unavailable_until = 0.0
+
+
+def _telemetry_db_marked_down() -> bool:
+    return time.monotonic() < _telemetry_db_unavailable_until
+
+
+def _mark_telemetry_db_down() -> None:
+    global _telemetry_db_unavailable_until
+    _telemetry_db_unavailable_until = time.monotonic() + _TELEMETRY_DB_RETRY_AFTER_S
+
+# (provider, model) -> (settings field holding its API key, request timeout
+# seconds). The provider/model values here must match capability_registry.py
+# entries exactly — this is the only place secrets/timeouts are looked up,
+# deliberately kept out of the registry (static, no credentials) and out of
+# the router (selection only, never touches credentials or transport).
+_MODEL_RUNTIME_CONFIG: dict[tuple[str, str], tuple[str, int]] = {
+    ("nvidia_nim", "openai/gpt-oss-120b"): ("nvidia_nim_openai_api_key", 60),
+    ("nvidia_nim", "z-ai/glm-5.2"): ("nvidia_nim_glm_api_key", 60),
+    # gemma-4-31b-it measured a genuine 60-90s+ cold start live in an
+    # earlier session — 120s gives headroom above the worst observed case.
+    ("nvidia_nim", "google/gemma-4-31b-it"): ("nvidia_nim_gemini_api_key", 120),
+    ("anthropic", "claude-sonnet-5"): ("anthropic_agent_api_key", 60),
 }
 
-_NVIDIA_NIM_KEY_SETTING = {
-    "openai": "nvidia_nim_openai_api_key",
-    "glm": "nvidia_nim_glm_api_key",
-    "gemini": "nvidia_nim_gemini_api_key",
-}
 
-# NVIDIA NIM request timeout, per role. gemini (gemma-4-31b-it) measured a
-# genuine 60-90s+ cold start live in this session — 120s gives headroom
-# above the worst observed case rather than the requirement's bare minimum.
-# The other two NVIDIA-hosted roles responded in ~1-3s in the same session,
-# but still get a generous timeout since cold starts are a property of
-# "hasn't been called recently," not specific to one model.
-_NVIDIA_NIM_TIMEOUT_S = {
-    "openai": 60,
-    "glm": 60,
-    "gemini": 120,
-}
+@lru_cache
+def _telemetry_session_factory():
+    """A dedicated session factory for circuit/health reads at agent-
+    construction time — deliberately separate from app.db's shared engine
+    (used for the actual job/business data), with a short connect timeout,
+    so an unreachable or slow telemetry DB fails fast (a few seconds)
+    instead of blocking agent construction for the driver's full default
+    connect timeout (which can be minutes). Cached: built once per process,
+    not once per agent."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
 
-# Fallback target for every NVIDIA-hosted role: openai/gpt-oss-120b, per the
-# requirement's own example, and the fastest/most reliable of the three in
-# this session's live tests. A role already ON openai has no fallback (would
-# just be the same model failing twice).
-_FALLBACK_PROVIDER = "openai"
+    from app.config import get_settings
+
+    engine = create_engine(
+        get_settings().database_url,
+        pool_pre_ping=False,
+        connect_args={"connect_timeout": 2},
+    )
+    return sessionmaker(bind=engine, expire_on_commit=False, future=True)
 
 
-def _build_litellm(provider: str) -> object:
-    from google.adk.models.lite_llm import LiteLlm
+class _ResilientHealthSource:
+    """Wraps DbHealthSource: a telemetry-DB outage must never block agent
+    construction — degrades to 'no data' on any error (routing_policies.py
+    already handles that case explicitly), logging once rather than
+    propagating. Checks the module-level short-circuit first so a known-down
+    DB doesn't pay a fresh connect timeout on every call."""
 
-    settings = get_settings()
+    def __init__(self, delegate):
+        self._delegate = delegate
 
-    if provider in _NVIDIA_NIM_MODEL_SLUGS:
-        api_key = getattr(settings, _NVIDIA_NIM_KEY_SETTING[provider])
-        model_slug = _NVIDIA_NIM_MODEL_SLUGS[provider]
-        timeout = _NVIDIA_NIM_TIMEOUT_S[provider]
-        return LiteLlm(model=f"nvidia_nim/{model_slug}", api_key=api_key, timeout=timeout)
+    def get(self, provider: str):
+        if _telemetry_db_marked_down():
+            return None
+        try:
+            return self._delegate.get(provider)
+        except Exception:  # noqa: BLE001 - a telemetry read must never block selection
+            logger.warning("provider health lookup failed for %s — treating as no data",
+                           provider, exc_info=True)
+            _mark_telemetry_db_down()
+            return None
 
-    if provider == "claude":
-        return LiteLlm(model="anthropic/claude-sonnet-5", api_key=settings.anthropic_agent_api_key, timeout=60)
 
-    raise ValueError(
-        f"unknown VA_AGENT_MODEL_PROVIDER={provider!r} — expected one of "
-        f"{sorted({*_NVIDIA_NIM_MODEL_SLUGS, 'claude'})}"
+class _ResilientCircuitSource:
+    """Wraps DbCircuitBreaker with the same fail-open philosophy as
+    _ResilientHealthSource above: an unreachable circuit-state DB degrades
+    to 'treat as closed' (selectable), never blocks or crashes agent
+    construction. When the DB is actually reachable, real circuit state is
+    honored exactly as Phase 3 built it — this only changes behavior on a
+    telemetry-infrastructure failure, not on a genuinely open circuit."""
+
+    def __init__(self, delegate):
+        self._delegate = delegate
+
+    def is_open(self, provider: str) -> bool:
+        if _telemetry_db_marked_down():
+            return False
+        try:
+            return self._delegate.is_open(provider)
+        except Exception:  # noqa: BLE001 - a telemetry read must never block selection
+            logger.warning("circuit state check failed for %s — treating as closed",
+                           provider, exc_info=True)
+            _mark_telemetry_db_down()
+            return False
+
+
+def _build_router():
+    from app.agents.circuit_breaker import DbCircuitBreaker
+    from app.agents.provider_health import DbHealthSource
+    from app.agents.provider_router import ProviderRouter
+
+    session_factory = _telemetry_session_factory()
+    return ProviderRouter(
+        health_source=_ResilientHealthSource(DbHealthSource(session_factory)),
+        circuit_source=_ResilientCircuitSource(DbCircuitBreaker(session_factory)),
     )
 
 
-def get_model(role: str | None = None) -> object:
-    """Resolve the model to use for an agent, per VA_AGENT_MODEL_PROVIDER.
+def _build_litellm_from_selection(selection: ProviderSelection):
+    from google.adk.models.lite_llm import LiteLlm
 
-    Returns a ReliableLlm (app/agents/reliable_llm.py) wrapping the selected
-    provider's LiteLlm as primary, with a fallback to NVIDIA NIM's
-    openai/gpt-oss-120b for timeout/rate-limit/unavailable failures — never
-    for auth failures (see app/agents/errors.py's retryable flag). `role` is
-    accepted now for a future per-role override map (e.g. a cheaper model
-    for Document/Contract) — unused today, every role gets the same
-    provider default.
+    from app.config import get_settings
+
+    settings = get_settings()
+    key_setting, timeout = _MODEL_RUNTIME_CONFIG.get((selection.provider, selection.model), (None, 60))
+    api_key = getattr(settings, key_setting) if key_setting else None
+    return LiteLlm(model=f"{selection.provider}/{selection.model}", api_key=api_key, timeout=timeout)
+
+
+def get_model(role: str) -> object:
+    """Resolve the model to use for an agent, by role.
+
+    Returns a ReliableLlm wrapping the top-ranked ProviderRouter selection
+    as primary and the second-ranked (if any) as fallback — same
+    ReliableLlm construction as before Phase 4, just fed dynamically
+    selected models instead of a single static config value. Raises
+    NoProviderAvailableError (app/agents/errors.py) if the router finds no
+    viable candidate — never silently substitutes an undefined provider.
     """
-    del role  # reserved for future per-role overrides
     from app.agents.reliable_llm import ReliableLlm
 
-    provider = get_settings().agent_model_provider
-    primary = _build_litellm(provider)
+    requirements = ROLE_REQUIREMENTS[role]
+    router = _build_router()
+    selections = router.select(requirements)  # raises NoProviderAvailableError if empty
+
+    primary_selection = selections[0]
+    primary = _build_litellm_from_selection(primary_selection)
 
     fallback = None
     fallback_provider = None
-    if provider != _FALLBACK_PROVIDER:
-        fallback = _build_litellm(_FALLBACK_PROVIDER)
-        fallback_provider = _FALLBACK_PROVIDER
+    if len(selections) > 1:
+        fallback_selection = selections[1]
+        fallback = _build_litellm_from_selection(fallback_selection)
+        fallback_provider = fallback_selection.provider
 
     return ReliableLlm(
-        primary=primary, primary_provider=provider,
+        primary=primary, primary_provider=primary_selection.provider,
         fallback=fallback, fallback_provider=fallback_provider,
     )
