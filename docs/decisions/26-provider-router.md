@@ -17,8 +17,14 @@ anything in this document.
 - `ProviderRequirements` abstraction (§4)
 - `capability_requirements.py` as static configuration data (§5)
 - `ProviderRouter.select(requirements)` (§7)
-- `ProviderSelection` with `provider`, `model`, `routing_reason`, `policy`,
-  `selection_id`, `selected_at` (§6)
+- `ProviderSelection` metadata object: `provider`, `model`, `routing_reason`,
+  `policy`, `selection_id`, `selected_at` (§6)
+- `provider_call_log` aggregation (read-time, indexed, bounded) as the
+  source of truth for health/latency/rate metrics (§8)
+- DB-backed circuit state (`provider_circuit_state`), readable cross-process
+  by the API's diagnostic endpoints (§8, §9)
+- HTTP 429 explicitly excluded from tripping the circuit breaker (§9) —
+  confirmed, no longer just a flagged judgment call (see Change 1 below)
 
 **Rejected:**
 - `provider_health_snapshot` table (ADR-3) — read-time aggregation instead
@@ -27,11 +33,8 @@ anything in this document.
 - Moving execution responsibilities into `ProviderRouter` — selection only,
   never execution, retries, fallback, parsing, or metrics (§3, §7)
 
-One judgment call made during design and not explicitly specified in the
-original request: **`AIRateLimitError` (429) does not trip the circuit
-breaker** (§9) — reachable-but-throttled is not an availability failure,
-and `ReliableLlm`'s existing retry/backoff already handles it. Flagged for
-awareness; no objection raised, treated as confirmed.
+This full list is repeated, with rationale, in §20 (Final review — decision
+summary) at the end of this document.
 
 ## 1. Problem
 
@@ -214,17 +217,31 @@ One row per completed `ReliableLlm` call — the exact same metrics dict
 already produced today (§13 wiring), just also persisted per-provider
 instead of only per-job.
 
-**Cost derivation:** `estimated_cost_per_token` is dynamic health data (Part
-3 of the original design explicitly separates it from static registry
-metadata), but computing a dollar figure needs a price rate from
-somewhere. That rate itself doesn't change with provider health, so each
-`capability_registry.py` entry carries one extra static field —
-`price_per_1k_tokens` — used *only* for this multiplication, never for
-capability matching or filtering. `provider_health.py` computes the actual
-`estimated_cost_per_token` aggregate by multiplying logged
-`input_tokens`/`output_tokens` by that static rate over the query window —
-so the rate is static, the resulting cost aggregate is dynamic, consistent
-with the Part 2/Part 3 split.
+### Cost model: static price vs. dynamic actuals — explicit separation
+
+**Static Capability Registry** (`capability_registry.py`) holds
+configuration metadata only: `provider`, `model_name`, `capabilities`,
+`max_context`, `supports_json`, `supports_streaming`, `supports_reasoning`,
+`supports_tools`, `priority`, `enabled`, `tags`, and `price_per_1k_tokens`.
+**`price_per_1k_tokens` is configuration metadata, not runtime health
+data** — it's a price list entry, unrelated to whether the provider is
+currently healthy, and it never changes based on observed behavior. It is
+used *only* for cost estimation math, never for capability matching or
+filtering.
+
+**Runtime Provider Health** (`provider_health.py`, backed by
+`provider_call_log`) holds everything that's actually observed: real input
+tokens, real output tokens, real latency, success rate, failure rate,
+retry count, fallback count, and observed cost aggregates.
+
+**Actual cost is always `real token usage logs × static model pricing
+metadata`** — `provider_health.py` computes the `estimated_cost_per_token`
+(and any windowed total-cost aggregate) by multiplying logged
+`input_tokens`/`output_tokens` from `provider_call_log` by the matching
+model's static `price_per_1k_tokens` from the registry, over the query
+window. The rate is static; the resulting aggregate is dynamic. Neither
+table duplicates the other's data — the registry never stores an observed
+number, and the health layer never stores a price.
 
 ### `provider_circuit_state` (one mutable row per provider)
 ```sql
@@ -271,18 +288,53 @@ HALF_OPEN --[next call succeeds]--> CLOSED
 HALF_OPEN --[next call fails]--> OPEN (reset cooldown)
 ```
 
-Trips on: `AIProviderTimeoutError`, `AIProviderUnavailableError`.
-Never trips on: `AIAuthError` (401/403 — a config problem, not an
+**Trips on:** `AIProviderTimeoutError`, `AIProviderUnavailableError`
+(covers connection failures and HTTP 503 — both already classified into
+`AIProviderUnavailableError` by `errors.py`'s existing `classify_exception`).
+
+**Never trips on:** `AIAuthError` (401/403 — a config problem, not an
 infrastructure one; retrying/routing around it fixes nothing),
 `AISchemaValidationError` (a model-output-quality problem, not a
-reachability one), `AIRateLimitError` is deliberately **excluded from
-tripping the circuit** — a 429 means the provider is reachable and working,
-just temporarily throttled; that's already handled by `ReliableLlm`'s own
-retry/backoff, and treating it as a circuit-breaker trigger would take a
-perfectly healthy provider out of rotation for a transient rate limit.
+reachability one), and any other application-level error (invalid
+prompts, etc.) — none of these indicate the provider is unreachable, so
+none of them should remove it from rotation.
 
-Defaults (configurable in `config.py`, matching this project's existing
-`rate_limit_*`-style settings pattern): failure threshold 5, cooldown 60s.
+### HTTP 429 (rate limit) — explicit handling
+
+**429 MUST NOT trip the circuit breaker.** A 429 means the provider is
+reachable, healthy, and working — the caller simply exceeded its current
+request allowance. That is not an infrastructure availability failure, and
+treating it as one would pull a perfectly healthy provider out of rotation
+over something `ReliableLlm` already handles correctly on its own.
+
+```
+HTTP 429 Rate Limit
+      │
+      ├──▶ Retry with exponential backoff        (ReliableLlm — unchanged, existing)
+      │
+      ├──▶ Recorded in provider_call_log          (success=false, error_code=AI_RATE_LIMIT_ERROR)
+      │
+      ├──▶ Visible in provider health metrics     (§8's read-time aggregation includes it
+      │                                             in failure_rate/retry_rate like any other
+      │                                             logged outcome — no special-casing needed,
+      │                                             since it's just a row with an error_code)
+      │
+      └──▶ Circuit breaker: NOT evaluated          (AIRateLimitError is simply absent from the
+                                                     "trips on" list above — no code path treats
+                                                     it as a circuit-relevant outcome)
+```
+
+429s remain fully queryable for diagnostics (`/internal/providers/metrics`,
+§11) and available as an input to routing policies (e.g. a future policy
+could deprioritize a provider with a high recent 429 rate without ever
+opening its circuit — see §10's `lowest_cost` note on retry/fallback
+overhead) — being excluded from circuit-tripping doesn't mean the data is
+discarded, only that it doesn't independently gate availability.
+
+### Defaults
+
+Configurable in `config.py`, matching this project's existing
+`rate_limit_*`-style settings pattern: failure threshold 5, cooldown 60s.
 
 ## 10. Routing policies
 
@@ -305,6 +357,27 @@ current runtime behavior until a second model is enabled in the registry.
 
 `VA_AGENT_MODEL_PROVIDER` is deprecated in favor of the registry's `enabled`
 flags + this policy setting — see the deprecation note in §13.
+
+### `lowest_cost`, scoped for the initial implementation
+
+A cost-aware policy that only looked at static `price_per_1k_tokens` would
+be misleading: a cheap-per-token model that retries constantly or falls
+back often can end up *more* expensive per successful analysis than a
+pricier model that rarely fails. The complete picture is static price
+combined with observed token usage, retry overhead, fallback frequency, and
+provider reliability.
+
+**The initial implementation deliberately does not build all of that.** It
+ranks by: static `price_per_1k_tokens` × recent observed average token
+usage from `provider_health` where available (falling back to
+registry price alone if a provider has no call history yet — a new or
+rarely-used model shouldn't be unrankable just because
+`provider_call_log` has no rows for it). Retry overhead, fallback
+frequency, and a reliability-weighted cost score are **explicitly deferred
+— documented here as a future enhancement, not built now.** Doing so before
+there's real usage data to validate against would be tuning a formula
+against numbers nobody has observed yet — the same shape of premature
+optimization ADR-3 already rejected for the health-snapshot table.
 
 ## 11. Diagnostics endpoints
 
@@ -555,3 +628,45 @@ with an admin user.
 12. Tests per §18.
 13. Full existing suite re-run for regression (expect zero changes to
     existing test outcomes — this is the backward-compatibility proof).
+
+## 20. Final review — decision summary
+
+**Approved:**
+- `ProviderRequirements` abstraction (§4)
+- `capability_requirements.py` as static configuration data (§5)
+- `ProviderRouter.select(requirements)` (§7)
+- `ProviderSelection` metadata object (§6)
+- `provider_call_log` aggregation — read-time, indexed, bounded window,
+  no snapshot table (§8)
+- DB-backed circuit state (`provider_circuit_state`), readable cross-process
+  (§8, §9)
+- HTTP 429 explicitly excluded from tripping the circuit breaker (§9) —
+  retried by `ReliableLlm`, logged to `provider_call_log`, visible in
+  health metrics and diagnostics, available to future routing decisions
+
+**Rejected:**
+- `provider_health_snapshot` table (ADR-3)
+- Class-per-agent capability profiles (ADR-2)
+- Replacing `ReliableLlm`
+- Moving execution logic (retries, fallback execution, schema validation,
+  parsing, metrics collection) into `ProviderRouter`
+
+**Deferred (documented, not built now):**
+- `lowest_cost` policy's full reliability-weighted formula (retry overhead,
+  fallback frequency as first-class inputs) — §10. Initial version uses
+  static price × observed average token usage only.
+- Hourly-bucketed health rollups — only if call volume grows by orders of
+  magnitude beyond current rate limits (ADR-3's revisit condition).
+
+### Open questions
+
+None outstanding. The one previously-flagged judgment call (429 vs. the
+circuit breaker) is now an explicit, approved requirement rather than an
+assumption — Change 1 in this revision formalizes exactly the behavior
+already implemented in §9's design, so no design change to any component
+was needed there, only clearer documentation of the rule and its
+visibility guarantees.
+
+No other ambiguity was identified while applying Changes 1–3. The document
+is implementation-ready as it stands; the next step remains `writing-plans`
+for a detailed implementation plan, per the brainstorming process.
