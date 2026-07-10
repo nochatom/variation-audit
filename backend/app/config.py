@@ -7,8 +7,15 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Provider Router (docs/decisions/26-provider-router.md §10). Must fail
+# loudly on an invalid value at Settings() construction time rather than
+# silently falling back to a default — see the field_validator below.
+VALID_AGENT_ROUTING_POLICIES = frozenset({
+    "highest_priority", "lowest_latency", "lowest_cost", "highest_quality", "longest_context",
+})
 
 
 class Settings(BaseSettings):
@@ -149,6 +156,40 @@ class Settings(BaseSettings):
     nvidia_nim_openai_api_key: str | None = None
     nvidia_nim_glm_api_key: str | None = None
     nvidia_nim_gemini_api_key: str | None = None
+
+    # Provider Router (docs/decisions/26-provider-router.md). Picks which
+    # routing_policies.py function ProviderRouter.select() uses to rank
+    # capability-filtered, circuit-closed candidates. "highest_priority" is
+    # the default and, with the Phase 1 registry seed (only one model
+    # enabled), reproduces today's exact static agent_model_provider
+    # behavior — see the Phase 4 backward-compatibility test.
+    #
+    # Deliberately fails loudly (raises at Settings() construction, i.e. at
+    # process startup) on an unsupported value instead of silently falling
+    # back to a default — an invalid VA_AGENT_ROUTING_POLICY is a
+    # configuration bug, and masking it would mean silently routing every
+    # agent through unintended logic instead of failing where the mistake
+    # actually is.
+    agent_routing_policy: str = "highest_priority"
+
+    @field_validator("agent_routing_policy")
+    @classmethod
+    def _validate_agent_routing_policy(cls, v: str) -> str:
+        if v not in VALID_AGENT_ROUTING_POLICIES:
+            raise ValueError(
+                f"VA_AGENT_ROUTING_POLICY={v!r} is not a supported routing "
+                f"policy — expected one of {sorted(VALID_AGENT_ROUTING_POLICIES)}. "
+                "Fix the environment variable; this fails loudly rather than "
+                "silently falling back to a default."
+            )
+        return v
+
+    # Circuit breaker defaults (docs/decisions/26-provider-router.md §9).
+    # Independent per-provider state; these thresholds are conservative on
+    # purpose — tune only once real provider_call_log data suggests they
+    # should move, not speculatively.
+    agent_circuit_failure_threshold: int = 5
+    agent_circuit_cooldown_seconds: int = 60
 
 
 @lru_cache

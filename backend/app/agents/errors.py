@@ -72,6 +72,16 @@ class AIProviderUnavailableError(AIProviderError):
     retryable = True
 
 
+class NoProviderAvailableError(AIProviderError):
+    """Raised by ProviderRouter.select() when zero registry candidates
+    survive capability + circuit-state filtering — a clear, immediate
+    failure at selection time rather than a confusing crash later inside
+    ReliableLlm when it's handed nothing to work with."""
+
+    code = "AI_NO_PROVIDER_AVAILABLE"
+    retryable = False
+
+
 def classify_exception(exc: Exception, *, provider: str | None = None, model: str | None = None) -> AIProviderError:
     """Map a raw exception (litellm's, or a stdlib timeout) to one of the
     four AIProviderError subclasses above."""
