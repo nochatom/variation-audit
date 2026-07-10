@@ -156,6 +156,21 @@ def record_outcome(
     session.commit()
 
 
+def list_states(session: Session) -> list[dict]:
+    """Every provider_circuit_state row — used by
+    app/routers/internal_providers.py's /circuits endpoint. Read-only, no
+    lazy OPEN->HALF_OPEN transition here (that's is_open()'s job, only
+    triggered by an actual selection attempt) — diagnostics must observe
+    state, never change it."""
+    rows = session.execute(
+        text(
+            "SELECT provider, state, failure_count, opened_at, last_success, last_failure "
+            "FROM provider_circuit_state ORDER BY provider"
+        )
+    ).mappings().all()
+    return [dict(row) for row in rows]
+
+
 def _as_aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 

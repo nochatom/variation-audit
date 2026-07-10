@@ -24,6 +24,7 @@ from app.routers.audit import router as audit_router
 from app.routers.billing import router as billing_router
 from app.routers.billing import webhook_router as billing_webhook_router
 from app.routers.dashboard import router as dashboard_router
+from app.routers.internal_providers import router as internal_providers_router
 from app.routers.invitations import org_router as org_invitations_router
 from app.routers.invitations import public_router as invitations_router
 from app.routers.notifications import router as notifications_router
@@ -78,6 +79,7 @@ app.include_router(notifications_router)
 app.include_router(audit_router)
 app.include_router(billing_router)
 app.include_router(billing_webhook_router)
+app.include_router(internal_providers_router)
 
 
 # Exempt from rate limiting: load balancers and uptime monitors probe this
