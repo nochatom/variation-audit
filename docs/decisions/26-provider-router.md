@@ -336,6 +336,31 @@ discarded, only that it doesn't independently gate availability.
 Configurable in `config.py`, matching this project's existing
 `rate_limit_*`-style settings pattern: failure threshold 5, cooldown 60s.
 
+### Not to be confused with: the Availability Cache (Phase 4, `model_provider.py`)
+
+Phase 4's implementation added a second, much smaller mechanism that
+**must not be conflated with the Circuit Breaker above** — they solve
+different problems and were built for different reasons:
+
+| | Circuit Breaker (`circuit_breaker.py`) | Availability Cache (`model_provider.py`) |
+|---|---|---|
+| Protects against | An unhealthy **LLM provider** | An unreachable **health/circuit database** |
+| Tracks | Provider call failures (timeout, unavailable) | Nothing about providers — no concept of "provider health" |
+| Storage | `provider_circuit_state`, Postgres-persisted, cross-process | A single in-process module-level timestamp, reset on restart |
+| Governs | Whether `ProviderRouter` actually excludes a provider from selection | Whether this process even *attempts* a fresh DB read for a few seconds |
+| Trips because | A provider genuinely failed calls | The telemetry DB connection was unreachable/slow — unrelated to any provider's health |
+| Effect on `provider_circuit_state` | Is the thing that updates it | **None whatsoever** |
+
+In short: the Circuit Breaker answers "is this LLM provider healthy?" The
+Availability Cache answers "can this process currently reach the database
+that would tell me?" — and when the answer is no, it **fails open**
+(assumes healthy/closed) so a health/circuit database outage degrades
+gracefully — see `_ResilientHealthSource`/`_ResilientCircuitSource` — rather
+than blocking or crashing agent construction. It exists solely to preserve
+agent startup and execution during an observability-infrastructure failure;
+it never makes a provider-health decision and never touches
+`provider_circuit_state`. See ADR-5.
+
 ## 10. Routing policies
 
 `VA_AGENT_ROUTING_POLICY` setting, one of:
@@ -532,6 +557,35 @@ partially fake.
 would be — acceptable, since the fields this decision rejects wouldn't have
 been reliably populated anyway.
 
+### ADR-5: the Availability Cache is a separate mechanism from the Circuit Breaker
+**Decision:** the 30-second in-process TTL added in Phase 4
+(`model_provider.py`'s `_AVAILABILITY_CACHE_TTL_S` /
+`_telemetry_db_marked_down()` / `_mark_telemetry_db_down()`) is named and
+documented as an **Availability Cache**, explicitly distinct from — and
+never described as part of — the Circuit Breaker (`circuit_breaker.py`,
+§9). It never reads or writes `provider_circuit_state`.
+**Why:** Phase 4 discovered that wiring `ProviderRouter`'s DB-backed
+health/circuit sources into `get_model()` meant every agent construction
+now needed a live database connection — a property the scaffold never had
+before, and a real regression when that database is slow or unreachable
+(observed live: 2+ minutes per orchestrator build against a stalled local
+Postgres, since one construction reads health/circuit data up to twice per
+role across 7 roles). The fix needed two parts: (1) fail fast rather than
+wait out a multi-driver-default connect timeout, and (2) don't repeat that
+fast-fail attempt on every one of those ~14 reads once the database is
+known to be down. Both are about *this process's ability to reach a
+database*, not about *any LLM provider's health* — conflating them into
+"the circuit breaker" would misrepresent what actually trips it (a DB
+outage, not a provider failure) and what it protects (agent construction
+continuing to work, not routing away from a bad provider).
+**Trade-off:** a provider whose circuit is *genuinely* open won't be
+correctly excluded for up to the cache's 30-second window if a DB blip
+happens to coincide with that check — acceptable, since the alternative
+(no cache) is agent construction blocking for minutes on a routine
+telemetry hiccup, which is a worse failure mode than routing to a
+still-degraded provider for a few extra seconds (`ReliableLlm`'s own
+retry/fallback layer remains the backstop either way, unchanged).
+
 ## 16. Provider onboarding guide
 
 Steps to add a **new provider** (e.g. a future Anthropic-direct or OpenAI-
@@ -670,3 +724,16 @@ visibility guarantees.
 No other ambiguity was identified while applying Changes 1–3. The document
 is implementation-ready as it stands; the next step remains `writing-plans`
 for a detailed implementation plan, per the brainstorming process.
+
+### Phase 4 addendum
+
+**Approved (added during implementation, documented after the fact):**
+- The **Availability Cache** (`model_provider.py`, ADR-5, §9's "Not to be
+  confused with" subsection) — a 30-second in-process TTL discovered to be
+  necessary once Phase 4 actually wired live DB-backed health/circuit
+  sources into `get_model()`. Explicitly **not** part of the Circuit
+  Breaker: it protects agent construction from a health/circuit *database*
+  outage, tracks nothing about provider health, never reads or writes
+  `provider_circuit_state`, and fails open. No production behavior beyond
+  what Phase 4's gates already required — this addendum is a naming/
+  documentation clarification, not a new decision to approve or reject.

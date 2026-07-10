@@ -26,6 +26,13 @@ If ProviderRouter.select() finds no viable candidate (every provider
 disabled, or every candidate's circuit open), it raises
 NoProviderAvailableError — get_model() lets it propagate unchanged. Never
 silently falls back to an undefined provider.
+
+This file also introduces an Availability Cache (below) — a short in-process
+TTL that stops repeatedly retrying an unreachable telemetry database. It is
+NOT part of the Circuit Breaker (circuit_breaker.py) and has no effect on
+provider_circuit_state: it protects agent construction from a health/circuit
+*database* outage, not from an unhealthy *LLM provider*. See the detailed
+comparison table above _AVAILABILITY_CACHE_TTL_S below.
 """
 from __future__ import annotations
 
@@ -38,24 +45,72 @@ from app.agents.provider_selection import ProviderSelection
 
 logger = logging.getLogger("app.agents.model_provider")
 
-# In-process short-circuit for the telemetry DB itself (see
-# _ResilientHealthSource/_ResilientCircuitSource below): one agent
-# construction calls these up to twice per role (health + circuit) across
-# up to 7 roles — without this, a genuinely unreachable telemetry DB would
-# pay a fresh multi-second connect timeout on every single one of those
-# calls. Once any call fails, skip attempting a new connection for this
-# many seconds and degrade immediately instead.
-_TELEMETRY_DB_RETRY_AFTER_S = 30.0
+# --------------------------------------------------------------------------
+# Availability Cache — NOT the Circuit Breaker.
+#
+# This is a distinct, deliberately simpler mechanism from
+# circuit_breaker.py's provider_circuit_state machine (closed/open/half-open,
+# DB-persisted, one row per LLM provider, driven by classified call
+# outcomes). Do not conflate the two:
+#
+#   Circuit Breaker (circuit_breaker.py)          Availability Cache (here)
+#   ------------------------------------          --------------------------
+#   Protects against unhealthy LLM providers.      Protects against health/
+#                                                   circuit *database*
+#                                                   outages.
+#   Tracks provider call failures (timeout,         Tracks nothing about
+#   unavailable) via provider_circuit_state.        providers — has no
+#                                                    concept of "provider
+#                                                    health" at all.
+#   Persisted in Postgres; visible across every      In-process only (a
+#   process, survives a restart.                     plain module-level
+#                                                      timestamp); reset on
+#                                                      every process restart.
+#   Governs actual provider *selection* — an          Governs whether this
+#   OPEN circuit genuinely excludes a provider         process even
+#   from ProviderRouter's candidate list.               ATTEMPTS to read
+#                                                        circuit/health data
+#                                                        for a few seconds —
+#                                                        has zero effect on
+#                                                        provider_circuit_
+#                                                        state itself.
+#   A provider trips it by actually failing.          The DB connection
+#                                                       trips it by being
+#                                                       unreachable/slow —
+#                                                       has nothing to do
+#                                                       with whether any
+#                                                       provider is healthy.
+#
+# In short: the Circuit Breaker is about LLM provider health. The
+# Availability Cache is about whether *this process* can currently reach the
+# telemetry database at all — and it fails open (assumes healthy/closed)
+# specifically so that a health/circuit DB outage degrades gracefully
+# instead of blocking agent construction, per _ResilientHealthSource/
+# _ResilientCircuitSource below. One agent construction reads health/circuit
+# data up to twice per role across up to 7 roles — without this cache, a
+# genuinely unreachable telemetry DB would pay a fresh multi-second connect
+# timeout on every single one of those reads. Once any read fails, this
+# cache skips attempting a new connection for a fixed window and degrades
+# immediately instead — existing purely to preserve agent startup and
+# execution during observability-infrastructure failures, never to make a
+# provider-health decision.
+# --------------------------------------------------------------------------
+_AVAILABILITY_CACHE_TTL_S = 30.0
 _telemetry_db_unavailable_until = 0.0
 
 
 def _telemetry_db_marked_down() -> bool:
+    """True while the Availability Cache considers the telemetry DB down —
+    not a statement about any LLM provider's health."""
     return time.monotonic() < _telemetry_db_unavailable_until
 
 
 def _mark_telemetry_db_down() -> None:
+    """Records that the telemetry DB was just unreachable, for the
+    Availability Cache's TTL window — never touches provider_circuit_state
+    or any Circuit Breaker data."""
     global _telemetry_db_unavailable_until
-    _telemetry_db_unavailable_until = time.monotonic() + _TELEMETRY_DB_RETRY_AFTER_S
+    _telemetry_db_unavailable_until = time.monotonic() + _AVAILABILITY_CACHE_TTL_S
 
 # (provider, model) -> (settings field holding its API key, request timeout
 # seconds). The provider/model values here must match capability_registry.py
@@ -98,8 +153,9 @@ class _ResilientHealthSource:
     """Wraps DbHealthSource: a telemetry-DB outage must never block agent
     construction — degrades to 'no data' on any error (routing_policies.py
     already handles that case explicitly), logging once rather than
-    propagating. Checks the module-level short-circuit first so a known-down
-    DB doesn't pay a fresh connect timeout on every call."""
+    propagating. Consults the Availability Cache first (see above) so a
+    known-down DB doesn't pay a fresh connect timeout on every call — this
+    class has no relationship to circuit_breaker.py's Circuit Breaker."""
 
     def __init__(self, delegate):
         self._delegate = delegate
@@ -117,12 +173,16 @@ class _ResilientHealthSource:
 
 
 class _ResilientCircuitSource:
-    """Wraps DbCircuitBreaker with the same fail-open philosophy as
-    _ResilientHealthSource above: an unreachable circuit-state DB degrades
-    to 'treat as closed' (selectable), never blocks or crashes agent
-    construction. When the DB is actually reachable, real circuit state is
-    honored exactly as Phase 3 built it — this only changes behavior on a
-    telemetry-infrastructure failure, not on a genuinely open circuit."""
+    """Wraps DbCircuitBreaker (the real Circuit Breaker, circuit_breaker.py)
+    with the same fail-open philosophy as _ResilientHealthSource above: an
+    unreachable circuit-state DB degrades to 'treat as closed' (selectable),
+    never blocks or crashes agent construction. When the DB is actually
+    reachable, real circuit state is honored exactly as Phase 3 built it —
+    the Availability Cache only changes behavior on a telemetry-
+    infrastructure failure (can't reach provider_circuit_state at all), not
+    on a genuinely open circuit (reachable, and a provider tripped it) —
+    those two situations are deliberately handled by two different
+    mechanisms, not conflated into one."""
 
     def __init__(self, delegate):
         self._delegate = delegate
