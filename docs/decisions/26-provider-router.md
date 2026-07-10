@@ -1,9 +1,37 @@
 # .26 — Provider Router: policy-driven, health-aware model selection
 
-Status: Approved (design). Not yet implemented.
-Scope: `backend/app/agents/` only. Additive infrastructure — no change to the
-agent graph, orchestrator, worker, queue, heartbeat, or `ReliableLlm`'s
-execution responsibilities.
+**Status: FINAL — architecture review complete, approved for
+implementation.** Not yet implemented (no code changes in this document).
+
+Scope: `backend/app/agents/` (+ one new admin router) only. Additive
+infrastructure — no change to the agent graph, orchestrator, worker, queue,
+heartbeat, or `ReliableLlm`'s execution responsibilities. Explicitly out of
+scope for this work: `app/models.py`, `app/services/billing.py`, and any
+other large-file refactor flagged during the earlier tooling pass — those
+are separate, unrelated future architecture tasks and are not touched by
+anything in this document.
+
+### Approved / rejected, for the record
+
+**Approved:**
+- `ProviderRequirements` abstraction (§4)
+- `capability_requirements.py` as static configuration data (§5)
+- `ProviderRouter.select(requirements)` (§7)
+- `ProviderSelection` with `provider`, `model`, `routing_reason`, `policy`,
+  `selection_id`, `selected_at` (§6)
+
+**Rejected:**
+- `provider_health_snapshot` table (ADR-3) — read-time aggregation instead
+- Class-per-agent capability profiles (ADR-2) — flat dict instead
+- Replacing `ReliableLlm` — it is unmodified; only its inputs become dynamic
+- Moving execution responsibilities into `ProviderRouter` — selection only,
+  never execution, retries, fallback, parsing, or metrics (§3, §7)
+
+One judgment call made during design and not explicitly specified in the
+original request: **`AIRateLimitError` (429) does not trip the circuit
+breaker** (§9) — reachable-but-throttled is not an availability failure,
+and `ReliableLlm`'s existing retry/backoff already handles it. Flagged for
+awareness; no objection raised, treated as confirmed.
 
 ## 1. Problem
 
@@ -51,7 +79,7 @@ line (orchestrator, worker, queue), is out of scope and untouched.
 | Component | Owns | Does NOT own |
 |---|---|---|
 | `capability_requirements.py` | role → `ProviderRequirements` static data | provider selection, execution |
-| `capability_registry.py` | static model metadata (provider, model, capabilities, context, flags, priority, enabled) | dynamic health, selection logic |
+| `capability_registry.py` | static model metadata (provider, model, capabilities, context, flags, priority, enabled, price_per_1k_tokens) | dynamic health, selection logic |
 | `provider_health.py` | reads/writes `provider_call_log`; computes aggregates | circuit state transitions |
 | `circuit_breaker.py` | circuit state machine, reads/writes `provider_circuit_state` | health metrics, selection |
 | `routing_policies.py` | pure ranking functions given health + registry data | filtering, circuit checks |
@@ -183,7 +211,7 @@ CREATE TABLE provider_call_log (
 CREATE INDEX idx_provider_call_log_provider_time ON provider_call_log (provider, created_at);
 ```
 One row per completed `ReliableLlm` call — the exact same metrics dict
-already produced today (§9 wiring), just also persisted per-provider
+already produced today (§13 wiring), just also persisted per-provider
 instead of only per-job.
 
 **Cost derivation:** `estimated_cost_per_token` is dynamic health data (Part
@@ -431,28 +459,67 @@ partially fake.
 would be — acceptable, since the fields this decision rejects wouldn't have
 been reliably populated anyway.
 
-## 16. Extension guide
+## 16. Provider onboarding guide
 
-**Add a new provider:** add entries to `capability_registry.py` with that
-provider's models; add the provider's API key setting to `config.py`
-following the existing `nvidia_nim_*_api_key` pattern; no other file
-changes needed unless it needs a new litellm custom_llm_provider prefix
-(rare — litellm already supports most providers natively).
+Steps to add a **new provider** (e.g. a future Anthropic-direct or OpenAI-
+direct integration, not routed through NVIDIA NIM):
 
-**Add a new model (existing provider):** one new entry in
-`capability_registry.py` — `enabled=True` makes it eligible for routing
-immediately, no other changes.
+1. Confirm litellm has native support for the provider (check
+   `litellm.provider_list`) — almost always yes; if not, it needs a
+   `custom_llm_provider` registration, which is rare and out of scope for a
+   routine onboarding.
+2. Add the provider's API key setting to `config.py`, following the
+   existing `nvidia_nim_*_api_key` / `anthropic_agent_api_key` naming
+   pattern (one `Settings` field, `str | None = None`, "unset → not
+   configured" — never a hard failure at import time).
+3. Add one `capability_registry.py` entry per model that provider offers
+   (see §17, Model onboarding, for the entry shape itself).
+4. No changes to `provider_router.py`, `routing_policies.py`,
+   `circuit_breaker.py`, or `provider_health.py` — all of them operate
+   generically over whatever's in the registry and `provider_call_log`;
+   a new provider is just new rows/data, not new code paths.
+5. No changes to `model_provider.py`, `agent_definitions.py`, or the
+   orchestrator — the whole point of this layer.
 
-**Add a new capability:** use the new capability string in whichever
+## 17. Model onboarding guide
+
+Steps to add a **new model** (existing or new provider):
+
+1. Add one entry to `capability_registry.py`:
+   ```python
+   ModelSpec(
+       provider="nvidia_nim", model_name="z-ai/glm-6.0",
+       supported_capabilities=["structured_json", "summarization", "fast_response"],
+       max_context=64000, supports_json=True, supports_streaming=True,
+       supports_reasoning=False, supports_tools=False,
+       priority=8, enabled=True, tags=["general_purpose"],
+       price_per_1k_tokens=0.0004,
+   )
+   ```
+2. Set `enabled=True` when it's ready to receive traffic — that's the only
+   switch; there is no admin UI toggle (§11 is read-only by design), so
+   flipping this requires a code change + deploy, same as any other static
+   config in this codebase (plan limits, rate limits).
+3. If it should be preferred over what's currently selected for some role,
+   either raise its `priority` (for `highest_priority` policy) or trust the
+   `lowest_latency`/`lowest_cost` policies to pick it up once
+   `provider_call_log` has enough real data for that provider.
+4. No new capability string is required unless the model does something
+   genuinely new — reuse existing capability tags (`legal_reasoning`,
+   `contract_analysis`, `structured_json`, etc.) wherever they already
+   describe what the model can do.
+
+**Add a new capability** (only needed when a model does something no
+existing tag captures): use the new string in whichever
 `capability_registry.py` model entries actually support it, and in
 whichever `capability_requirements.py` role entries need it. No schema
-migration — capabilities are just strings in a list.
+migration — capabilities are just strings in a list, not an enum.
 
 **Add a new routing policy:** one new function in `routing_policies.py`
 matching the standard `(candidates, health) -> list[ProviderSelection]`
 signature; add its name as a new valid value for `VA_AGENT_ROUTING_POLICY`.
 
-## 17. Testing strategy
+## 18. Testing strategy
 
 Unit (no DB): capability filtering (matches/excludes correctly on each
 requirement field), each routing policy's ranking logic in isolation,
@@ -470,7 +537,7 @@ persists and is readable cross-"process" (two separate sessions); the 5
 diagnostic endpoints return real data end-to-end through a `TestClient`
 with an admin user.
 
-## 18. Implementation plan (high-level — detailed plan via writing-plans)
+## 19. Implementation plan (high-level — detailed plan via writing-plans)
 
 1. `errors.py`: add `NoProviderAvailableError`.
 2. `provider_requirements.py`, `provider_selection.py` — the two dataclasses.
@@ -485,6 +552,6 @@ with an admin user.
 9. `model_provider.py` — rewritten `get_model(role)` per §13.
 10. `worker.py` — one-line sink change per §13.
 11. `internal_providers.py` router + registration in `main.py`.
-12. Tests per §17.
+12. Tests per §18.
 13. Full existing suite re-run for regression (expect zero changes to
     existing test outcomes — this is the backward-compatibility proof).
