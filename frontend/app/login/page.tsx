@@ -8,6 +8,7 @@ import { api, storeTokens, setCompanyId, TokenResponse } from "@/lib/api";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { useTheme } from "@/lib/use-theme";
 import { ErrorNote } from "@/components/ui";
+import { LogoMark } from "@/components/ui/Logo";
 
 // Only ever follow a same-site relative path (never a scheme or "//host"
 // prefix) — the redirect param is attacker-controllable query input, so an
@@ -111,7 +112,7 @@ function LoginForm() {
       </button>
       <div className="w-full max-w-sm">
         <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationIQ home">
-          <span className="grid h-8 w-8 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
+          <LogoMark size={32} />
           <div>
             <h1 className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</h1>
             <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>

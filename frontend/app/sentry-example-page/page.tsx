@@ -15,6 +15,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
+import { LogoMark } from "@/components/ui/Logo";
 
 declare function myUndefinedFunction(): void;
 
@@ -47,7 +48,7 @@ export default function SentryExamplePage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-ip-bg px-4 font-ip text-ip-ink">
       <div className="ip-card-lg w-full max-w-md p-6 text-center">
-        <span className="grid h-8 w-8 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white mx-auto">V</span>
+        <div className="mx-auto flex justify-center"><LogoMark size={32} /></div>
         <h1 className="mt-4 text-lg font-bold tracking-tight text-ip-ink">Sentry verification page</h1>
         <p className="mt-2 text-[13px] text-ip-ink-2">
           Not linked from navigation. Triggers a real, uncaught error on each

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FileCheck2, Files, Gavel, Inbox, Link2, ScanSearch, ShieldAlert } from "lucide-react";
 import { Chip, ConfidenceBar, StatCard, TimeBarFlag, aud } from "@/components/ui";
+import { LogoMark } from "@/components/ui/Logo";
 
 /* ---------------- nav ---------------- */
 export function Nav() {
@@ -8,7 +9,7 @@ export function Nav() {
     <header className="sticky top-0 z-30 h-14 border-b border-ip-line bg-ip-bg/85 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-6 sm:px-12 lg:px-16">
         <Link href="/" className="flex items-center gap-2.5" aria-label="VariationIQ home">
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
+          <LogoMark size={28} />
           <span className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</span>
         </Link>
         <nav className="hidden items-center gap-8 text-sm text-ip-ink-2 md:flex">
@@ -368,7 +369,7 @@ export function SiteFooter() {
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div className="col-span-2 sm:col-span-1">
             <Link href="/" className="flex items-center gap-2.5" aria-label="VariationIQ home">
-              <span className="grid h-7 w-7 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
+              <LogoMark size={28} />
               <span className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</span>
             </Link>
             <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-ip-ink-3">

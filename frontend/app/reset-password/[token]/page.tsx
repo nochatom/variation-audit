@@ -7,6 +7,7 @@ import { Eye, EyeOff, Lock } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useTheme } from "@/lib/use-theme";
 import { ErrorNote } from "@/components/ui";
+import { LogoMark } from "@/components/ui/Logo";
 
 export default function ResetPasswordPage() {
   const { token } = useParams<{ token: string }>();
@@ -59,7 +60,7 @@ export default function ResetPasswordPage() {
       </button>
       <div className="w-full max-w-sm">
         <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationIQ home">
-          <span className="grid h-8 w-8 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
+          <LogoMark size={32} />
           <div>
             <h1 className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</h1>
             <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>

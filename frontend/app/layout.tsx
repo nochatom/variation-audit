@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const publicSans = Public_Sans({ subsets: ["latin"], variable: "--font-public-sans" });
 
 export const metadata: Metadata = {
-  title: "Variation Audit",
+  title: "VariationIQ",
   description: "AU construction variation recovery — review queue, value, and claims.",
 };
 
@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             async/defer) so it still runs before paint, avoiding theme flash. */}
         <script src="/theme-init.js" />
       </head>
-      <body className="bg-canvas font-sans text-ink antialiased">{children}</body>
+      <body className="bg-ip-bg font-ip text-ip-ink antialiased">{children}</body>
     </html>
   );
 }

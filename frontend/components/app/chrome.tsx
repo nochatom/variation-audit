@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { api } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
 import { useTheme } from "@/lib/use-theme";
+import { LogoMark } from "@/components/ui/Logo";
 
 type NavItem = { label: string; href: string; icon: ReactNode; adminOnly?: boolean };
 
@@ -69,7 +70,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         className="flex h-14 items-center gap-2.5 border-b border-ip-line px-5 cursor-pointer transition hover:opacity-80"
         aria-label="VariationIQ home"
       >
-        <span className="grid h-7 w-7 place-items-center rounded-md bg-ip-navy-fill text-sm font-bold text-white">V</span>
+        <LogoMark size={28} />
         <span className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</span>
       </Link>
 
