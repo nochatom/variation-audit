@@ -89,13 +89,29 @@ class LocalDocumentLoader:
     def __init__(self, base_dir: str):
         self.base_dir = base_dir
 
+    def _safe_path(self, storage_key: str) -> str:
+        """Every real storage_key is server-generated (see
+        app.services.projects.add_document — always
+        f"{company_id}/{project_id}/docs/{uuid}.txt", never derived from a
+        caller-supplied filename), so this never rejects legitimate traffic
+        today. It's a defense-in-depth guard against a future code path
+        passing an untrusted key straight through: os.path.join silently
+        discards base_dir entirely if storage_key were absolute, and `..`
+        segments can otherwise escape it.
+        """
+        base = os.path.abspath(self.base_dir)
+        path = os.path.abspath(os.path.join(base, storage_key))
+        if os.path.commonpath([base, path]) != base:
+            raise ValueError(f"storage_key resolves outside the document store: {storage_key!r}")
+        return path
+
     def load(self, storage_key: str) -> str:
-        path = os.path.join(self.base_dir, storage_key)
+        path = self._safe_path(storage_key)
         with open(path, encoding="utf-8", errors="replace") as fh:
             return fh.read()
 
     def put(self, storage_key: str, data: bytes | str) -> str:
-        path = os.path.join(self.base_dir, storage_key)
+        path = self._safe_path(storage_key)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         body = data if isinstance(data, bytes) else data.encode("utf-8")
         with open(path, "wb") as fh:
@@ -103,7 +119,7 @@ class LocalDocumentLoader:
         return storage_key
 
     def delete(self, storage_key: str) -> None:
-        path = os.path.join(self.base_dir, storage_key)
+        path = self._safe_path(storage_key)
         try:
             os.remove(path)
         except FileNotFoundError:
@@ -126,3 +142,116 @@ def build_loader():
 def get_store():
     """FastAPI dependency yielding the document store (overridable in tests)."""
     return build_loader()
+
+
+class StorageConfigurationError(RuntimeError):
+    """Raised at startup when production has no viable object-storage
+    backend configured — see validate_production_storage_config."""
+
+
+def validate_production_storage_config(settings) -> None:
+    """Fail loudly at startup if production has no way to store documents.
+
+    Mirrors this codebase's existing "fail at construction, not at first
+    use" pattern (VA_JWT_SECRET, VA_AGENT_ROUTING_POLICY in app/config.py).
+    A no-op outside production, and a no-op in production if VA_LOCAL_DOC_DIR
+    is set — this does not change build_loader()'s resolution order, it only
+    checks that at least one of its branches is actually usable before the
+    app starts accepting traffic, instead of only discovering the gap on the
+    first document upload.
+    """
+    if settings.environment != "production":
+        return
+    if settings.local_doc_dir:
+        return
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        raise StorageConfigurationError(
+            "production storage is not configured: set VA_LOCAL_DOC_DIR, or "
+            "both VA_SUPABASE_URL and VA_SUPABASE_SERVICE_ROLE_KEY. Without "
+            "one of these, build_loader() has no usable backend and every "
+            "document upload would fail."
+        )
+
+
+def check_storage_health(settings=None) -> dict:
+    """Read-only diagnostic: verifies the configured storage backend is
+    reachable, without uploading, downloading, or deleting any object.
+
+    Returns a dict shaped for GET /internal/storage/health — never includes
+    the service_role key, a JWT, or any other credential; `details` only
+    ever holds non-secret metadata (e.g. the bucket's own public metadata
+    fields, which contain no auth material).
+    """
+    from datetime import datetime, timezone
+
+    if settings is None:
+        from app.config import get_settings
+
+        settings = get_settings()
+
+    checked_at = datetime.now(timezone.utc).isoformat()
+
+    if settings.local_doc_dir:
+        provider = "local"
+        bucket = settings.local_doc_dir
+        if not os.path.isdir(settings.local_doc_dir):
+            return {
+                "provider": provider, "bucket": bucket, "status": "unhealthy",
+                "checked_at": checked_at,
+                "details": {"reason": "local_doc_dir does not exist"},
+            }
+        if not os.access(settings.local_doc_dir, os.R_OK | os.W_OK):
+            return {
+                "provider": provider, "bucket": bucket, "status": "unhealthy",
+                "checked_at": checked_at,
+                "details": {"reason": "local_doc_dir is not readable/writable"},
+            }
+        return {
+            "provider": provider, "bucket": bucket, "status": "healthy",
+            "checked_at": checked_at, "details": {},
+        }
+
+    if settings.supabase_url and settings.supabase_service_role_key:
+        # Config exists (this branch's guard) and the client below is
+        # constructed inline (no persistent state) — the bucket GET is the
+        # remaining check: is it actually reachable.
+        provider = "supabase"
+        bucket = settings.supabase_storage_bucket
+        import httpx
+
+        try:
+            resp = httpx.get(
+                f"{settings.supabase_url.rstrip('/')}/storage/v1/bucket/{bucket}",
+                headers={
+                    "Authorization": f"Bearer {settings.supabase_service_role_key}",
+                    "apikey": settings.supabase_service_role_key,
+                },
+                timeout=10.0,
+            )
+        except httpx.HTTPError as exc:
+            return {
+                "provider": provider, "bucket": bucket, "status": "unhealthy",
+                "checked_at": checked_at,
+                "details": {"reason": f"request to Supabase Storage failed: {type(exc).__name__}"},
+            }
+        if resp.status_code == 200:
+            body = resp.json()
+            return {
+                "provider": provider, "bucket": bucket, "status": "healthy",
+                "checked_at": checked_at,
+                "details": {
+                    "public": body.get("public"),
+                    "created_at": body.get("created_at"),
+                },
+            }
+        return {
+            "provider": provider, "bucket": bucket, "status": "unhealthy",
+            "checked_at": checked_at,
+            "details": {"reason": f"bucket lookup returned HTTP {resp.status_code}"},
+        }
+
+    return {
+        "provider": "s3", "bucket": settings.s3_bucket, "status": "unknown",
+        "checked_at": checked_at,
+        "details": {"reason": "health check not implemented for the S3 backend"},
+    }

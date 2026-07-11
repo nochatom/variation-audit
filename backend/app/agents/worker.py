@@ -156,6 +156,16 @@ def fail_job(session: Session, job: AgentAnalysisJob, code: str, message: str,
     if llm_calls is not None:
         job.llm_calls = llm_calls
     session.commit()
+    # Single choke point for every failure path in _process_job_async
+    # (AIProviderError, intake rejection, or a genuinely unexpected
+    # exception) — job_id/project_id/agent/error_code only, never the raw
+    # message (which may be a provider exception's text — see
+    # app.agents.errors.safe_job_error_message, which is what the API
+    # actually returns to clients instead of this raw text).
+    logger.warning("job.failed", extra={
+        "job_id": str(job.id), "project_id": str(job.project_id),
+        "agent": job.current_agent, "error_code": code,
+    })
 
 
 def _make_progress_callback(job: AgentAnalysisJob, session: Session):
@@ -250,6 +260,13 @@ async def _process_job_async(
         fail_job(session, job, "AGENT_INTAKE_REJECTED", str(exc), llm_calls=llm_calls)
         return
     except Exception as exc:  # noqa: BLE001 - never leave a job stuck PROCESSING
+        # Unlike AIProviderError/RuntimeError (already-classified, expected
+        # failures), this is genuinely unexpected — log the full traceback
+        # server-side; fail_job's own "job.failed" line still records
+        # job_id/project_id/agent/error_code.
+        logger.exception("job.unexpected_error", extra={
+            "job_id": str(job.id), "project_id": str(job.project_id), "agent": job.current_agent,
+        })
         fail_job(session, job, "AGENT_PIPELINE_ERROR", repr(exc), llm_calls=llm_calls)
         return
     finally:

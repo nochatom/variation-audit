@@ -332,8 +332,10 @@ async def upload_document(request: Request, response: Response,
             extra={"project_id": str(project.id), "company_id": str(project.company_id),
                   "uploaded_filename": filename},
         )
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY,
-                            "failed to store the uploaded document — please try again")
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, {
+            "error_code": "DOCUMENT_UPLOAD_FAILED",
+            "message": "Unable to process this document. Please try again.",
+        })
 
     return DocumentUploadResponse(
         id=str(document.id), project_id=str(project.id),

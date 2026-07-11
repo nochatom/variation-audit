@@ -431,7 +431,7 @@ def test_create_invitation_endpoint_duplicate_returns_409_with_clear_message():
         f"/orgs/{cid}/invitations", json={"email": "dup@firm.com"},
     )
     assert resp.status_code == 409
-    assert "active invitation already exists" in resp.json()["detail"].lower()
+    assert "active invitation already exists" in resp.json()["error"]["message"].lower()
 
 
 def test_create_invitation_endpoint_email_failure_surfaces_email_sent_false():

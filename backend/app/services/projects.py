@@ -51,6 +51,12 @@ def create_project(
     return project
 
 
+# Defensive hard cap, not a pagination feature — no legitimate org has
+# anywhere near this many projects; it just bounds the worst case for an
+# unbounded query (security hardening pass).
+_MAX_LIST_ROWS = 2000
+
+
 def list_projects(session: Session, company_id: uuid.UUID, *,
                   archived: bool = False) -> list[Project]:
     """Active projects by default; archived=True lists only archived ones."""
@@ -58,7 +64,7 @@ def list_projects(session: Session, company_id: uuid.UUID, *,
     stmt = stmt.where(Project.archived_at.is_not(None) if archived
                       else Project.archived_at.is_(None))
     return list(session.execute(
-        stmt.order_by(Project.created_at.desc())
+        stmt.order_by(Project.created_at.desc()).limit(_MAX_LIST_ROWS)
     ).scalars().all())
 
 

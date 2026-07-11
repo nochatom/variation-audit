@@ -21,6 +21,12 @@ VALID_AGENT_ROUTING_POLICIES = frozenset({
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="VA_", extra="ignore")
 
+    # Deployment environment. "production" enables stricter startup checks
+    # (see app.storage.validate_production_storage_config) that don't apply
+    # to development/test — e.g. failing fast if no object-storage backend
+    # is configured, instead of only discovering that at first upload.
+    environment: str = "development"
+
     # Database (product owns all persistence)
     database_url: str = Field(
         default="postgresql+psycopg://localhost/variation_audit",

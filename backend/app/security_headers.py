@@ -23,6 +23,11 @@ SECURITY_HEADERS = {
     "Cross-Origin-Resource-Policy": "same-origin",
     # Ignored by clients over plain HTTP (harmless in local dev); takes effect once served over HTTPS.
     "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+    # Every response here is either private (auth-scoped JSON/PDF) or an
+    # error — nothing this API returns should ever sit in a shared/CDN cache
+    # or a browser's disk cache. Applies uniformly rather than per-route
+    # since there is no genuinely cacheable authenticated response today.
+    "Cache-Control": "no-store",
 }
 
 

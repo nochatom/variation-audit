@@ -8,6 +8,7 @@ A job is the engine's client; the product owns all persistence.
 """
 from __future__ import annotations
 
+import logging
 import time
 import uuid
 from datetime import datetime, timezone
@@ -16,6 +17,10 @@ from typing import Protocol
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+# job_id/project_id/error_code only — never prompt text, document content,
+# or credentials (see fail_job below and its module-docstring note).
+logger = logging.getLogger("app.worker.job_worker")
 
 from app.engine.client import EngineClient, EngineError, EngineTimeout
 from app.engine.schemas import AnalysisRequest, AnalysisResult, DocumentIn, JobPoll
@@ -75,6 +80,7 @@ def claim_one(session: Session) -> AnalysisJob | None:
     job.status = JobStatus.running
     job.started_at = _now()
     session.commit()
+    logger.info("job.claimed", extra={"job_id": str(job.id), "project_id": str(job.project_id)})
     return job
 
 
@@ -177,6 +183,7 @@ def ingest_result(session: Session, job: AnalysisJob, poll: JobPoll) -> None:
     job.finished_at = _now()
     _notify(session, job, "analysis_complete")
     session.commit()
+    logger.info("job.succeeded", extra={"job_id": str(job.id), "project_id": str(job.project_id)})
 
 
 def fail_job(session: Session, job: AnalysisJob, code: str, message: str, retryable: bool) -> None:
@@ -187,6 +194,16 @@ def fail_job(session: Session, job: AnalysisJob, code: str, message: str, retrya
     job.finished_at = _now()
     _notify(session, job, "analysis_failed", {"code": code, "retryable": retryable})
     session.commit()
+    # Every failure path (EngineTimeout, EngineError, an unexpected
+    # exception, or the engine reporting failure) funnels through here, so
+    # this is the single place job failures become visible in logs — job_id/
+    # project_id/error_code only, never the message itself (which may be an
+    # engine/library exception's text — the DB row is the place to look up
+    # full detail, not the log stream).
+    logger.warning("job.failed", extra={
+        "job_id": str(job.id), "project_id": str(job.project_id),
+        "error_code": code, "retryable": retryable,
+    })
 
 
 # --------------------------------------------------------------------------
@@ -203,6 +220,13 @@ def process_job(session: Session, client: EngineClient, job: AnalysisJob, loader
         fail_job(session, job, exc.code, str(exc), exc.retryable)
         return
     except Exception as exc:  # noqa: BLE001 - never leave a job stuck "running"
+        # Unlike EngineTimeout/EngineError (expected, already-classified
+        # failures), this is genuinely unexpected — log the full traceback
+        # server-side (job_id/project_id context only) so it's investigable;
+        # fail_job's own "job.failed" line still records the classification.
+        logger.exception("job.unexpected_error", extra={
+            "job_id": str(job.id), "project_id": str(job.project_id),
+        })
         fail_job(session, job, "INTERNAL", repr(exc), retryable=True)
         return
 

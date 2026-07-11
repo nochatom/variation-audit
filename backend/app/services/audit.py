@@ -32,6 +32,7 @@ def evidence_with_documents(session: Session,
     evidence = list(session.execute(
         select(Evidence).where(Evidence.variation_id == variation_id)
         .order_by(Evidence.created_at)
+        .limit(2000)  # defensive hard cap, not pagination — security hardening pass
     ).scalars().all())
     doc_ids = [e.source_document_id for e in evidence if e.source_document_id]
     docs: dict[uuid.UUID, Document] = {

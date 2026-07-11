@@ -39,6 +39,11 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# Defensive hard cap, not a pagination feature — bounds the worst case for
+# an otherwise-unbounded query (security hardening pass).
+_MAX_LIST_ROWS = 2000
+
+
 def review_queue(session: Session, company_id: uuid.UUID, *,
                  project_id: uuid.UUID | None = None,
                  status: ReviewStatus | None = ReviewStatus.pending) -> list[Variation]:
@@ -49,7 +54,7 @@ def review_queue(session: Session, company_id: uuid.UUID, *,
     if status is not None:
         stmt = stmt.where(Variation.review_status == status)
     stmt = stmt.order_by(Variation.confidence_score.desc(), Variation.created_at.desc())
-    return list(session.execute(stmt).scalars().all())
+    return list(session.execute(stmt.limit(_MAX_LIST_ROWS)).scalars().all())
 
 
 def get_variation(session: Session, company_id: uuid.UUID,
@@ -111,5 +116,5 @@ def add_comment(session: Session, variation: Variation, *, user: User, body: str
 def list_comments(session: Session, variation_id: uuid.UUID) -> list[ReviewComment]:
     return list(session.execute(
         select(ReviewComment).where(ReviewComment.variation_id == variation_id)
-        .order_by(ReviewComment.created_at)
+        .order_by(ReviewComment.created_at).limit(_MAX_LIST_ROWS)
     ).scalars().all())

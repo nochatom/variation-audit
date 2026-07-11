@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.agents.errors import safe_job_error_message
 from app.agents.jobs import enqueue_agent_analysis
 from app.auth.deps import ensure_member, get_current_user, get_db
 from app.models import AgentAnalysisJob, Project, User
@@ -42,7 +43,12 @@ class AgentJobOut(BaseModel):
             current_agent=job.current_agent,
             progress_percent=job.progress_percent,
             error_code=job.error_code,
-            error_message=job.error_message,
+            # Never the raw job.error_message column — that can hold a raw
+            # litellm exception message or repr(exc) for an unexpected
+            # failure (see app/agents/worker.py's fail_job calls). Map to a
+            # generic, safe, user-facing message instead; the raw text stays
+            # in the DB/logs only.
+            error_message=safe_job_error_message(job.error_code),
             result=job.result,
             created_at=job.created_at.isoformat(),
             started_at=job.started_at.isoformat() if job.started_at else None,

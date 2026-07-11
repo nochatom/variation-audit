@@ -26,33 +26,21 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.agents import circuit_breaker, provider_health
 from app.agents.capability_registry import CAPABILITY_REGISTRY
-from app.auth.deps import get_current_user, get_db
-from app.models import Membership, MembershipRole, User
+from app.auth.deps import get_db, require_any_org_admin
+from app.models import User
 
 router = APIRouter(prefix="/internal/providers", tags=["internal-providers"])
 
 SCHEMA_VERSION = "1.0"
 
-
-def _require_any_org_admin(
-    user: User = Depends(get_current_user), session: Session = Depends(get_db),
-) -> User:
-    """Admin of at least one organization — see module docstring for why
-    this differs from the usual org-scoped require_admin."""
-    is_admin = session.execute(
-        select(Membership).where(
-            Membership.user_id == user.id, Membership.role == MembershipRole.admin,
-        )
-    ).scalar_one_or_none()
-    if is_admin is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin role required")
-    return user
+# Kept as a local alias — every endpoint below depends on this name; the
+# implementation now lives in app.auth.deps (shared with /internal/storage).
+_require_any_org_admin = require_any_org_admin
 
 
 def _envelope(data) -> dict:

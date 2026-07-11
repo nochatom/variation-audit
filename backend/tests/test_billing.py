@@ -155,7 +155,7 @@ def test_checkout_endpoint_409_when_already_on_paid_plan(monkeypatch):
     session = FakeSession(results=[FakeResult(scalar=membership), FakeResult(scalar=sub)])
     resp = _client(session, user).post(f"/orgs/{cid}/billing/checkout", json={"plan": "enterprise"})
     assert resp.status_code == 409
-    assert "already" in resp.json()["detail"].lower()
+    assert "already" in resp.json()["error"]["message"].lower()
     get_settings.cache_clear()
 
 

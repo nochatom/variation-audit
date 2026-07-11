@@ -62,3 +62,22 @@ def require_admin(session: Session, user: User, company_id: uuid.UUID) -> Member
     if m.role != MembershipRole.admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin role required")
     return m
+
+
+def require_any_org_admin(
+    user: User = Depends(get_current_user), session: Session = Depends(get_db),
+) -> User:
+    """Admin of at least one organization — for platform-wide diagnostics
+    endpoints (e.g. /internal/providers, /internal/storage) where the data
+    isn't scoped to any single org, so the usual org-scoped require_admin
+    doesn't fit. This codebase has no separate "platform admin" role;
+    requiring org-admin-of-any-org is the closest fit to "the existing admin
+    authorization mechanism" without inventing a new one."""
+    is_admin = session.execute(
+        select(Membership).where(
+            Membership.user_id == user.id, Membership.role == MembershipRole.admin,
+        )
+    ).scalar_one_or_none()
+    if is_admin is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin role required")
+    return user

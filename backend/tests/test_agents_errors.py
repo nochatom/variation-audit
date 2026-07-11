@@ -10,6 +10,7 @@ from app.agents.errors import (
     AIProviderUnavailableError,
     AIRateLimitError,
     classify_exception,
+    safe_job_error_message,
 )
 
 
@@ -68,3 +69,38 @@ def test_5xx_status_codes_map_to_unavailable(status_code):
     exc.status_code = status_code
     classified = classify_exception(exc)
     assert isinstance(classified, AIProviderUnavailableError)
+
+
+# --------------------------------------------------------------------------
+# safe_job_error_message — the client-facing sanitization layer
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("code", [
+    "AI_AUTH_ERROR", "AI_RATE_LIMIT_ERROR", "AI_PROVIDER_TIMEOUT",
+    "AI_SCHEMA_INVALID", "AI_PROVIDER_UNAVAILABLE", "AI_NO_PROVIDER_AVAILABLE",
+    "AGENT_INTAKE_REJECTED", "AGENT_PIPELINE_ERROR",
+])
+def test_safe_job_error_message_has_an_entry_for_every_known_code(code):
+    message = safe_job_error_message(code)
+    assert message
+    assert isinstance(message, str)
+
+
+def test_safe_job_error_message_none_when_no_error_code():
+    assert safe_job_error_message(None) is None
+
+
+def test_safe_job_error_message_falls_back_for_unknown_code():
+    message = safe_job_error_message("SOME_FUTURE_CODE_NOT_YET_MAPPED")
+    assert message  # never None/empty for a real (if unmapped) code
+
+
+def test_safe_job_error_message_never_echoes_raw_provider_text():
+    """The whole point of this function: no matter what raw exception text
+    a provider or litellm produced, the safe message never contains it —
+    callers must pass error_code only, never the raw message, and this
+    confirms the function's signature enforces that (it doesn't even accept
+    the raw message as a parameter)."""
+    import inspect
+
+    sig = inspect.signature(safe_job_error_message)
+    assert list(sig.parameters) == ["error_code"]

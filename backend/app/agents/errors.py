@@ -82,6 +82,33 @@ class NoProviderAvailableError(AIProviderError):
     retryable = False
 
 
+# User-facing messages per error_code, keyed the same way AgentAnalysisJob.
+# error_code is populated (app/agents/worker.py's fail_job calls). Deliberately
+# generic — the raw exception text (a litellm message, or repr() of an
+# unexpected exception) never crosses into a client response; it stays in
+# the DB row / logs for debugging. See app/routers/agent_jobs.py's
+# AgentJobOut, which uses this instead of the raw error_message column.
+USER_FACING_JOB_ERROR_MESSAGES: dict[str, str] = {
+    AIAuthError.code: "The AI provider rejected our credentials. Please contact support.",
+    AIRateLimitError.code: "The AI provider is temporarily rate-limiting requests. Please try again shortly.",
+    AIProviderTimeoutError.code: "The analysis timed out. Please try again.",
+    AISchemaValidationError.code: "The AI provider returned an unexpected response. Please try again.",
+    AIProviderUnavailableError.code: "The AI provider is temporarily unavailable. Please try again shortly.",
+    NoProviderAvailableError.code: "No AI provider is currently available. Please try again shortly.",
+    "AGENT_INTAKE_REJECTED": "This project isn't ready for analysis yet — check that a contract has been uploaded.",
+    "AGENT_PIPELINE_ERROR": "Something went wrong while analyzing this project. Please try again.",
+}
+_DEFAULT_JOB_ERROR_MESSAGE = "Something went wrong while analyzing this project. Please try again."
+
+
+def safe_job_error_message(error_code: str | None) -> str | None:
+    """Maps a failed job's error_code to a safe, generic user-facing
+    message — never the raw provider/exception text stored in the DB."""
+    if error_code is None:
+        return None
+    return USER_FACING_JOB_ERROR_MESSAGES.get(error_code, _DEFAULT_JOB_ERROR_MESSAGE)
+
+
 def classify_exception(exc: Exception, *, provider: str | None = None, model: str | None = None) -> AIProviderError:
     """Map a raw exception (litellm's, or a stdlib timeout) to one of the
     four AIProviderError subclasses above."""

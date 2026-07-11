@@ -142,4 +142,4 @@ def test_add_member_endpoint_blocked_at_seat_limit():
     resp = _client(session, user).post(f"/orgs/{cid}/members",
                                        json={"email": "new@firm.com", "role": "member"})
     assert resp.status_code == 402
-    assert resp.json()["detail"]["error_code"] == "seat_limit_exceeded"
+    assert resp.json()["error"]["code"] == "seat_limit_exceeded"

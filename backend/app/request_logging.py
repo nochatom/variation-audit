@@ -35,8 +35,43 @@ def _user_id_from_request(request: Request) -> str | None:
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         request_id = uuid.uuid4().hex
+        # Set before call_next so app/errors.py's exception handlers can
+        # quote the same id as this request's log line — including the
+        # bare-Exception handler, which (unlike the HTTPException/
+        # RequestValidationError ones) Starlette dispatches from
+        # ServerErrorMiddleware, *outside* this middleware. That means an
+        # unhandled exception propagates up through this call_next rather
+        # than coming back as an ordinary response — hence the try/except
+        # below: without it, a genuinely unexpected exception would skip
+        # this method's own log line entirely (no record that the request
+        # ever happened) and the X-Request-ID header would never be set.
+        request.state.request_id = request_id
         start = time.monotonic()
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = round((time.monotonic() - start) * 1000, 2)
+            log.log(
+                logging.ERROR,
+                "%s %s -> 500 (unhandled)",
+                request.method,
+                request.url.path,
+                extra={
+                    "event": "http_request",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": 500,
+                    "duration_ms": duration_ms,
+                    "client_ip": request.client.host if request.client else None,
+                    "user_id": _user_id_from_request(request),
+                },
+            )
+            # Re-raise — app/errors.py's unhandled_exception_handler (run by
+            # ServerErrorMiddleware) still builds the actual client response
+            # and sets X-Request-ID on it directly, since it never passes
+            # back through this method to have the header added below.
+            raise
         duration_ms = round((time.monotonic() - start) * 1000, 2)
         response.headers["X-Request-ID"] = request_id
 

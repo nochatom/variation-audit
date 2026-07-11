@@ -113,7 +113,7 @@ def test_delete_rejects_active_project_409_even_for_admin():
     client, session, project, _ = _setup(role=MembershipRole.admin)  # archived_at=None
     resp = client.delete(f"/projects/{project.id}")
     assert resp.status_code == 409
-    assert "archived" in resp.json()["detail"]
+    assert "archived" in resp.json()["error"]["message"]
     assert session.added_of(AuditLog) == []   # nothing recorded, nothing deleted
 
 

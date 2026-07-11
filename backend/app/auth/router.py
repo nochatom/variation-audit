@@ -275,7 +275,9 @@ def refresh(request: Request, response: Response, req: RefreshRequest,
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(req: LogoutRequest, session: Session = Depends(get_db)) -> None:
+@limiter.limit(AUTH_RATE_LIMIT)
+def logout(request: Request, response: Response, req: LogoutRequest,
+          session: Session = Depends(get_db)) -> None:
     """Revoke one refresh token — ends this session/device only."""
     revoked = refresh_tokens.revoke(session, req.refresh_token)
     if revoked:
@@ -283,7 +285,9 @@ def logout(req: LogoutRequest, session: Session = Depends(get_db)) -> None:
 
 
 @router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
-def logout_all(user: User = Depends(get_current_user), session: Session = Depends(get_db)) -> None:
+@limiter.limit(AUTH_RATE_LIMIT)
+def logout_all(request: Request, response: Response, user: User = Depends(get_current_user),
+               session: Session = Depends(get_db)) -> None:
     """Revoke every refresh token for the current user — signs out all devices."""
     count = refresh_tokens.revoke_all(session, user.id)
     security_logger.info("logout-all", extra={

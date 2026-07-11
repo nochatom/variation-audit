@@ -10,6 +10,20 @@ import io
 
 from app.models import SourceType
 
+# Defensive hard cap on register CSV row count — the 10MB upload byte cap
+# (app/routers/projects.py's MAX_CSV_BYTES) doesn't bound row count on its
+# own (a 10MB file of minimal rows can still be hundreds of thousands of
+# rows), and each row becomes its own DB insert + object-storage PUT with no
+# batching (app/services/projects.py's add_document, called once per row).
+# Well above any realistic register size; exists purely to bound the worst
+# case (security hardening pass).
+MAX_CSV_ROWS = 5000
+
+
+class CsvTooManyRows(ValueError):
+    pass
+
+
 # Canonical field -> column-name aliases a real export might use.
 _COMMS_ALIASES: dict[str, list[str]] = {
     "id": ["id", "message_id", "msg_id", "ref", "reference"],
@@ -103,6 +117,8 @@ def parse_rfi_csv(data: bytes) -> list[dict]:
 
     out: list[dict] = []
     for i, row in enumerate(reader):
+        if i >= MAX_CSV_ROWS:
+            raise CsvTooManyRows(f"CSV exceeds the {MAX_CSV_ROWS}-row limit")
         subject = pick(row, _RFI_ALIASES["subject"])
         question = pick(row, _RFI_ALIASES["question"])
         response = pick(row, _RFI_ALIASES["response"])
@@ -164,6 +180,8 @@ def parse_site_instructions_csv(data: bytes) -> list[dict]:
 
     out: list[dict] = []
     for i, row in enumerate(reader):
+        if i >= MAX_CSV_ROWS:
+            raise CsvTooManyRows(f"CSV exceeds the {MAX_CSV_ROWS}-row limit")
         instruction = pick(row, _SITE_INSTRUCTION_ALIASES["instruction"])
         if not instruction:
             continue
@@ -227,6 +245,8 @@ def parse_meeting_minutes_csv(data: bytes) -> list[dict]:
 
     out: list[dict] = []
     for i, row in enumerate(reader):
+        if i >= MAX_CSV_ROWS:
+            raise CsvTooManyRows(f"CSV exceeds the {MAX_CSV_ROWS}-row limit")
         topic = pick(row, _MEETING_MINUTE_ALIASES["topic"])
         notes = pick(row, _MEETING_MINUTE_ALIASES["notes"])
         decision = pick(row, _MEETING_MINUTE_ALIASES["decision"])
@@ -267,6 +287,8 @@ def parse_comms_csv(data: bytes) -> list[dict]:
 
     docs: list[dict] = []
     for i, row in enumerate(reader):
+        if i >= MAX_CSV_ROWS:
+            raise CsvTooManyRows(f"CSV exceeds the {MAX_CSV_ROWS}-row limit")
         body = pick(row, "text")
         if not body or not body.strip():
             continue
