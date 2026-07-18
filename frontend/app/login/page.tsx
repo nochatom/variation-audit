@@ -9,6 +9,7 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { useTheme } from "@/lib/use-theme";
 import { ErrorNote } from "@/components/ui";
 import { LogoMark } from "@/components/ui/Logo";
+import { Wordmark } from "@/components/ui/Wordmark";
 
 // Only ever follow a same-site relative path (never a scheme or "//host"
 // prefix) — the redirect param is attacker-controllable query input, so an
@@ -114,7 +115,7 @@ function LoginForm() {
         <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationIQ home">
           <LogoMark size={32} />
           <div>
-            <h1 className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</h1>
+            <h1 aria-label="VariationIQ" className="flex"><Wordmark height={18} className="text-ip-ink" /></h1>
             <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>
           </div>
         </Link>
@@ -126,7 +127,7 @@ function LoginForm() {
                 key={m}
                 type="button"
                 onClick={() => { setMode(m); setError(null); }}
-                className={`flex-1 rounded-sm py-1.5 font-semibold transition-colors ${
+                className={`flex-1 rounded-sm py-1.5 font-semibold transition-colors duration-150 ease-out active:scale-[0.97] ${
                   mode === m ? "bg-ip-navy-fill text-white" : "text-ip-ink-2 hover:text-ip-ink"
                 }`}
               >
@@ -225,7 +226,7 @@ function LoginForm() {
             type="button"
             onClick={signInWithGoogle}
             disabled={busy}
-            className="flex w-full items-center justify-center gap-2.5 rounded-md border border-ip-line bg-ip-card px-4 py-2 text-sm font-semibold text-ip-ink transition-colors hover:bg-ip-card-2 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2.5 rounded-md border border-ip-line bg-ip-card px-4 py-2 text-sm font-semibold text-ip-ink transition-[background-color,transform] duration-150 ease-out hover:bg-ip-card-2 active:scale-[0.98] disabled:opacity-60"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
               <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.47a5.53 5.53 0 01-2.4 3.63v3.02h3.88c2.27-2.09 3.57-5.17 3.57-8.84z" />

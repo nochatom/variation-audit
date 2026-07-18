@@ -119,6 +119,11 @@ def project_dashboard(session: Session, company_id: uuid.UUID, project: Project)
             "recoverable_total": float(latest_job.recoverable_total)
             if latest_job.recoverable_total is not None else None,
             "baseline": latest_job.baseline,
+            # Real failure detail (set by the worker's fail_job) so the client
+            # can show the actual error, not a generic message. Null unless failed.
+            "error_code": latest_job.error_code,
+            "error_message": latest_job.error_message,
+            "error_retryable": latest_job.error_retryable,
         },
         "links": {
             "review_queue": f"/projects/{project.id}/review-queue?company_id={company_id}",

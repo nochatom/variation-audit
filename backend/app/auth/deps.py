@@ -29,7 +29,12 @@ def get_current_user(
     except TokenError:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid or expired token")
     sub = payload.get("sub")
-    user = session.get(User, uuid.UUID(sub)) if sub else None
+    try:
+        user = session.get(User, uuid.UUID(sub)) if sub else None
+    except ValueError:
+        # A signed token whose sub isn't a UUID is still an invalid credential —
+        # answer 401, never a 500.
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid or expired token")
     if user is None or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "user not found or inactive")
     return user

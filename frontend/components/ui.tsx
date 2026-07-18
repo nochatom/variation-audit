@@ -19,10 +19,10 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-ip-ink">{title}</h1>
-        {description && <p className="mt-1 text-sm text-ip-ink-2">{description}</p>}
+        <h1 className="text-[30px] font-bold leading-[1.08] tracking-display text-ip-ink">{title}</h1>
+        {description && <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ip-ink-2">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -38,21 +38,32 @@ export function StatCard({
   value,
   hint,
   accent,
+  size = "md",
 }: {
   label: string;
   value: string;
   hint?: string;
   accent?: "recovery" | "risk" | "navy";
+  /** "md" = full dashboard metric; "sm" = compact (e.g. narrow preview grids). */
+  size?: "sm" | "md";
 }) {
-  const bar =
-    accent === "recovery" ? "border-l-ip-recovery" : accent === "risk" ? "border-l-ip-risk" : accent === "navy" ? "border-l-ip-navy" : "";
+  // A small semantic dot + typographic hierarchy replaces the old left-rail
+  // accent (a rounded-card rail reads as templated) — the metric itself
+  // carries the colour, which is where the eye should land.
+  const dot =
+    accent === "recovery" ? "bg-ip-recovery" : accent === "risk" ? "bg-ip-risk" : accent === "navy" ? "bg-ip-navy" : "bg-ip-ink-3";
   const valueColor =
     accent === "recovery" ? "text-ip-recovery" : accent === "risk" ? "text-ip-risk" : "text-ip-ink";
+  const pad = size === "sm" ? "p-3.5" : "p-5";
+  const valueSize = size === "sm" ? "mt-2 text-[22px]" : "mt-3 text-[32px]";
   return (
-    <div className={`ip-card p-4 ${accent ? `border-l-[3px] ${bar}` : ""}`}>
-      <div className="ip-label">{label}</div>
-      <div className={`mt-1.5 text-[28px] font-bold leading-none tabular-nums tracking-tight ${valueColor}`}>{value}</div>
-      {hint && <div className="mt-1.5 text-[12px] text-ip-ink-3">{hint}</div>}
+    <div className={`ip-card ${pad}`}>
+      <div className="flex items-center gap-1.5">
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden />
+        <span className="ip-label">{label}</span>
+      </div>
+      <div className={`${valueSize} font-bold leading-none tabular-nums tracking-display ${valueColor}`}>{value}</div>
+      {hint && <div className="mt-2 text-[12px] text-ip-ink-3">{hint}</div>}
     </div>
   );
 }
@@ -133,5 +144,13 @@ export function InfoNote({ children }: { children: ReactNode }) {
 }
 
 export function Spinner() {
-  return <div className="py-16 text-center text-sm text-ip-ink-3">Loading…</div>;
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-16 text-sm text-ip-ink-3">
+      <svg viewBox="0 0 24 24" className="h-5 w-5 animate-spin text-ip-navy" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeOpacity="0.2" />
+        <path d="M21 12a9 9 0 00-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      </svg>
+      Loading…
+    </div>
+  );
 }

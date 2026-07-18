@@ -45,3 +45,47 @@ jobs:
         run: npm test
       - name: build
         run: npm run build
+
+  frontend-e2e:
+    name: Frontend E2E (smoke + a11y + journey)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Build
+        run: npm run build
+      # Deterministic gate: smoke + axe a11y + the critical login → dashboard →
+      # create-project → contract-upload → billing-modal journey, on desktop
+      # and mobile viewports. The API is mocked at the network layer, so this
+      # needs no backend/engine/Postgres and is OS-independent. This is the
+      # blocking pre-deploy gate.
+      - name: E2E (smoke + a11y + journey)
+        run: npm run e2e
+      # Visual regression runs here too, but is non-blocking until the
+      # Linux-rendered baselines are committed: Playwright screenshots are
+      # per-OS, and the repo currently ships win32 baselines from local dev.
+      # To promote it to a hard gate: download the snapshots artifact from a
+      # run of this step, commit e2e/visual.spec.ts-snapshots/*-linux.png,
+      # then remove `continue-on-error`.
+      - name: Visual regression (non-blocking until Linux baselines committed)
+        continue-on-error: true
+        run: npm run e2e:visual || (npm run e2e:update && echo "Generated Linux baselines — commit them to enforce this gate.")
+      - name: Upload Playwright report + snapshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/e2e/visual.spec.ts-snapshots/
+          retention-days: 7

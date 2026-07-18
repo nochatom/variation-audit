@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test --grep-invert @visual",
+    "e2e:visual": "playwright test --grep @visual",
+    "e2e:update": "playwright test --grep @visual --update-snapshots",
+    "e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.63.0",
@@ -19,6 +23,8 @@
     "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.61.1",
     "@types/node": "20.16.10",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",

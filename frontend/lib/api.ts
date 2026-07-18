@@ -6,6 +6,9 @@
 // /auth/refresh on a 401 (retrying the original request once).
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+// Same origin the JSON client targets — exported so the SSE progress stream
+// (EventSource) can build its URL against the identical backend.
+export const API_BASE = BASE;
 
 const TOKEN_KEY = "va_token";
 const REFRESH_KEY = "va_refresh_token";
@@ -189,6 +192,10 @@ export const api = {
       body: JSON.stringify({ email, password, org_name, full_name }),
     }),
   me: () => request<Me>("/auth/me"),
+  /** Update the current user's own editable profile fields (full name).
+   * Returns the same Me shape as me() so the caller can refresh its cache. */
+  updateMe: (full_name: string | null) =>
+    request<Me>("/auth/me", { method: "PATCH", body: JSON.stringify({ full_name }) }),
   /** Exchanges a Supabase Google-login session for this app's own token pair
    * — an additional entry point into the existing session system, not a
    * separate one. Same TokenResponse shape as login/signup. */
@@ -234,6 +241,11 @@ export const api = {
     }),
   analyze: (projectId: string) =>
     request<{ job_id: string; status: string }>(`/projects/${projectId}/analyze`, { method: "POST" }),
+  /** Stop a queued/running analysis. Returns the job's new status
+   * ("cancelled" if queued, still "running" if the worker must terminalize it). */
+  cancelAnalysis: (projectId: string, jobId: string) =>
+    request<{ job_id: string; status: string }>(
+      `/projects/${projectId}/analysis/${jobId}/cancel`, { method: "POST" }),
 
   // review
   reviewQueue: (projectId: string, companyId: string, status = "pending") =>
@@ -308,14 +320,21 @@ export const api = {
   unreadCount: () => request<{ count: number }>("/notifications/unread-count"),
   markNotificationRead: (id: string) =>
     request<NotificationItem>(`/notifications/${id}/read`, { method: "POST" }),
-  markAllNotificationsRead: () => request<{ updated: number }>("/notifications/read-all", { method: "POST" }),
+  // Backend returns {"marked": n} (routers/notifications.py) — not {"updated"}.
+  markAllNotificationsRead: () => request<{ marked: number }>("/notifications/read-all", { method: "POST" }),
 
   // reports — PDF fetched as a blob so we can attach the bearer token
   async reportPdf(projectId: string): Promise<Blob> {
     const res = await fetch(`${BASE}/projects/${projectId}/report.pdf`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
-    if (!res.ok) throw new ApiError(res.status, "report failed");
+    if (!res.ok) {
+      // Surface the REAL backend error (e.g. the 403 "the 'exports' feature
+      // isn't available on your current plan — upgrade to access it", or a
+      // 500's detail) instead of a generic "report failed". The body carries
+      // the actionable message — parseErrorDetail reads {error:{message}}.
+      throw new ApiError(res.status, await parseErrorDetail(res));
+    }
     return res.blob();
   },
 };
@@ -340,7 +359,14 @@ export type ProjectDashboard = {
   recoverable_confirmed: number;
   time_bar_at_risk: number;
   document_count: number;
-  latest_job: { id: string; status: string; recoverable_total: number | null } | null;
+  latest_job: {
+    id: string;
+    status: string;
+    recoverable_total: number | null;
+    error_code?: string | null;
+    error_message?: string | null;
+    error_retryable?: boolean | null;
+  } | null;
 };
 export type VariationSummary = {
   id: string;

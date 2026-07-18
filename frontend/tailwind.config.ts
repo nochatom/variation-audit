@@ -52,10 +52,14 @@ const config: Config = {
         sans: ["var(--font-inter)", "SF Pro Display", "-apple-system", "system-ui", "Segoe UI", "Roboto", "sans-serif"],
         ip: ["var(--font-public-sans)", "Public Sans", "system-ui", "Segoe UI", "sans-serif"],
       },
-      letterSpacing: { tighter: "-0.02em", tightest: "-0.04em" },
+      letterSpacing: { tighter: "-0.02em", tightest: "-0.04em", display: "-0.025em" },
       boxShadow: {
-        "ip-card": "0 1px 2px rgb(16 24 40 / 0.05)",
-        "ip-pop": "0 8px 24px -8px rgb(16 24 40 / 0.18)",
+        // Layered, low-opacity depth (Stripe/Linear register) — a hairline
+        // ambient layer + a soft directional layer reads more premium than a
+        // single flat drop shadow.
+        "ip-card": "0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.03)",
+        "ip-card-hover": "0 2px 6px -1px rgb(16 24 40 / 0.06), 0 6px 16px -3px rgb(16 24 40 / 0.10)",
+        "ip-pop": "0 12px 32px -8px rgb(16 24 40 / 0.18), 0 4px 10px -4px rgb(16 24 40 / 0.10)",
       },
     },
   },

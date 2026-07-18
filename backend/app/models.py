@@ -59,6 +59,7 @@ class JobStatus(str, enum.Enum):
     running = "running"
     succeeded = "succeeded"
     failed = "failed"
+    cancelled = "cancelled"
 
 
 class EngineStage(str, enum.Enum):
@@ -470,6 +471,9 @@ class AnalysisJob(Base):
     error_code: Mapped[str | None] = mapped_column(Text)
     error_message: Mapped[str | None] = mapped_column(Text)
     error_retryable: Mapped[bool | None] = mapped_column(Boolean)
+    # Cooperative cancellation signal: set by the cancel endpoint; the worker
+    # observes it between engine polls and transitions the job to "cancelled".
+    cancel_requested_at: Mapped[datetime | None] = mapped_column()
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
     started_at: Mapped[datetime | None] = mapped_column()
@@ -671,4 +675,36 @@ class ReviewComment(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = _created()
+
+
+# --------------------------------------------------------------------------
+# Analysis job progress events (real, worker-emitted; streamed over SSE by
+# app/routers/analysis_events.py). Append-only: one row per major processing
+# step the worker actually performs — never synthesised/faked. Auxiliary to
+# the job itself, so a failed event write never affects job execution
+# (app/worker/progress.py swallows emit errors).
+# --------------------------------------------------------------------------
+class AnalysisJobEvent(Base):
+    __tablename__ = "analysis_job_events"
+    __table_args__ = (
+        # SSE tails "events for this job after seq N" — this index serves it.
+        Index("idx_job_events_job_seq", "job_id", "seq"),
+    )
+
+    id: Mapped[uuid.UUID] = _pk()
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("analysis_jobs.id", ondelete="CASCADE"), nullable=False
+    )
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)  # monotonic per job, for ordering/resume
+    stage: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)  # pending | running | completed | failed
+    percentage: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    current_document: Mapped[str | None] = mapped_column(Text)
+    processed_documents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    total_documents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    variations_found: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    evidence_links: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    elapsed_seconds: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, server_default="0")
+    estimated_remaining: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     created_at: Mapped[datetime] = _created()

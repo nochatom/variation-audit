@@ -75,10 +75,10 @@ export default function DashboardPage() {
 
 function NavCard({ href, title, body, meta }: { href: string; title: string; body: string; meta: ReactNode }) {
   return (
-    <Link href={href} className="ip-card group p-5 transition-colors hover:bg-ip-card-2">
+    <Link href={href} className="ip-card ip-card-interactive group p-5 hover:bg-ip-card-2">
       <div className="flex items-center justify-between">
         <h3 className="text-[15px] font-bold tracking-tight text-ip-ink">{title}</h3>
-        <span className="text-ip-ink-3 transition-transform group-hover:translate-x-0.5">→</span>
+        <span className="text-ip-ink-3 transition-transform duration-150 ease-out group-hover:translate-x-0.5">→</span>
       </div>
       <p className="mt-1.5 text-[13px] leading-relaxed text-ip-ink-2">{body}</p>
       <div className="ip-label mt-3 text-ip-ink-3">{meta}</div>

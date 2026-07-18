@@ -139,18 +139,25 @@ export default function PricingPage() {
               themselves the first time we surface one you would have missed.
             </p>
 
-            <div className="mt-10 inline-flex items-center gap-2 rounded-pill border border-ip-line bg-ip-card p-1 text-[13px] font-semibold">
+            <div className="mt-10 inline-flex items-center gap-1 rounded-pill border border-ip-line bg-ip-card p-1 text-[13px] font-semibold">
+              {/* Instant color-swap (not a sliding indicator): the two options
+                  have very different widths, so a fixed 50% slider would
+                  misalign. A crisp color change is the correct call here. */}
               <button
-                className={`rounded-pill px-4 py-1.5 transition-colors ${interval === "monthly" ? "bg-ip-navy text-white" : "text-ip-ink-2"}`}
+                className={`rounded-pill px-4 py-1.5 transition-colors duration-150 ease-out active:scale-[0.97] ${
+                  interval === "monthly" ? "bg-ip-navy text-white" : "text-ip-ink-2 hover:text-ip-ink"
+                }`}
                 onClick={() => setInterval("monthly")}
               >
                 Monthly
               </button>
               <button
-                className={`rounded-pill px-4 py-1.5 transition-colors ${interval === "annual" ? "bg-ip-navy text-white" : "text-ip-ink-2"}`}
+                className={`rounded-pill px-4 py-1.5 transition-colors duration-150 ease-out active:scale-[0.97] ${
+                  interval === "annual" ? "bg-ip-navy text-white" : "text-ip-ink-2 hover:text-ip-ink"
+                }`}
                 onClick={() => setInterval("annual")}
               >
-                Annual <span className="text-ip-recovery">· 2 months free</span>
+                Annual <span className={interval === "annual" ? "text-white/80" : "text-ip-recovery"}>· 2 months free</span>
               </button>
             </div>
           </div>
@@ -199,7 +206,15 @@ export default function PricingPage() {
                 Every plan, side by side.
               </h2>
             </div>
-            <div className="mt-10 overflow-x-auto rounded-lg border border-ip-line">
+            {/* tabIndex + role/label give keyboard users access to the
+                horizontally-scrolling table on narrow viewports (WCAG
+                scrollable-region-focusable). */}
+            <div
+              className="mt-10 overflow-x-auto rounded-lg border border-ip-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ip-navy/40"
+              tabIndex={0}
+              role="region"
+              aria-label="Plan comparison table"
+            >
               <table className="w-full min-w-[560px] border-collapse text-left text-[13px]">
                 <thead>
                   <tr className="border-b border-ip-line bg-ip-card-2">
@@ -293,12 +308,13 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
       }`}
     >
       {plan.highlighted && (
-        // Quiet outlined label, not a filled button-like pill — opaque card
-        // background because the badge straddles the card border (a
-        // translucent bg would show the line through it), with a ring in the
-        // page background to carve a clean notch where it crosses.
-        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill border border-ip-navy/25 bg-ip-card px-2.5 py-[3px] text-[10px] font-semibold uppercase tracking-[0.08em] text-ip-navy ring-4 ring-ip-bg">
-          <span className="h-1 w-1 rounded-full bg-ip-navy" aria-hidden />
+        // Prominent solid-navy pill (bg-ip-navy-fill is the design system's
+        // designated fill for white-text badges — stays dark navy in both
+        // themes) so it reads immediately against the card. Straddles the
+        // card border; ring-4 in the page background carves a clean notch
+        // where it crosses, shadow-ip-pop lifts it off the card.
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill bg-ip-navy-fill px-3.5 py-1 text-[11px] font-bold uppercase tracking-[0.09em] text-white shadow-ip-pop ring-4 ring-ip-bg">
+          <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
           Most Popular
         </span>
       )}
@@ -324,12 +340,9 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
         )}
       </div>
 
-      <ul className="mt-7 space-y-2.5 text-[13.5px] text-ip-ink-2">
+      <ul className="mt-7 space-y-3 border-t border-ip-line pt-6">
         {plan.features.map((f) => (
-          <li key={f} className="flex items-start gap-2">
-            <span className="mt-0.5 grid h-4.5 w-4.5 shrink-0 place-items-center rounded-full bg-ip-navy/10 text-[10px] text-ip-navy">✓</span>
-            {f}
-          </li>
+          <FeatureRow key={f} feature={f} highlighted={plan.highlighted} />
         ))}
       </ul>
 
@@ -342,6 +355,45 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
         {plan.cta}
       </a>
     </div>
+  );
+}
+
+/* One feature line. Included features get a crisp recovery-green check;
+   roadmap items (the existing "Future:" strings — content unchanged) get a
+   muted clock badge so "shipping now" reads distinctly from "coming later". */
+function FeatureRow({ feature, highlighted }: { feature: string; highlighted?: boolean }) {
+  const isFuture = feature.startsWith("Future:");
+  return (
+    <li className="flex items-start gap-3">
+      <span
+        className={`mt-px grid h-5 w-5 shrink-0 place-items-center rounded-md ${
+          isFuture ? "bg-ip-line/70 text-ip-ink-3" : "bg-ip-recovery/12 text-ip-recovery"
+        }`}
+        aria-hidden
+      >
+        {isFuture ? (
+          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 8v4l2.5 1.5" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        )}
+      </span>
+      <span
+        className={`text-[13.5px] leading-5 ${
+          isFuture
+            ? "text-ip-ink-3"
+            : highlighted
+              ? "font-medium text-ip-ink"
+              : "text-ip-ink-2"
+        }`}
+      >
+        {feature}
+      </span>
+    </li>
   );
 }
 

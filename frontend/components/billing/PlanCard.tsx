@@ -62,7 +62,7 @@ export function PlanCard({
             <button
               onClick={onCancel}
               disabled={busy}
-              className="rounded-md bg-ip-risk/10 px-3 py-2 text-sm font-semibold text-ip-risk hover:bg-ip-risk/20"
+              className="rounded-md bg-ip-risk/10 px-3 py-2 text-sm font-semibold text-ip-risk transition-[background-color,transform] duration-150 ease-out hover:bg-ip-risk/20 active:scale-[0.97]"
             >
               Cancel subscription
             </button>

@@ -22,6 +22,7 @@ from app.logging_config import configure_logging
 from app.rate_limit import limiter
 from app.request_logging import RequestLoggingMiddleware
 from app.routers.agent_jobs import router as agent_jobs_router
+from app.routers.analysis_events import router as analysis_events_router
 from app.routers.audit import router as audit_router
 from app.routers.billing import router as billing_router
 from app.routers.billing import webhook_router as billing_webhook_router
@@ -90,6 +91,7 @@ app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(auth_router)
 app.include_router(agent_jobs_router)
+app.include_router(analysis_events_router)
 app.include_router(projects_router)
 app.include_router(review_router)
 app.include_router(orgs_router)

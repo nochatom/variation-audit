@@ -132,3 +132,72 @@ def test_login_endpoint_success_and_bad_password():
     app.dependency_overrides.clear()
     bad = _client_with(FakeSession(results=[FakeResult(scalar=user)]))
     assert bad.post("/auth/login", json={"email": "l@firm.com", "password": "no"}).status_code == 401
+
+
+# -- PATCH /me (editable profile: full name) -------------------------------
+from app.auth.deps import get_current_user  # noqa: E402
+
+
+def _authed_client(user: User, session) -> TestClient:
+    def _override_db():
+        yield session
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_current_user] = lambda: user
+    return TestClient(app)
+
+
+def test_update_me_sets_full_name_and_persists_on_user():
+    user = User(id=uuid.uuid4(), email="e@firm.com", password_hash="x",
+                is_active=True, full_name="Old Name")
+    session = FakeSession(results=[FakeResult(rows=[])])  # no orgs
+    client = _authed_client(user, session)
+
+    resp = client.patch("/auth/me", json={"full_name": "New Name"})
+
+    assert resp.status_code == 200
+    assert resp.json()["full_name"] == "New Name"
+    assert user.full_name == "New Name"      # written to the DB row
+    assert session.commits == 1              # persisted
+
+
+def test_update_me_trims_whitespace():
+    user = User(id=uuid.uuid4(), email="e@firm.com", password_hash="x",
+                is_active=True, full_name=None)
+    session = FakeSession(results=[FakeResult(rows=[])])
+    client = _authed_client(user, session)
+
+    resp = client.patch("/auth/me", json={"full_name": "  Padded Name  "})
+
+    assert resp.status_code == 200
+    assert resp.json()["full_name"] == "Padded Name"
+    assert user.full_name == "Padded Name"
+
+
+def test_update_me_blank_name_clears_to_null():
+    user = User(id=uuid.uuid4(), email="e@firm.com", password_hash="x",
+                is_active=True, full_name="Something")
+    session = FakeSession(results=[FakeResult(rows=[])])
+    client = _authed_client(user, session)
+
+    resp = client.patch("/auth/me", json={"full_name": "   "})
+
+    assert resp.status_code == 200
+    assert resp.json()["full_name"] is None
+    assert user.full_name is None
+
+
+def test_update_me_requires_authentication():
+    app.dependency_overrides.clear()
+    client = TestClient(app)
+    resp = client.patch("/auth/me", json={"full_name": "Whoever"})
+    assert resp.status_code in (401, 403)
+
+
+def test_update_me_rejects_overlong_name():
+    user = User(id=uuid.uuid4(), email="e@firm.com", password_hash="x", is_active=True)
+    session = FakeSession(results=[FakeResult(rows=[])])
+    client = _authed_client(user, session)
+
+    resp = client.patch("/auth/me", json={"full_name": "x" * 201})
+
+    assert resp.status_code == 422  # exceeds max_length=200

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from pydantic import BaseModel, Field, field_validator
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app import parsing
 from app.auth.deps import ensure_member, get_current_user, get_db, require_admin
-from app.models import Membership, Project, ProjectStatus, SourceType, User
+from app.models import AnalysisJob, JobStatus, Membership, Project, ProjectStatus, SourceType, User
 from app.rate_limit import ANALYSIS_LIMIT, UPLOAD_LIMIT, limiter
 from app.services import billing as billing_service
 from app.services import jobs
@@ -457,6 +458,22 @@ def analyze(request: Request, response: Response, project_id: uuid.UUID,
             user: User = Depends(get_current_user),
             session: Session = Depends(get_db)) -> AnalyzeResponse:
     project = _load_project(session, user, project_id)
+
+    # One active analysis per project. If a job is already queued or running,
+    # return it (200) instead of enqueuing a duplicate — repeated "Run
+    # analysis" clicks would otherwise pile up a backlog the single worker
+    # can't drain, and the client would watch a queued job that never starts.
+    existing = session.execute(
+        select(AnalysisJob)
+        .where(AnalysisJob.project_id == project.id,
+               AnalysisJob.status.in_((JobStatus.queued, JobStatus.running)))
+        .order_by(AnalysisJob.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if existing is not None:
+        response.status_code = status.HTTP_200_OK
+        return AnalyzeResponse(job_id=str(existing.id), status=existing.status.value)
+
     if not (project.contract_text or "").strip():
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
                             "project has no contract_text; upload a contract before analyzing")
@@ -468,4 +485,37 @@ def analyze(request: Request, response: Response, project_id: uuid.UUID,
     job = jobs.enqueue_analysis(
         session, company_id=project.company_id, project_id=project.id, created_by=user.id,
     )
+    return AnalyzeResponse(job_id=str(job.id), status=job.status.value)
+
+
+@router.post("/{project_id}/analysis/{job_id}/cancel", response_model=AnalyzeResponse)
+def cancel_analysis(project_id: uuid.UUID, job_id: uuid.UUID,
+                    user: User = Depends(get_current_user),
+                    session: Session = Depends(get_db)) -> AnalyzeResponse:
+    """Stop a queued or running analysis.
+
+    - queued: not yet claimed by a worker, so it's cancelled immediately.
+    - running: set the cancel signal; the worker observes it between engine
+      polls (see job_worker.process_job) and transitions the job to
+      "cancelled", stopping its wait on the engine and releasing that slot.
+    - already terminal (succeeded/failed/cancelled): idempotent no-op — return
+      the current status so a double-click is harmless.
+    """
+    project = _load_project(session, user, project_id)  # 404 if not the caller's
+    job = session.get(AnalysisJob, job_id)
+    if job is None or job.project_id != project.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "analysis job not found")
+
+    now = datetime.now(timezone.utc)
+    if job.status == JobStatus.queued:
+        job.status = JobStatus.cancelled
+        job.cancel_requested_at = now
+        job.finished_at = now
+        session.commit()
+        logger.info("analysis.cancelled_queued", extra={"job_id": str(job.id)})
+    elif job.status == JobStatus.running:
+        job.cancel_requested_at = now  # worker will terminalize it
+        session.commit()
+        logger.info("analysis.cancel_requested", extra={"job_id": str(job.id)})
+    # else: terminal -> no change, idempotent.
     return AnalyzeResponse(job_id=str(job.id), status=job.status.value)

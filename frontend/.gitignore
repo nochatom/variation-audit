@@ -4,3 +4,10 @@ out/
 .env.local
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright — reports and transient run output (NOT the committed snapshot
+# baselines under e2e/*-snapshots/, which the visual-regression gate needs).
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

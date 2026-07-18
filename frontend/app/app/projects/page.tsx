@@ -163,7 +163,7 @@ export default function ProjectsPage() {
               <div className="flex items-start justify-between gap-2">
                 <h3 className="min-w-0 flex-1 truncate font-bold tracking-tight text-ip-ink">{p.name}</h3>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <Chip tone={statusTone(p.status)}>{p.status}</Chip>
+                  <Chip tone={statusTone(p.status)}>{p.status.replace(/_/g, " ")}</Chip>
                   <ProjectActionsMenu
                     project={{ archived_at: null }}
                     isAdmin={isAdmin}

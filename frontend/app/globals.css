@@ -6,6 +6,13 @@
   html {
     color-scheme: dark;
   }
+  :root {
+    /* Emil Kowalski-style strong easing curves — the built-in CSS easings
+       (ease, ease-out) are too weak to feel intentional. */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  }
   /* Animate same-page anchor navigation (marketing nav section links).
      Guarded so users who ask for reduced motion get an instant jump. */
   @media (prefers-reduced-motion: no-preference) {
@@ -19,8 +26,23 @@
   body {
     @apply bg-canvas text-ink;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Contextual alternates + a whisper of negative tracking — the subtle
+       optical tightening premium products use so text reads "set", not
+       "typed". */
+    font-feature-settings: "cv05", "cv11", "ss01";
+    letter-spacing: -0.006em;
   }
+  /* Headings carry tighter display tracking + balanced wrapping (Linear /
+     Vercel register: large type is confidently tight, never loose). */
+  h1, h2, h3 {
+    letter-spacing: -0.021em;
+    text-wrap: balance;
+  }
+  /* Tabular figures everywhere numbers are compared/aligned — dashboards and
+     pricing should never have digits that dance. */
+  .tabular-nums { font-variant-numeric: tabular-nums; }
   ::selection {
     background: rgba(94, 106, 210, 0.35);
   }
@@ -36,7 +58,7 @@
     --ip-line-strong: 197 198 205;
     --ip-ink: 18 28 39;
     --ip-ink-2: 69 71 77;
-    --ip-ink-3: 117 119 125;
+    --ip-ink-3: 92 94 101;   /* darkened from 117 119 125 to clear WCAG AA (4.5:1) for small tertiary text on light/off-white backgrounds — was 4.25–4.47:1 */
     --ip-navy: 5 17 37;
     --ip-navy-2: 27 38 59;
     --ip-navy-3: 60 71 93;
@@ -44,7 +66,7 @@
     --ip-navy-fill-2: 27 38 59;
     --ip-orange: 255 122 38;
     --ip-orange-2: 158 67 0;
-    --ip-recovery: 10 125 52;
+    --ip-recovery: 8 110 45;   /* darkened from 10 125 52 to clear WCAG AA for the small recovery-green chips on their tinted background */
     --ip-recovery-2: 0 164 55;
     --ip-risk: 186 26 26;
     --ip-risk-bg: 255 218 214;
@@ -83,13 +105,21 @@
            placeholder:text-ink-subtle focus:border-hairline-strong focus:outline-none
            focus:ring-2 focus:ring-primary-focus/50;
   }
+  .va-btn-primary,
+  .va-btn-secondary {
+    transition: background-color 160ms var(--ease-out), transform 160ms var(--ease-out);
+  }
+  .va-btn-primary:active:not(:disabled),
+  .va-btn-secondary:active:not(:disabled) {
+    transform: scale(0.97);
+  }
   .va-btn-primary {
     @apply rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white
-           transition-colors hover:bg-primary-hover disabled:opacity-50;
+           hover:bg-primary-hover disabled:opacity-50;
   }
   .va-btn-secondary {
     @apply rounded-md border border-hairline bg-surface-1 px-3.5 py-2 text-sm font-medium
-           text-ink transition-colors hover:bg-surface-2;
+           text-ink hover:bg-surface-2 disabled:opacity-50;
   }
   .va-eyebrow {
     @apply text-[13px] font-medium uppercase tracking-[0.04em] text-ink-subtle;
@@ -121,20 +151,52 @@
   .ip-card-lg {
     @apply rounded-xl border border-ip-line bg-ip-card shadow-ip-card;
   }
+  /* Clickable cards earn a perceptible affordance — a soft lift + a border
+     that firms up on hover, on the custom ease so it feels intentional. */
+  .ip-card-interactive {
+    @apply ip-card;
+    transition: box-shadow 200ms var(--ease-out), border-color 200ms var(--ease-out),
+      transform 200ms var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .ip-card-interactive:hover {
+      @apply border-ip-line-strong shadow-ip-card-hover;
+      transform: translateY(-2px);
+    }
+  }
+  .ip-card-interactive:active {
+    transform: translateY(0);
+  }
   .ip-label {
-    @apply text-[12px] font-semibold uppercase tracking-[0.05em] text-ip-ink-3;
+    @apply text-[11px] font-semibold uppercase tracking-[0.06em] text-ip-ink-3;
+  }
+  .btn-navy,
+  .btn-orange,
+  .btn-ghost {
+    transition: background-color 160ms var(--ease-out), border-color 160ms var(--ease-out),
+      box-shadow 160ms var(--ease-out), transform 160ms var(--ease-out);
+  }
+  .btn-navy:focus-visible,
+  .btn-orange:focus-visible,
+  .btn-ghost:focus-visible {
+    @apply outline-none ring-2 ring-ip-navy/40 ring-offset-2 ring-offset-ip-bg;
+  }
+  .btn-navy:active:not(:disabled),
+  .btn-orange:active:not(:disabled),
+  .btn-ghost:active:not(:disabled) {
+    transform: scale(0.97);
   }
   .btn-navy {
     @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-ip-navy-fill px-3.5 py-2
-           text-sm font-semibold text-white transition-colors hover:bg-ip-navy-fill-2 disabled:opacity-50;
+           text-sm font-semibold text-white hover:bg-ip-navy-fill-2 disabled:opacity-50;
   }
   .btn-orange {
     @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-ip-orange px-3.5 py-2
-           text-sm font-semibold text-white transition-colors hover:bg-ip-orange-2 disabled:opacity-50;
+           text-sm font-semibold text-white hover:bg-ip-orange-2 disabled:opacity-50;
   }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-ip-line-strong
-           bg-ip-card px-3.5 py-2 text-sm font-semibold text-ip-navy transition-colors
+           bg-ip-card px-3.5 py-2 text-sm font-semibold text-ip-navy
            hover:bg-ip-card-2 disabled:opacity-50;
   }
   .ip-input {
@@ -147,6 +209,165 @@
   }
   .ip-row {
     @apply border-b border-ip-line last:border-0;
+  }
+  /* Opt-in hover treatment for cards that are actually clickable (plan
+     cards, project rows) — static Card usages (stat displays, empty
+     states) intentionally don't get this, since a hover affordance on a
+     non-interactive element is misleading. */
+  .ip-card-interactive {
+    @apply cursor-pointer;
+    transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out),
+      transform 160ms var(--ease-out);
+  }
+  .ip-card-interactive:hover {
+    @apply border-ip-line-strong shadow-ip-pop;
+  }
+  .ip-card-interactive:active {
+    transform: scale(0.99);
+  }
+
+  /* ---- Reusable entrance animation for popovers/dropdowns/menus ----
+     Scales from 0.95 (never 0 — nothing in the real world pops from
+     nothing) + fades in. Pair with an explicit transform-origin utility
+     (origin-top-right, origin-top-left, etc.) matching the trigger. */
+  .animate-scale-in {
+    animation: scale-in 160ms var(--ease-out);
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  .animate-scale-out {
+    animation: scale-out 120ms var(--ease-in-out);
+  }
+  @keyframes scale-out {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+  }
+
+  /* Modal: center-anchored (not trigger-anchored — modals aren't
+     positioned relative to what opened them), fade + gentle scale. */
+  .animate-modal-in {
+    animation: modal-in 200ms var(--ease-out);
+  }
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  .animate-modal-out {
+    animation: modal-out 160ms var(--ease-in-out);
+  }
+  @keyframes modal-out {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+  .animate-backdrop-in {
+    animation: backdrop-in 200ms ease;
+  }
+  @keyframes backdrop-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .animate-backdrop-out {
+    animation: backdrop-out 160ms ease;
+  }
+  @keyframes backdrop-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  /* Drawer: slides in from the edge it's anchored to (left, for the
+     mobile sidebar). translateX(100%) is relative to the element's own
+     width, so it works regardless of the drawer's actual size. */
+  .animate-drawer-in {
+    animation: drawer-in 260ms var(--ease-drawer);
+  }
+  @keyframes drawer-in {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  .animate-drawer-out {
+    animation: drawer-out 200ms var(--ease-out);
+  }
+  @keyframes drawer-out {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-100%);
+    }
+  }
+
+  /* One-time staggered entrance for marketing/landing content — first-time
+     context, per the animation decision framework this is where delight
+     is earned. Never used on dashboard/app UI (tens-of-times-a-day
+     contexts should have little to no animation). */
+  .animate-fade-up {
+    opacity: 0;
+    animation: fade-up 500ms var(--ease-out) forwards;
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Comprehensive reduced-motion reset (a11y-project canonical form).
+     Supersedes a partial ".animate-* only" block — this also neutralizes the
+     button press-scales, the sliding segmented-toggle indicators, and every
+     hover/color transition, so a user who asks for reduced motion gets
+     instant state changes with no movement, while final computed styles (and
+     transitionend/setTimeout-driven unmounts) still resolve correctly. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /* Landing page decorative grid backgrounds — extracted from inline style={{}}

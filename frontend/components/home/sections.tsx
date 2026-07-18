@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FileCheck2, Files, Gavel, Inbox, Link2, ScanSearch, ShieldAlert } from "lucide-react";
 import { Chip, ConfidenceBar, StatCard, TimeBarFlag, aud } from "@/components/ui";
 import { LogoMark } from "@/components/ui/Logo";
+import { Wordmark } from "@/components/ui/Wordmark";
 
 /* ---------------- nav ---------------- */
 export function Nav() {
@@ -10,7 +11,7 @@ export function Nav() {
       <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-6 sm:px-12 lg:px-16">
         <Link href="/" className="flex items-center gap-2.5" aria-label="VariationIQ home">
           <LogoMark size={28} />
-          <span className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</span>
+          <Wordmark height={17} className="text-ip-ink" />
         </Link>
         <nav className="hidden items-center gap-8 text-sm text-ip-ink-2 md:flex">
           {/* Root-relative (/#id), not bare #id — this nav renders on every
@@ -40,21 +41,30 @@ export function Hero() {
     <section className="relative flex min-h-[calc(100vh-56px)] w-full items-center border-b border-ip-line">
       <div className="mx-auto grid w-full max-w-[1440px] grid-cols-1 items-center gap-y-14 px-6 py-16 sm:px-12 lg:grid-cols-[11fr_9fr] lg:gap-x-16 lg:px-16 lg:py-0">
         <div>
-          <span className="inline-flex items-center gap-2 rounded-pill border border-ip-line bg-ip-card px-3 py-1 text-[12px] font-semibold text-ip-ink-2">
+          <span
+            className="animate-fade-up inline-flex items-center gap-2 rounded-pill border border-ip-line bg-ip-card px-3 py-1 text-[12px] font-semibold text-ip-ink-2"
+            style={{ animationDelay: "0ms" }}
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-ip-navy" />
             AI revenue recovery for Australian construction
           </span>
 
-          <h1 className="mt-6 text-[clamp(2.5rem,4.6vw,3.75rem)] font-bold leading-[1.05] tracking-tight text-ip-ink">
+          <h1
+            className="animate-fade-up mt-6 text-[clamp(2.5rem,4.6vw,3.75rem)] font-bold leading-[1.05] tracking-tight text-ip-ink"
+            style={{ animationDelay: "60ms" }}
+          >
             Find the variation revenue already buried in your projects.
           </h1>
 
-          <p className="mt-5 max-w-lg text-[17px] leading-relaxed text-ip-ink-2">
+          <p
+            className="animate-fade-up mt-5 max-w-lg text-[17px] leading-relaxed text-ip-ink-2"
+            style={{ animationDelay: "120ms" }}
+          >
             VariationIQ reads your contracts, RFIs, emails, site instructions and meeting
             minutes to surface unclaimed variations before the time-bar closes.
           </p>
 
-          <div className="mt-9 flex flex-wrap items-center gap-3">
+          <div className="animate-fade-up mt-9 flex flex-wrap items-center gap-3" style={{ animationDelay: "180ms" }}>
             <Link href="/login" className="btn-navy px-6 py-3 text-[15px]">
               Start Free Analysis
             </Link>
@@ -63,7 +73,7 @@ export function Hero() {
             </a>
           </div>
 
-          <div className="mt-12">
+          <div className="animate-fade-up mt-12" style={{ animationDelay: "240ms" }}>
             <p className="ip-label mb-3">Built for AU construction trades</p>
             <div className="flex flex-wrap gap-2">
               {["General Contractors", "Electrical", "Plumbing", "HVAC", "Civil Engineering"].map((t) => (
@@ -75,7 +85,7 @@ export function Hero() {
           </div>
         </div>
 
-        <div>
+        <div className="animate-fade-up" style={{ animationDelay: "150ms" }}>
           <ScreenshotPreview />
           <WorkflowChain />
         </div>
@@ -111,9 +121,9 @@ function ScreenshotPreview() {
           </div>
 
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-            <StatCard label="Recoverable" value={aud(284500)} hint="AUD" accent="recovery" />
-            <StatCard label="Variations" value="12" hint="detected" />
-            <StatCard label="Time-bar risk" value="3" hint="within 14 days" accent="risk" />
+            <StatCard size="sm" label="Recoverable" value={aud(284500)} hint="AUD" accent="recovery" />
+            <StatCard size="sm" label="Variations" value="12" hint="detected" />
+            <StatCard size="sm" label="Time-bar risk" value="3" hint="within 14 days" accent="risk" />
           </div>
 
           <div className="mt-2.5 overflow-hidden rounded-lg border border-ip-line">
@@ -254,7 +264,7 @@ export function Features() {
           {caps.map((c) => (
             <div
               key={c.title}
-              className="group rounded-xl border border-ip-line bg-ip-card p-7 shadow-ip-card transition-all duration-200 hover:-translate-y-0.5 hover:border-ip-line-strong hover:shadow-ip-pop"
+              className="group rounded-xl border border-ip-line bg-ip-card p-7 shadow-ip-card transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-ip-line-strong hover:shadow-ip-pop"
             >
               <div className="grid h-11 w-11 place-items-center rounded-lg border border-ip-navy/15 bg-ip-navy/8 text-ip-navy transition-colors duration-200 group-hover:bg-ip-navy/12">
                 <c.icon className="h-5 w-5" strokeWidth={1.75} aria-hidden />
@@ -295,7 +305,7 @@ export function ProductCapabilities() {
           {items.map((i) => (
             <div
               key={i.title}
-              className="group rounded-xl border border-ip-line bg-ip-card p-6 shadow-ip-card transition-all duration-200 hover:-translate-y-0.5 hover:border-ip-line-strong hover:shadow-ip-pop"
+              className="group rounded-xl border border-ip-line bg-ip-card p-6 shadow-ip-card transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-ip-line-strong hover:shadow-ip-pop"
             >
               <div className="flex items-center gap-3">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-ip-navy/15 bg-ip-navy/8 text-ip-navy transition-colors duration-200 group-hover:bg-ip-navy/12">
@@ -370,7 +380,7 @@ export function SiteFooter() {
           <div className="col-span-2 sm:col-span-1">
             <Link href="/" className="flex items-center gap-2.5" aria-label="VariationIQ home">
               <LogoMark size={28} />
-              <span className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</span>
+              <Wordmark height={17} className="text-ip-ink" />
             </Link>
             <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-ip-ink-3">
               AI revenue recovery for Australian construction — surfacing unclaimed variations from your project

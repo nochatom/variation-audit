@@ -286,7 +286,27 @@ def test_analysis_rate_limited_after_10_per_hour(monkeypatch):
 
     limiter.reset()
     try:
-        client, project = _project_client_n(15, contract_text="Agreed scope baseline.")
+        user = User(id=uuid.uuid4(), email="ca@firm.com", password_hash="x", is_active=True)
+        cid = uuid.uuid4()
+        project = Project(id=uuid.uuid4(), company_id=cid, name="Tower A",
+                          contract_text="Agreed scope baseline.", status=ProjectStatus.in_progress)
+        membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid)
+        # Each analyze request runs TWO queries: _load_project's membership
+        # lookup, then the duplicate-active-job check (None = no active job, so
+        # a fresh job is enqueued). Provide both per request.
+        results = []
+        for _ in range(11):
+            results.append(FakeResult(scalar=membership, scalars=[membership]))
+            results.append(FakeResult(scalar=None))
+        session = FakeSession(results=results, get_obj=project)
+
+        def _db():
+            yield session
+        app.dependency_overrides[get_db] = _db
+        app.dependency_overrides[get_current_user] = lambda: user
+        app.dependency_overrides[get_store] = lambda: FakeStore()
+        client = TestClient(app)
+
         monkeypatch.setattr(
             projects_router.jobs, "enqueue_analysis",
             lambda *a, **k: SimpleNamespace(id=uuid.uuid4(), status=JobStatus.queued),
@@ -300,6 +320,7 @@ def test_analysis_rate_limited_after_10_per_hour(monkeypatch):
         assert statuses[10] == 429
     finally:
         limiter.reset()
+        app.dependency_overrides.clear()
 
 
 def test_health_exempt_from_rate_limiting():

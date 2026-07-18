@@ -99,6 +99,13 @@ class MeResponse(BaseModel):
     organizations: list[OrgOut] = []
 
 
+class UpdateMeRequest(BaseModel):
+    # Same length bound as SignupRequest.full_name. Only the profile's
+    # display name is editable here — email/password/org membership all have
+    # their own dedicated, separately-authorized flows and are not touched.
+    full_name: str | None = Field(default=None, max_length=200)
+
+
 # ---- endpoints -----------------------------------------------------------
 _SIGNUP_ACCEPTED_MESSAGE = "Account request received — signing you in."
 
@@ -240,8 +247,7 @@ def reset_password(request: Request, response: Response, req: ResetPasswordReque
     })
 
 
-@router.get("/me", response_model=MeResponse)
-def me(user: User = Depends(get_current_user), session: Session = Depends(get_db)) -> MeResponse:
+def _me_response(session: Session, user: User) -> MeResponse:
     rows = session.execute(
         select(Membership, Organization)
         .join(Organization, Organization.id == Membership.company_id)
@@ -250,6 +256,32 @@ def me(user: User = Depends(get_current_user), session: Session = Depends(get_db
     orgs = [OrgOut(id=str(o.id), name=o.name, role=m.role.value) for m, o in rows]
     return MeResponse(user_id=str(user.id), email=user.email,
                       full_name=user.full_name, organizations=orgs)
+
+
+@router.get("/me", response_model=MeResponse)
+def me(user: User = Depends(get_current_user), session: Session = Depends(get_db)) -> MeResponse:
+    return _me_response(session, user)
+
+
+@router.patch("/me", response_model=MeResponse)
+def update_me(req: UpdateMeRequest, user: User = Depends(get_current_user),
+              session: Session = Depends(get_db)) -> MeResponse:
+    """Update the current user's own editable profile fields (full name).
+
+    Self-scoped by get_current_user — a user can only ever edit their own
+    row; no company/admin authorization is involved because this touches no
+    org-scoped data. Returns the same MeResponse shape as GET /me so the
+    frontend can refresh its cached user in one round trip.
+    """
+    # Normalize: treat an all-whitespace name as cleared, so the UI never
+    # persists a blank-but-nonempty value.
+    name = (req.full_name or "").strip()
+    user.full_name = name or None
+    session.commit()
+    security_logger.info("profile updated", extra={
+        "event": "profile_updated", "user_id": str(user.id),
+    })
+    return _me_response(session, user)
 
 
 @router.post("/refresh", response_model=RefreshResponse)

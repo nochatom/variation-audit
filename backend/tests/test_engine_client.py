@@ -71,6 +71,35 @@ def test_run_to_completion_success():
     assert poll.engine_version == "v1"
 
 
+def test_run_to_completion_cancels_when_signalled():
+    # cancel_check returning True must abort the poll loop with EngineCancelled
+    # so the worker can mark the job cancelled instead of failed.
+    from app.engine.client import EngineCancelled
+
+    client = EngineClient("http://engine", transport=_transport([_running(), _running()]))
+    with pytest.raises(EngineCancelled) as ei:
+        client.run_to_completion(_request(), sleep=NOOP_SLEEP, cancel_check=lambda: True)
+    assert ei.value.code == "CANCELLED"
+    assert ei.value.retryable is False
+
+
+def test_run_to_completion_not_cancelled_when_signal_false():
+    client = EngineClient("http://engine", transport=_transport([_running(), _succeeded()]))
+    poll = client.run_to_completion(_request(), sleep=NOOP_SLEEP, cancel_check=lambda: False)
+    assert poll.status == JobStatus.succeeded
+
+
+def test_run_to_completion_heartbeat_fires_per_nonterminal_poll():
+    # on_poll (the worker's progress heartbeat) must fire once per non-terminal
+    # poll and NOT on the terminal one — so a long AI Analysis stage keeps the
+    # live stream ticking instead of falsely reporting a stall.
+    calls = []
+    client = EngineClient("http://engine", transport=_transport([_running(), _running(), _succeeded()]))
+    poll = client.run_to_completion(_request(), sleep=NOOP_SLEEP, on_poll=lambda: calls.append(1))
+    assert poll.status == JobStatus.succeeded
+    assert len(calls) == 2
+
+
 def test_run_to_completion_timeout():
     client = EngineClient("http://engine", transport=_transport([_running()]))
     with pytest.raises(EngineTimeout) as ei:
@@ -100,3 +129,40 @@ def test_submit_error_maps_code():
         client.submit(_request())
     assert ei.value.code == "UNSUPPORTED_CONTRACT_VERSION"
     assert ei.value.retryable is False
+
+
+def _flaky_transport(fail_gets: int):
+    """POST -> 202; the first `fail_gets` GETs raise RemoteProtocolError
+    ("Server disconnected..."), i.e. the stale keep-alive reuse race; then GET
+    -> succeeded. Reproduces the exact root cause of the intermittent failure."""
+    state = {"gets": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            return httpx.Response(202, json=_created())
+        state["gets"] += 1
+        if state["gets"] <= fail_gets:
+            raise httpx.RemoteProtocolError(
+                "Server disconnected without sending a response.", request=request
+            )
+        return httpx.Response(200, json=_succeeded())
+
+    return httpx.MockTransport(handler)
+
+
+def test_poll_retries_transient_disconnect():
+    # One stale-connection disconnect, then success — the single retry recovers
+    # on a fresh connection instead of failing the whole job (root-cause fix).
+    client = EngineClient("http://engine", transport=_flaky_transport(fail_gets=1))
+    poll = client.run_to_completion(_request(), sleep=NOOP_SLEEP)
+    assert poll.status == JobStatus.succeeded
+
+
+def test_poll_gives_up_after_retry_exhausted():
+    # Persistent disconnect (not the transient race): surface a clean,
+    # retryable ENGINE_UNAVAILABLE rather than a raw httpx exception.
+    client = EngineClient("http://engine", transport=_flaky_transport(fail_gets=99))
+    with pytest.raises(EngineError) as ei:
+        client.run_to_completion(_request(), sleep=NOOP_SLEEP)
+    assert ei.value.code == "ENGINE_UNAVAILABLE"
+    assert ei.value.retryable is True

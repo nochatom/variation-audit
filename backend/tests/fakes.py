@@ -18,9 +18,10 @@ class FakeScalars:
 class FakeResult:
     """Mimics the bits of a SQLAlchemy Result the code uses."""
 
-    def __init__(self, scalar=None, scalars=None):
+    def __init__(self, scalar=None, scalars=None, rows=None):
         self._scalar = scalar
         self._scalars = scalars or []
+        self._rows = rows or []          # for .all() (e.g. multi-column selects)
 
     def scalar_one_or_none(self):
         return self._scalar
@@ -30,6 +31,9 @@ class FakeResult:
 
     def scalars(self):
         return FakeScalars(self._scalars)
+
+    def all(self):
+        return list(self._rows)
 
 
 class FakeSession:

@@ -81,7 +81,7 @@ export function UpgradeModal({
             <div key={p.tier} className={`rounded-md border p-4 ${isCurrent ? "border-ip-navy" : "border-ip-line"}`}>
               <div className="text-sm font-bold text-ip-ink">{p.label}</div>
               <div className="mt-1 text-[13px] font-semibold tabular-nums text-ip-ink">
-                {p.tier === "enterprise" ? "Contact sales" : price === 0 ? (
+                {p.tier === "enterprise" ? "Contact Sales" : price === 0 ? (
                   <>A$0 <span className="font-normal text-ip-ink-3">Forever</span></>
                 ) : (
                   <>AUD {price!.toLocaleString()} <span className="font-normal text-ip-ink-3">/ {interval === "monthly" ? "mo" : "yr"}</span></>
@@ -99,7 +99,7 @@ export function UpgradeModal({
                   <span className="inline-block rounded-pill bg-ip-navy/10 px-2.5 py-1 text-[11px] font-semibold text-ip-navy">Current plan</span>
                 )}
                 {isUpgrade && p.tier === "enterprise" && (
-                  <a href="mailto:hello@variationiq.com" className="btn-navy block w-full text-center text-xs">Contact sales</a>
+                  <a href="mailto:hello@variationiq.com" className="btn-navy block w-full text-center text-xs">Contact Sales</a>
                 )}
                 {isUpgrade && p.tier !== "enterprise" && (
                   <button

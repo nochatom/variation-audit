@@ -1,6 +1,9 @@
 """Worker logic: claim_one, build_request, ingest_result — with fake sessions."""
 import uuid
 
+import pytest
+from sqlalchemy.orm.exc import StaleDataError
+
 from app.engine.schemas import (
     AnalysisResult,
     BaselineOut,
@@ -21,7 +24,8 @@ from app.models import (
     ValueEstimate,
     Variation,
 )
-from app.worker.job_worker import build_request, claim_one, ingest_result
+from app.worker.job_worker import build_request, claim_one, fail_job, ingest_result
+import app.worker.job_worker as job_worker
 from tests.fakes import FakeResult, FakeSession
 
 
@@ -149,3 +153,51 @@ def test_ingest_result_url_sets_ref_without_variations():
     assert job.result_ref == "https://s3/large-result.json"
     assert job.status == JobStatus.succeeded
     assert session.added_of(Variation) == []
+
+
+# -- robustness: a failing job must never take the worker down --------------
+def test_fail_job_survives_vanished_row():
+    """If the job row was deleted under us, fail_job must roll back and return
+    — not raise StaleDataError (which used to crash the whole worker loop)."""
+    class StaleSession(FakeSession):
+        def __init__(self):
+            super().__init__()
+            self.rolledback = 0
+
+        def commit(self):
+            raise StaleDataError("UPDATE expected 1 row; 0 matched")
+
+        def rollback(self):
+            self.rolledback += 1
+
+    job = _job()
+    job.created_by = None  # no notification recipient -> _notify is a no-op
+    session = StaleSession()
+    fail_job(session, job, "INTERNAL", "engine disconnected", retryable=True)  # must NOT raise
+    assert session.rolledback == 1
+
+
+def test_run_forever_survives_iteration_crash(monkeypatch):
+    """One poisoned iteration must not kill the loop — the worker keeps going,
+    otherwise every later job is stuck 'queued' forever."""
+    calls = {"n": 0}
+
+    def fake_run_once(_sf, _c, _l):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("boom in iteration 1")  # simulate an unexpected crash
+        return False  # idle thereafter
+
+    monkeypatch.setattr(job_worker, "run_once", fake_run_once)
+
+    sleeps = {"n": 0}
+
+    def fake_sleep(_):
+        sleeps["n"] += 1
+        if sleeps["n"] >= 2:
+            raise KeyboardInterrupt  # break the infinite loop for the test
+
+    with pytest.raises(KeyboardInterrupt):
+        job_worker.run_forever(None, None, None, sleep=fake_sleep)
+    # Reached a 2nd iteration => it survived the iteration-1 crash.
+    assert calls["n"] >= 2

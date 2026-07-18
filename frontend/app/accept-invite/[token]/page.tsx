@@ -7,6 +7,7 @@ import { api, ApiError, InvitationPreview, getToken, setCompanyId, storeTokens }
 import { useTheme } from "@/lib/use-theme";
 import { ErrorNote } from "@/components/ui";
 import { LogoMark } from "@/components/ui/Logo";
+import { Wordmark } from "@/components/ui/Wordmark";
 
 type Stage =
   | { kind: "loading" }
@@ -121,7 +122,7 @@ export default function AcceptInvitePage() {
         <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationIQ home">
           <LogoMark size={32} />
           <div>
-            <h1 className="text-[15px] font-bold tracking-tight text-ip-ink">VariationIQ</h1>
+            <h1 aria-label="VariationIQ" className="flex"><Wordmark height={18} className="text-ip-ink" /></h1>
             <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>
           </div>
         </Link>
