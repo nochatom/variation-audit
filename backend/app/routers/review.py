@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import ensure_member, get_current_user, get_db
 from app.models import Project, ReviewStatus, User, Variation
+from app.posthog_client import posthog_client
 from app.services import review as review_service
 
 router = APIRouter(tags=["review"])
@@ -148,6 +149,16 @@ def review_variation(variation_id: uuid.UUID, action: ReviewAction,
         review_service.set_review_status(session, v, user=user, new_status=action.status)
     except review_service.InvalidTransition as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, f"invalid transition: {exc}")
+    posthog_client.capture(
+        "variation_reviewed",
+        distinct_id=str(user.id),
+        properties={
+            "new_status": action.status.value,
+            "confidence_score": float(v.confidence_score),
+            "confidence_band": v.confidence_band.value if v.confidence_band else None,
+            "time_bar_risk": bool(v.time_bar_risk),
+        },
+    )
     return _summary(v)
 
 

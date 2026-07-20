@@ -27,6 +27,7 @@ from app.config import get_settings
 from app.logging_config import security_logger
 from app.mailer import get_mailer
 from app.models import Invitation, MembershipRole, User
+from app.posthog_client import posthog_client
 from app.rate_limit import AUTH_LIMIT as AUTH_RATE_LIMIT
 from app.rate_limit import INVITATION_LIMIT
 from app.rate_limit import limiter
@@ -148,6 +149,11 @@ def create_invitation(request: Request, response: Response, company_id: uuid.UUI
         "event": "invitation_created", "invitation_id": str(inv.id),
         "company_id": str(company_id), "role": req.role.value, "email_sent": email_sent,
     })
+    posthog_client.capture(
+        "member_invited",
+        distinct_id=str(user.id),
+        properties={"role": req.role.value, "email_sent": email_sent},
+    )
     return _out(inv, raw_token=raw_token, email_sent=email_sent)
 
 

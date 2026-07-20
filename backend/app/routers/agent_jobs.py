@@ -16,6 +16,7 @@ from app.agents.errors import safe_job_error_message
 from app.agents.jobs import enqueue_agent_analysis
 from app.auth.deps import ensure_member, get_current_user, get_db
 from app.models import AgentAnalysisJob, Project, User
+from app.posthog_client import posthog_client
 from app.rate_limit import ANALYSIS_LIMIT, limiter
 
 router = APIRouter(prefix="/projects/{project_id}/agent-analysis", tags=["agent-analysis"])
@@ -78,6 +79,11 @@ def create_agent_analysis_job(
                             "project has no contract_text; upload a contract before analyzing")
     job = enqueue_agent_analysis(
         session, company_id=project.company_id, project_id=project.id, created_by=user.id,
+    )
+    posthog_client.capture(
+        "agent_analysis_started",
+        distinct_id=str(user.id),
+        properties={"job_id": str(job.id)},
     )
     return AgentJobOut.from_job(job)
 
