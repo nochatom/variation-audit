@@ -8,6 +8,8 @@ Run locally:
     cd backend
     uvicorn app.main:app --reload
 """
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -46,10 +48,19 @@ configure_logging()
 # A no-op outside production, so dev/test import behavior is unchanged.
 validate_production_storage_config(get_settings())
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    from app.posthog_client import posthog_client
+    posthog_client.flush()
+
+
 app = FastAPI(
     title="Variation Audit API",
     version="0.1.0",
     description="AU construction variation recovery — product layer.",
+    lifespan=lifespan,
 )
 
 # Rate limiting (per client IP) — a default limit applies to every endpoint via

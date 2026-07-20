@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app import parsing
 from app.auth.deps import ensure_member, get_current_user, get_db, require_admin
 from app.models import AnalysisJob, JobStatus, Membership, Project, ProjectStatus, SourceType, User
+from app.posthog_client import posthog_client
 from app.rate_limit import ANALYSIS_LIMIT, UPLOAD_LIMIT, limiter
 from app.services import billing as billing_service
 from app.services import jobs
@@ -127,6 +128,14 @@ def create_project(req: CreateProjectRequest, user: User = Depends(get_current_u
         session, company_id=req.company_id, created_by=user.id, name=req.name,
         contract_text=req.contract_text, scope_text=req.scope_text, state=req.state,
         status=ProjectStatus.in_progress,
+    )
+    posthog_client.capture(
+        "project_created",
+        distinct_id=str(user.id),
+        properties={
+            "has_state": req.state is not None,
+            "has_contract": bool(req.contract_text),
+        },
     )
     return _out(project)
 
@@ -256,6 +265,14 @@ async def upload_contract(request: Request, response: Response,
         project_service.set_contract(session, project, scope_text=text)
     else:
         project_service.set_contract(session, project, contract_text=text)
+    posthog_client.capture(
+        "contract_uploaded",
+        distinct_id=str(user.id),
+        properties={
+            "is_scope": is_scope,
+            "file_type": "pdf" if is_pdf else "text",
+        },
+    )
     return _out(project)
 
 
@@ -485,6 +502,11 @@ def analyze(request: Request, response: Response, project_id: uuid.UUID,
     job = jobs.enqueue_analysis(
         session, company_id=project.company_id, project_id=project.id, created_by=user.id,
     )
+    posthog_client.capture(
+        "analysis_started",
+        distinct_id=str(user.id),
+        properties={"job_id": str(job.id)},
+    )
     return AnalyzeResponse(job_id=str(job.id), status=job.status.value)
 
 
@@ -513,9 +535,19 @@ def cancel_analysis(project_id: uuid.UUID, job_id: uuid.UUID,
         job.finished_at = now
         session.commit()
         logger.info("analysis.cancelled_queued", extra={"job_id": str(job.id)})
+        posthog_client.capture(
+            "analysis_cancelled",
+            distinct_id=str(user.id),
+            properties={"previous_status": "queued"},
+        )
     elif job.status == JobStatus.running:
         job.cancel_requested_at = now  # worker will terminalize it
         session.commit()
         logger.info("analysis.cancel_requested", extra={"job_id": str(job.id)})
+        posthog_client.capture(
+            "analysis_cancelled",
+            distinct_id=str(user.id),
+            properties={"previous_status": "running"},
+        )
     # else: terminal -> no change, idempotent.
     return AnalyzeResponse(job_id=str(job.id), status=job.status.value)

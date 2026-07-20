@@ -25,6 +25,7 @@ from app.billing.provider import BillingNotConfigured
 from app.config import get_settings
 from app.logging_config import security_logger
 from app.models import AuditLog, Invoice, PlanTier, Subscription, User
+from app.posthog_client import posthog_client
 from app.rate_limit import BILLING_LIMIT, limiter
 from app.services import billing as billing_service
 
@@ -161,6 +162,14 @@ def create_checkout(request: Request, response: Response, company_id: uuid.UUID,
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc))
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    posthog_client.capture(
+        "checkout_initiated",
+        distinct_id=str(user.id),
+        properties={
+            "plan": req.plan.value,
+            "billing_interval": req.billing_interval,
+        },
+    )
     return UrlOut(url=result.url)
 
 
@@ -187,6 +196,11 @@ def cancel(request: Request, response: Response, company_id: uuid.UUID,
         sub = billing_service.cancel_subscription(session, company_id, user)
     except billing_service.NoActiveSubscription as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc))
+    posthog_client.capture(
+        "subscription_cancelled",
+        distinct_id=str(user.id),
+        properties={"plan": sub.plan.value},
+    )
     return _sub_out(sub)
 
 

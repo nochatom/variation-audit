@@ -22,3 +22,4 @@ google-adk>=2.4,<3.0          # multi-agent orchestration scaffold (app/agents/)
                               # deprecates Sequential/ParallelAgent in favor of Workflow, which can't
                               # yet be used as an LlmAgent sub-agent — see app/agents/orchestrator.py.
 litellm>=1.50                # provider-agnostic model layer for the ADK scaffold (Gemini/Claude/OpenAI)
+posthog>=3.0.0              # analytics, error tracking, feature flags

@@ -44,6 +44,10 @@ services:
       # guarantee for this same value (security hardening pass).
       VA_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET before running docker compose up, e.g. JWT_SECRET=$(openssl rand -hex 32) docker compose up --build}
       VA_LOCAL_DOC_DIR: /data/docs
+      # PostHog analytics (app/posthog_client.py). Real project token for the
+      # EU-cloud project; analytics is silently disabled when unset.
+      VA_POSTHOG_PROJECT_TOKEN: phc_y3DH2EhCXy7g7w2qfw7J9yMJrgkYvo5WkzkEiqFrTFas
+      VA_POSTHOG_HOST: https://eu.i.posthog.com
     volumes:
       - docdata:/data/docs
     depends_on:
@@ -60,6 +64,9 @@ services:
       VA_DATABASE_URL: postgresql+psycopg://va:va@db:5432/variation_audit
       VA_ENGINE_BASE_URL: http://engine:8088
       VA_LOCAL_DOC_DIR: /data/docs
+      # PostHog analytics — same config as the API service (see above).
+      VA_POSTHOG_PROJECT_TOKEN: phc_y3DH2EhCXy7g7w2qfw7J9yMJrgkYvo5WkzkEiqFrTFas
+      VA_POSTHOG_HOST: https://eu.i.posthog.com
       RUN_MIGRATIONS: "0"          # the API container owns migrations
     volumes:
       - docdata:/data/docs

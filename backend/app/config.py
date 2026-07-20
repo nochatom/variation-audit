@@ -208,6 +208,11 @@ class Settings(BaseSettings):
     agent_circuit_failure_threshold: int = 5
     agent_circuit_cooldown_seconds: int = 60
 
+    # PostHog analytics
+    posthog_project_token: str = ""
+    posthog_host: str = "https://eu.i.posthog.com"
+    posthog_disabled: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:
