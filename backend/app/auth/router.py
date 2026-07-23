@@ -17,6 +17,7 @@ from app.mailer import get_mailer
 from app.models import Membership, Organization, User
 from app.rate_limit import AUTH_LIMIT as AUTH_RATE_LIMIT
 from app.rate_limit import limiter
+from app.posthog_client import posthog_client
 from app.services import oauth_google
 from app.services import password_reset as password_reset_service
 
@@ -129,6 +130,14 @@ def signup(request: Request, response: Response, req: SignupRequest,
         security_logger.info("signup succeeded", extra={
             "event": "signup_succeeded", "user_id": str(user.id), "email": user.email, "org_id": str(org.id),
         })
+        posthog_client.capture(
+            "user_signed_up",
+            distinct_id=str(user.id),
+            properties={
+                "$set": {"full_name": user.full_name},
+                "signup_method": "email",
+            },
+        )
     except service.EmailAlreadyExists:
         # Timing parity with the success path: pay the same bcrypt hash the
         # success path pays, and end with the same commit round trip
@@ -165,6 +174,11 @@ def login(request: Request, response: Response, req: LoginRequest,
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
     security_logger.info("login succeeded",
                          extra={"event": "login_succeeded", "user_id": str(user.id), "email": user.email})
+    posthog_client.capture(
+        "user_logged_in",
+        distinct_id=str(user.id),
+        properties={"login_method": "email"},
+    )
     return _token_for(session, user)
 
 
@@ -201,6 +215,17 @@ def google_login(request: Request, response: Response, req: GoogleLoginRequest,
         "event": "google_signup_succeeded" if is_new else "google_login_succeeded",
         "user_id": str(user.id), "email": user.email,
     })
+    if is_new:
+        posthog_client.capture(
+            "user_signed_up",
+            distinct_id=str(user.id),
+            properties={"signup_method": "google"},
+        )
+    posthog_client.capture(
+        "user_logged_in",
+        distinct_id=str(user.id),
+        properties={"login_method": "google"},
+    )
     return _token_for(session, user)
 
 

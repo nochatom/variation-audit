@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import ensure_member, get_current_user, get_db
 from app.models import Project, ReviewStatus, User
+from app.posthog_client import posthog_client
 from app.reports_pdf import render_report_pdf
 from app.services import billing as billing_service
 from app.services import reports as report_service
@@ -45,5 +46,13 @@ def report_pdf(project_id: uuid.UUID, review_status: ReviewStatus | None = Revie
                                        project=project, status=review_status)
     pdf = render_report_pdf(data)
     filename = f"variation-report-{project_id}.pdf"
+    posthog_client.capture(
+        "report_exported",
+        distinct_id=str(user.id),
+        properties={
+            "review_status": review_status.value if review_status else None,
+            "variation_count": len(data.get("variations", [])),
+        },
+    )
     return Response(content=pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
