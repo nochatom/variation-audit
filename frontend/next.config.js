@@ -18,6 +18,17 @@ const SENTRY_INGEST_ORIGIN = `https://${new URL(SENTRY_DSN).host}`;
 // fetches with "Failed to fetch".
 const SUPABASE_ORIGIN = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 
+// PostHog analytics is reverse-proxied through this same origin at /relay
+// (see rewrites() below) rather than called cross-origin, so most browsers'
+// ad-blocker lists (which target *.posthog.com / *.i.posthog.com) don't
+// strip the requests. Because it's same-origin, connect-src/script-src need
+// no PostHog-specific entry at all — 'self' already covers it. Path is
+// deliberately generic ("/relay", not "/ingest" or anything analytics-shaped)
+// since some ad-blocker lists also match path substrings like /track,
+// /collect, /analytics regardless of domain.
+const POSTHOG_INGEST_DESTINATION = "https://eu.i.posthog.com";
+const POSTHOG_ASSETS_DESTINATION = "https://eu-assets.i.posthog.com";
+
 // script-src needs 'unsafe-inline': Next.js App Router embeds its own inline
 // RSC-hydration payload scripts (<script>self.__next_f.push(...)</script>) in
 // every page, including statically prerendered ones. A per-request nonce
@@ -37,8 +48,10 @@ const CSP = [
   // URL (new Blob([...]) + URL.createObjectURL) — without this, CSP falls
   // back through child-src to default-src 'self', which does NOT cover
   // blob:, and Worker creation is silently blocked (Replay degrades to a
-  // slower non-worker buffer rather than failing loudly).
-  "worker-src 'self' blob:",
+  // slower non-worker buffer rather than failing loudly). data: added
+  // alongside blob: for PostHog's worker-loading path, which can use a
+  // data: URI depending on bundler/version.
+  "worker-src 'self' blob: data:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -64,6 +77,20 @@ const nextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
+  // PostHog reverse proxy (see lib/posthog-provider.tsx's api_host: "/relay"):
+  // routes analytics through this app's own origin instead of calling
+  // *.posthog.com directly, so ad-blocker lists that target PostHog's ingest
+  // domains don't silently drop capture/session-replay/flag requests.
+  async rewrites() {
+    return [
+      { source: "/relay/static/:path*", destination: `${POSTHOG_ASSETS_DESTINATION}/static/:path*` },
+      { source: "/relay/:path*", destination: `${POSTHOG_INGEST_DESTINATION}/:path*` },
+    ];
+  },
+  // Required by PostHog's reverse-proxy setup: without this, Next.js's
+  // default trailing-slash redirect on /relay/decide (etc.) strips the
+  // request body/method before it ever reaches the rewrite above.
+  skipTrailingSlashRedirect: true,
 };
 
 module.exports = withSentryConfig(nextConfig, {

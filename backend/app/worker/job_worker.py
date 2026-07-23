@@ -101,19 +101,31 @@ def build_request(session: Session, job: AnalysisJob, loader: DocumentLoader,
         reporter.emit("Loading Documents", "running", STAGE_PCT["Queue"] + 3)
 
     documents: list[DocumentIn] = []
-    for d in docs:
+    # Perf instrumentation only (no behaviour change): per-document load
+    # timing + a total-loop time, so a slow storage read on one document is
+    # visible on its own line instead of hidden inside the job's total time.
+    perf_t_loop = time.perf_counter()
+    for i, d in enumerate(docs):
+        logger.info("perf: START document %s (%d/%d)", d.id, i + 1, len(docs))
+        perf_t0 = time.perf_counter()
         # The real work: pull each document's content from object storage.
         content = loader.load(d.storage_key)
+        perf_elapsed = time.perf_counter() - perf_t0
+        logger.info("perf: doc %s load time: %.3fs", d.id, perf_elapsed)
         documents.append(DocumentIn(
             document_id=str(d.id), type=d.source_type,
             timestamp=d.doc_timestamp, source=d.source, content=content,
         ))
+        logger.info("perf: END document %s (%.3fs)", d.id, perf_elapsed)
         if reporter is not None:
             reporter.processed_documents += 1
             reporter.current_document = d.source or str(d.id)
             span = STAGE_PCT["Loading Documents"] - STAGE_PCT["Queue"]
             pct = STAGE_PCT["Queue"] + int(span * reporter.processed_documents / max(1, reporter.total_documents))
             reporter.emit("Loading Documents", "running", pct, current_document=reporter.current_document)
+
+    logger.info("perf: document load loop total (%d docs): %.3fs",
+               len(docs), time.perf_counter() - perf_t_loop)
 
     if reporter is not None:
         reporter.current_document = None

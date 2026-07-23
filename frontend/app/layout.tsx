@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { PostHogProvider } from "../lib/posthog-provider";
 import "./globals.css";
 
 // Self-hosted (see app/fonts/*.woff2) instead of next/font/google, so the
@@ -34,7 +35,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             async/defer) so it still runs before paint, avoiding theme flash. */}
         <script src="/theme-init.js" />
       </head>
-      <body className="bg-ip-bg font-ip text-ip-ink antialiased">{children}</body>
+      <body className="bg-ip-bg font-ip text-ip-ink antialiased">
+        <PostHogProvider>{children}</PostHogProvider>
+      </body>
     </html>
   );
 }

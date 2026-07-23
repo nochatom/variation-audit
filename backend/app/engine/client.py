@@ -15,7 +15,12 @@ import httpx
 from app.engine.schemas import AnalysisRequest, JobCreated, JobPoll
 
 # Defaults from contract v1.1 §2.5 / §2.3
-MAX_WAIT_SECONDS = 10 * 60      # 10-min job cap -> ENGINE_TIMEOUT (product SLA)
+# 30-min overall job ceiling: large multi-document projects legitimately run
+# past 10 minutes (duration scales with file count/size), and the live SSE
+# stream already keeps the user informed (heartbeats) for the whole run. The
+# SSE endpoint's own hard ceiling is also 30 min — the two must stay aligned.
+# Genuinely hung runs still terminate: this cap + the per-call read timeout.
+MAX_WAIT_SECONDS = 30 * 60      # overall job cap -> ENGINE_TIMEOUT
 POLL_INITIAL_SECONDS = 2.0
 POLL_CAP_SECONDS = 15.0
 HTTP_TIMEOUT_SECONDS = 30.0
@@ -56,7 +61,7 @@ class EngineError(RuntimeError):
 
 
 class EngineTimeout(EngineError):
-    def __init__(self, message: str = "analysis exceeded the 10-minute limit and timed out"):
+    def __init__(self, message: str = "analysis exceeded the 30-minute limit and timed out"):
         super().__init__(message, code="ENGINE_TIMEOUT", retryable=True)
 
 
