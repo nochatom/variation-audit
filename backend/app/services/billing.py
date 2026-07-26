@@ -124,15 +124,17 @@ def _month_start() -> datetime:
 
 
 def _count_since(session: Session, model, company_id: uuid.UUID, since: datetime) -> int:
-    return len(session.execute(
-        select(model.id).where(model.company_id == company_id, model.created_at >= since)
-    ).scalars().all())
+    # Optimizing database performance: Use SQL COUNT instead of loading all rows into memory
+    return int(session.execute(
+        select(func.count(model.id)).where(model.company_id == company_id, model.created_at >= since)
+    ).scalar_one() or 0)
 
 
 def _seat_count(session: Session, company_id: uuid.UUID) -> int:
-    return len(session.execute(
-        select(Membership.id).where(Membership.company_id == company_id)
-    ).scalars().all())
+    # Optimizing database performance: Use SQL COUNT instead of loading all rows into memory
+    return int(session.execute(
+        select(func.count(Membership.id)).where(Membership.company_id == company_id)
+    ).scalar_one() or 0)
 
 
 def _included_seats(sub: Subscription) -> int | None:
@@ -180,9 +182,10 @@ def get_usage(session: Session, company_id: uuid.UUID) -> dict:
 
     doc_count = _count_since(session, Document, company_id, since)
     job_count = _count_since(session, AnalysisJob, company_id, since)
-    project_count = len(session.execute(
-        select(Project.id).where(Project.company_id == company_id, Project.archived_at.is_(None))
-    ).scalars().all())
+    # Optimizing database performance: Use SQL COUNT instead of loading all active project IDs into memory
+    project_count = int(session.execute(
+        select(func.count(Project.id)).where(Project.company_id == company_id, Project.archived_at.is_(None))
+    ).scalar_one() or 0)
 
     limits = PLAN_LIMITS[sub.plan]
     return {
@@ -375,9 +378,10 @@ def enforce_project_limit(session: Session, company_id: uuid.UUID, *, additional
     limit = PLAN_LIMITS[sub.plan]["projects"]
     if limit is None:
         return
-    current = len(session.execute(
-        select(Project.id).where(Project.company_id == company_id, Project.archived_at.is_(None))
-    ).scalars().all())
+    # Optimizing database performance: Use SQL COUNT instead of loading all active project IDs into memory
+    current = int(session.execute(
+        select(func.count(Project.id)).where(Project.company_id == company_id, Project.archived_at.is_(None))
+    ).scalar_one() or 0)
     if current + additional > limit:
         raise PlanLimitExceeded("project_limit_exceeded",
                                 f"plan limit of {limit} active projects reached")
