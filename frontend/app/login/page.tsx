@@ -4,7 +4,8 @@ import { Suspense, useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
-import { api, storeTokens, setCompanyId, TokenResponse } from "@/lib/api";
+import { api, ApiError, storeTokens, setCompanyId, TokenResponse } from "@/lib/api";
+import { mapAuthError } from "@/lib/auth-errors";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { useTheme } from "@/lib/use-theme";
 import { ErrorNote } from "@/components/ui";
@@ -31,7 +32,13 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { theme, toggleTheme } = useTheme();
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  // ?mode=signup opens the Sign-up tab directly. The marketing header shows
+  // both "Sign in" and "Get started"; without this they resolved to the same
+  // URL and the same tab, so a visitor who chose "Get started" still landed on
+  // a login form and had to find the toggle themselves.
+  const [mode, setMode] = useState<"login" | "signup">(
+    searchParams.get("mode") === "signup" ? "signup" : "login",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -43,8 +50,12 @@ function LoginForm() {
   const completeAuth = useCallback(
     async (tok: TokenResponse, rememberChoice: boolean) => {
       storeTokens(tok, rememberChoice);
-      const me = await api.me();
-      if (me.organizations[0]) setCompanyId(me.organizations[0].id);
+      // tok.organizations comes straight off the login/signup response — no
+      // separate GET /auth/me round trip needed just to learn this (that
+      // fetch was pure duplication: AppProvider, mounted right after this
+      // redirect, independently fetches /auth/me itself and already falls
+      // back to organizations[0] with no companyId set — see lib/app-context.tsx).
+      if (tok.organizations[0]) setCompanyId(tok.organizations[0].id);
       router.replace(safeRedirect(searchParams.get("redirect")));
     },
     [router, searchParams],
@@ -65,8 +76,8 @@ function LoginForm() {
       }
       const tok = await api.login(email.trim(), password);
       await completeAuth(tok, remember);
-    } catch (err: any) {
-      setError(err.message || "Failed");
+    } catch (err) {
+      setError(mapAuthError(err, mode));
     } finally {
       setBusy(false);
     }
@@ -91,8 +102,12 @@ function LoginForm() {
       });
       if (oauthError) throw oauthError;
       // Browser navigates to Google now; nothing left to do here.
-    } catch (err: any) {
-      setError(err.message || "Google sign-in failed");
+    } catch (err) {
+      // Supabase's own client errors (popup blocked, redirect misconfigured,
+      // etc.) aren't ApiError instances — mapAuthError's fallback for those
+      // is generic, so give a scoped-to-Google message instead of leaking
+      // the raw client error text.
+      setError(err instanceof ApiError ? mapAuthError(err, "google") : "Google sign-in isn't available right now. Please try again.");
       setBusy(false);
     }
   }

@@ -15,6 +15,9 @@ type Plan = {
   ctaHref: string;
   highlighted?: boolean;
   features: string[];
+  /** Announced but not yet shipped — rendered separately from `features` so a
+   *  roadmap item can never be mistaken for something you can buy today. */
+  roadmap?: string[];
 };
 
 const PLANS: Plan[] = [
@@ -68,29 +71,24 @@ const PLANS: Plan[] = [
       "Unlimited seats",
       "Unlimited storage",
       "Priority support",
-      "Future: SSO",
-      "Future: Advanced analytics",
     ],
+    // Not features. SSO and advanced analytics aren't built, so they sat in
+    // the bullet list beside things that work, with the same check mark —
+    // selling something that doesn't exist. Kept visible but plainly marked,
+    // because a buyer evaluating Enterprise is entitled to know the roadmap
+    // without being told it has already shipped.
+    roadmap: ["SSO", "Advanced analytics"],
   },
-];
-
-const COMPARISON_ROWS: { label: string; free: string; pro: string; enterprise: string }[] = [
-  { label: "Projects", free: "1", pro: "25", enterprise: "Unlimited" },
-  { label: "Documents / month", free: "20", pro: "500", enterprise: "Unlimited" },
-  { label: "AI analyses / month", free: "5", pro: "100", enterprise: "Unlimited" },
-  { label: "Seats", free: "3", pro: "15 included", enterprise: "Unlimited" },
-  { label: "Storage", free: "500 MB", pro: "5 GB", enterprise: "Unlimited" },
-  { label: "PDF reports", free: "—", pro: "✓", enterprise: "✓" },
-  { label: "Audit log", free: "—", pro: "✓", enterprise: "✓" },
-  { label: "Priority support", free: "—", pro: "—", enterprise: "✓" },
-  { label: "SSO", free: "—", pro: "—", enterprise: "Future" },
-  { label: "Advanced analytics", free: "—", pro: "—", enterprise: "Future" },
 ];
 
 const FAQ: { q: string; a: string }[] = [
   {
     q: "How does the ROI actually work?",
-    a: "A single missed variation on a commercial project is commonly worth thousands to tens of thousands of dollars. Pro costs AUD 149/month — recovering just one variation, on one project, typically covers a year or more of the subscription. VariationIQ doesn't create revenue, it surfaces revenue you already earned but haven't claimed.",
+    // Was: "commonly worth thousands to tens of thousands" + "typically covers
+    // a year or more" — two unmeasured claims stated as fact. The honest
+    // version states what the product does and hands the arithmetic to the
+    // reader, who has their own numbers.
+    a: "VariationIQ doesn't create revenue — it surfaces revenue you already earned but haven't claimed. Pro is AUD 149/month, so the question is simply whether a year of that is worth less than the variations currently going unclaimed on your projects. Start on the Free plan with one finished job and judge it against your own numbers rather than ours.",
   },
   {
     q: "What counts as an AI analysis?",
@@ -134,9 +132,11 @@ export default function PricingPage() {
             <h1 className="mt-3 text-[clamp(2rem,4.2vw,3rem)] font-bold leading-[1.1] tracking-tight text-ip-ink">
               Recover revenue you already earned.
             </h1>
+            {/* Dropped "Most plans pay for themselves the first time we surface
+                one you would have missed" — an unmeasurable claim, and the
+                fifth place on this page the same argument was being made. */}
             <p className="mx-auto mt-4 max-w-xl text-[16px] leading-relaxed text-ip-ink-2">
-              VariationIQ finds the variations buried in your project record. Most plans pay for
-              themselves the first time we surface one you would have missed.
+              Start free on one project. Upgrade when the record shows it&apos;s worth it.
             </p>
 
             <div className="mt-10 inline-flex items-center gap-1 rounded-pill border border-ip-line bg-ip-card p-1 text-[13px] font-semibold">
@@ -174,67 +174,37 @@ export default function PricingPage() {
           </div>
         </section>
 
-        {/* ROI section */}
+        {/* Why it pays.
+
+            The previous version of this section presented "Typical missed
+            variation: AUD 3,000–20,000+" and "Break-even: often in month one"
+            as stats, in the same grid as the real subscription price. Those
+            figures aren't measured — there's no design-partner data behind
+            them — and formatting an estimate like a finding lends it authority
+            it hasn't earned. On a page selling financial rigour that is a
+            liability, not a conversion lever.
+
+            What replaces them is the part that's actually true and checkable:
+            the price, and the reason the money is recoverable at all. The
+            arithmetic is left to the reader, who knows their own variation
+            values far better than we do. */}
         <section className="border-b border-ip-line">
           <div className="mx-auto max-w-[1000px] px-6 py-20 sm:px-12">
             <div className="ip-card-lg p-8 sm:p-12">
               <p className="ip-label mb-4">Why this pays for itself</p>
               <h2 className="text-[clamp(1.6rem,3vw,2.1rem)] font-bold tracking-tight text-ip-ink">
-                One recovered variation usually covers the subscription for a year.
+                You already earned the money. The evidence is just scattered.
               </h2>
-              <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
-                <RoiStat label="Pro plan" value="AUD 149/mo" hint="AUD 1,490/yr" />
-                <RoiStat label="Typical missed variation" value="AUD 3,000–20,000+" hint="per finding, before recovery" />
-                <RoiStat label="Break-even" value="1 finding" hint="often in month one" />
-              </div>
-              <p className="mt-8 text-[14px] leading-relaxed text-ip-ink-2">
-                Variations get missed because the evidence for them is scattered across contracts,
-                RFIs, emails, site instructions and meeting minutes — not because the entitlement
-                isn&apos;t real. VariationIQ reads that record so your commercial team can claim what
-                was already earned, before a time-bar notice period closes the window.
+              <p className="mt-6 max-w-2xl text-[15px] leading-relaxed text-ip-ink-2">
+                Variations get missed because the proof of them sits across contracts, RFIs, emails,
+                site instructions and meeting minutes — not because the entitlement isn&apos;t real.
+                VariationIQ reads that record so your commercial team can claim what was already
+                earned, before a time-bar notice period closes the window.
               </p>
-            </div>
-          </div>
-        </section>
-
-        {/* comparison table */}
-        <section className="border-b border-ip-line">
-          <div className="mx-auto max-w-[1200px] px-6 py-20 sm:px-12">
-            <div className="max-w-2xl">
-              <p className="ip-label">Compare plans</p>
-              <h2 className="mt-3 text-[clamp(1.9rem,3.6vw,2.6rem)] font-bold tracking-tight text-ip-ink">
-                Every plan, side by side.
-              </h2>
-            </div>
-            {/* tabIndex + role/label give keyboard users access to the
-                horizontally-scrolling table on narrow viewports (WCAG
-                scrollable-region-focusable). */}
-            <div
-              className="mt-10 overflow-x-auto rounded-lg border border-ip-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ip-navy/40"
-              tabIndex={0}
-              role="region"
-              aria-label="Plan comparison table"
-            >
-              <table className="w-full min-w-[560px] border-collapse text-left text-[13px]">
-                <thead>
-                  <tr className="border-b border-ip-line bg-ip-card-2">
-                    <th className="px-4 py-3 font-semibold text-ip-ink-3">Feature</th>
-                    <th className="px-4 py-3 font-semibold text-ip-ink">Free</th>
-                    <th className="px-4 py-3 font-semibold text-ip-navy">Pro</th>
-                    <th className="px-4 py-3 font-semibold text-ip-ink">Enterprise</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {COMPARISON_ROWS.map((row, i) => (
-                    <tr key={row.label} className={i % 2 === 1 ? "bg-ip-card-2/40" : ""}>
-                      <td className="border-t border-ip-line px-4 py-3 font-medium text-ip-ink-2">{row.label}</td>
-                      <td className="border-t border-ip-line px-4 py-3 text-ip-ink-2">{row.free}</td>
-                      <td className="border-t border-ip-line px-4 py-3 font-semibold text-ip-ink">{row.pro}</td>
-                      <td className="border-t border-ip-line px-4 py-3 text-ip-ink-2">{row.enterprise}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <p className="mt-6 max-w-2xl text-[15px] font-semibold leading-relaxed text-ip-ink">
+                Pro is AUD 149 a month. You know what one unclaimed variation is worth on your jobs
+                better than we do — run it on a finished project and see what the record says.
+              </p>
             </div>
           </div>
         </section>
@@ -326,7 +296,10 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
           <span className="text-2xl font-bold text-ip-ink">Contact Sales</span>
         ) : price === 0 ? (
           <>
-            <span className="text-3xl font-bold tabular-nums text-ip-ink">A$0</span>
+            {/* "AUD 0", not "A$0": the Pro card beside this renders "AUD 149",
+                and two currency conventions in one row of pricing cards is the
+                kind of detail that costs credibility on a page about money. */}
+            <span className="text-3xl font-bold tabular-nums text-ip-ink">AUD 0</span>
             <p className="mt-1 text-[12px] text-ip-ink-3">Forever</p>
           </>
         ) : (
@@ -346,6 +319,15 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
         ))}
       </ul>
 
+      {/* Separated from the feature list by a rule and its own label, so no
+          roadmap item can be read as something included today. */}
+      {plan.roadmap && plan.roadmap.length > 0 && (
+        <div className="mt-5 border-t border-ip-line pt-4">
+          <p className="ip-label mb-2">On the roadmap — not available yet</p>
+          <p className="text-[13px] text-ip-ink-3">{plan.roadmap.join(" · ")}</p>
+        </div>
+      )}
+
       <a
         href={plan.ctaHref}
         className={`mt-8 block rounded-md px-4 py-2.5 text-center text-sm font-semibold transition-colors ${
@@ -358,51 +340,23 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
   );
 }
 
-/* One feature line. Included features get a crisp recovery-green check;
-   roadmap items (the existing "Future:" strings — content unchanged) get a
-   muted clock badge so "shipping now" reads distinctly from "coming later". */
+/* One feature line. Every entry here is something the plan includes today —
+   roadmap items render separately in PlanCard, so this no longer needs a
+   second "coming later" state. */
 function FeatureRow({ feature, highlighted }: { feature: string; highlighted?: boolean }) {
-  const isFuture = feature.startsWith("Future:");
   return (
     <li className="flex items-start gap-3">
       <span
-        className={`mt-px grid h-5 w-5 shrink-0 place-items-center rounded-md ${
-          isFuture ? "bg-ip-line/70 text-ip-ink-3" : "bg-ip-recovery/12 text-ip-recovery"
-        }`}
+        className="mt-px grid h-5 w-5 shrink-0 place-items-center rounded-md bg-ip-recovery/12 text-ip-recovery"
         aria-hidden
       >
-        {isFuture ? (
-          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 8v4l2.5 1.5" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 6L9 17l-5-5" />
-          </svg>
-        )}
+        <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 6L9 17l-5-5" />
+        </svg>
       </span>
-      <span
-        className={`text-[13.5px] leading-5 ${
-          isFuture
-            ? "text-ip-ink-3"
-            : highlighted
-              ? "font-medium text-ip-ink"
-              : "text-ip-ink-2"
-        }`}
-      >
+      <span className={`text-[13.5px] leading-5 ${highlighted ? "font-medium text-ip-ink" : "text-ip-ink-2"}`}>
         {feature}
       </span>
     </li>
-  );
-}
-
-function RoiStat({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div className="rounded-lg border border-ip-line bg-ip-card p-5">
-      <div className="ip-label">{label}</div>
-      <div className="mt-2 text-xl font-bold tabular-nums text-ip-ink">{value}</div>
-      <div className="mt-1 text-[12px] text-ip-ink-3">{hint}</div>
-    </div>
   );
 }
