@@ -34,6 +34,7 @@ from app.routers.internal_storage import router as internal_storage_router
 from app.routers.invitations import org_router as org_invitations_router
 from app.routers.invitations import public_router as invitations_router
 from app.routers.notifications import router as notifications_router
+from app.routers.org_profile import router as org_profile_router
 from app.routers.orgs import router as orgs_router
 from app.routers.projects import router as projects_router
 from app.routers.reports import router as reports_router
@@ -106,6 +107,9 @@ app.include_router(analysis_events_router)
 app.include_router(projects_router)
 app.include_router(review_router)
 app.include_router(orgs_router)
+# Registered after orgs_router: /orgs/{id}/members is a literal path segment
+# and must not be shadowed by anything this router mounts.
+app.include_router(org_profile_router)
 app.include_router(org_invitations_router)
 app.include_router(invitations_router)
 app.include_router(reports_router)

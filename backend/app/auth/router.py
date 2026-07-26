@@ -48,12 +48,23 @@ class LoginRequest(BaseModel):
     password: str = Field(max_length=128)
 
 
+class OrgOut(BaseModel):
+    id: str
+    name: str
+    role: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
     user_id: str
     email: str
+    # Populated so the frontend's post-login/signup redirect can read the
+    # default company_id straight off this response, instead of an extra
+    # GET /auth/me round trip it used to make purely to learn this (see
+    # login-latency fix — app/login/page.tsx no longer calls api.me() here).
+    organizations: list[OrgOut] = []
 
 
 class RefreshRequest(BaseModel):
@@ -85,12 +96,6 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(min_length=8, max_length=128)
-
-
-class OrgOut(BaseModel):
-    id: str
-    name: str
-    role: str
 
 
 class MeResponse(BaseModel):
@@ -272,15 +277,18 @@ def reset_password(request: Request, response: Response, req: ResetPasswordReque
     })
 
 
-def _me_response(session: Session, user: User) -> MeResponse:
+def _user_organizations(session: Session, user: User) -> list[OrgOut]:
     rows = session.execute(
         select(Membership, Organization)
         .join(Organization, Organization.id == Membership.company_id)
         .where(Membership.user_id == user.id)
     ).all()
-    orgs = [OrgOut(id=str(o.id), name=o.name, role=m.role.value) for m, o in rows]
+    return [OrgOut(id=str(o.id), name=o.name, role=m.role.value) for m, o in rows]
+
+
+def _me_response(session: Session, user: User) -> MeResponse:
     return MeResponse(user_id=str(user.id), email=user.email,
-                      full_name=user.full_name, organizations=orgs)
+                      full_name=user.full_name, organizations=_user_organizations(session, user))
 
 
 @router.get("/me", response_model=MeResponse)
@@ -355,4 +363,5 @@ def logout_all(request: Request, response: Response, user: User = Depends(get_cu
 def _token_for(session: Session, user: User) -> TokenResponse:
     access = create_access_token(str(user.id), extra={"email": user.email})
     refresh = refresh_tokens.issue(session, user.id)
-    return TokenResponse(access_token=access, refresh_token=refresh, user_id=str(user.id), email=user.email)
+    return TokenResponse(access_token=access, refresh_token=refresh, user_id=str(user.id), email=user.email,
+                         organizations=_user_organizations(session, user))

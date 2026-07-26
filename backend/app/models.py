@@ -156,11 +156,52 @@ class Organization(Base):
 
     id: Mapped[uuid.UUID] = _pk()
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Identity of the contracting entity (0017). `name` stays the short
+    # display name shown in the app chrome; `legal_name` is what appears on a
+    # claim. ABN/ACN are stored digits-only — formatting is a view concern.
+    legal_name: Mapped[str | None] = mapped_column(Text)
+    abn: Mapped[str | None] = mapped_column(Text)
+    acn: Mapped[str | None] = mapped_column(Text)
+    website: Mapped[str | None] = mapped_column(Text)
+    phone: Mapped[str | None] = mapped_column(Text)
+    # Object-storage key, never a URL — signed URLs are minted at read time,
+    # the same convention project documents use.
+    logo_key: Mapped[str | None] = mapped_column(Text)
+    # Default jurisdiction for new projects. Security-of-payment regimes are
+    # state-based, so this drives time-bar calculations.
+    primary_state: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
 
     memberships: Mapped[list[Membership]] = relationship(back_populates="organization")
     projects: Mapped[list[Project]] = relationship(back_populates="organization")
+    offices: Mapped[list["Office"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+
+
+class Office(Base):
+    """A physical office of the organisation (0017).
+
+    At most one office per org may have is_primary set — enforced by the
+    partial unique index uq_offices_one_primary, not by application code.
+    """
+
+    __tablename__ = "offices"
+
+    id: Mapped[uuid.UUID] = _pk()
+    company_id: Mapped[uuid.UUID] = _company_fk()
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    address: Mapped[str | None] = mapped_column(Text)
+    suburb: Mapped[str | None] = mapped_column(Text)
+    state: Mapped[str | None] = mapped_column(Text)
+    postcode: Mapped[str | None] = mapped_column(Text)
+    phone: Mapped[str | None] = mapped_column(Text)
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
+
+    organization: Mapped[Organization] = relationship(back_populates="offices")
 
 
 class User(Base):
@@ -480,6 +521,36 @@ class AnalysisJob(Base):
     finished_at: Mapped[datetime | None] = mapped_column()
 
     variations: Mapped[list[Variation]] = relationship(back_populates="job")
+
+
+class AnalysisUsageEvent(Base):
+    """Immutable, append-only billing ledger: one row per analysis run that
+    was actually accepted (i.e. passed enforce_analysis_limit) and enqueued.
+    This — not a COUNT of live AnalysisJob rows — is the source of truth for
+    an org's monthly analysis quota (services/billing.py's get_usage /
+    enforce_analysis_limit).
+
+    Why a separate table instead of counting analysis_jobs directly: that
+    table's project_id FK is ON DELETE CASCADE (permanently deleting a
+    project deletes its jobs — see routers/projects.py:delete_project), so a
+    row-count-based quota would silently reset every time a user deletes and
+    recreates a project, letting a free org run unlimited analyses. project_id
+    and job_id here are ON DELETE SET NULL instead: deleting the project or
+    (in principle) the job leaves this ledger row — and therefore the
+    org's consumed quota — intact. Never updated or deleted once written.
+    """
+
+    __tablename__ = "analysis_usage_events"
+
+    id: Mapped[uuid.UUID] = _pk()
+    company_id: Mapped[uuid.UUID] = _company_fk()
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL")
+    )
+    job_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("analysis_jobs.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = _created()
 
 
 class AgentAnalysisJob(Base):

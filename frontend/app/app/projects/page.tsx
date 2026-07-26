@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { ChevronDown, Search, TriangleAlert } from "lucide-react";
 import { api, OrgDashboard, ProjectOut } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
 import { PageHeader, Card, Chip, ErrorNote, Spinner, EmptyState, statusTone, aud, fmtDate } from "@/components/ui";
 import { ProjectActionsMenu, DeleteProjectModal } from "@/components/project-actions";
 
 const AU_STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"] as const;
+
+/** Above this many projects a filter earns its place; below it, it's chrome. */
+const SEARCH_THRESHOLD = 8;
 
 export default function ProjectsPage() {
   const { companyId, isAdmin } = useApp();
@@ -19,10 +23,12 @@ export default function ProjectsPage() {
   const [lifecycleBusyId, setLifecycleBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProjectOut | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [query, setQuery] = useState("");
 
   const [name, setName] = useState("");
   const [state, setState] = useState("NSW");
   const [contract, setContract] = useState("");
+  const [showScope, setShowScope] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -90,6 +96,7 @@ export default function ProjectsPage() {
       await api.createProject(companyId, trimmedName, contract || undefined, state || undefined);
       setName("");
       setContract("");
+      setShowScope(false);
       setCreating(false);
       await load();
     } catch (e: any) {
@@ -99,12 +106,38 @@ export default function ProjectsPage() {
     }
   }
 
+  // Same ordering thesis as the Dashboard queue: money with a deadline first,
+  // then review backlog. A project list is a work order, not an alphabet.
+  const active = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (data?.projects ?? [])
+      .filter((p) => !q || p.name.toLowerCase().includes(q))
+      .sort(
+        (a, b) =>
+          b.time_bar_at_risk - a.time_bar_at_risk ||
+          b.counts.pending - a.counts.pending ||
+          a.name.localeCompare(b.name),
+      );
+  }, [data, query]);
+
+  const archivedList = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (archived ?? []).filter((p) => !q || p.name.toLowerCase().includes(q));
+  }, [archived, query]);
+
+  const totalActive = data?.projects.length ?? 0;
+  const showSearch = tab === "active" ? totalActive > SEARCH_THRESHOLD : (archived?.length ?? 0) > SEARCH_THRESHOLD;
+
   return (
     <div>
       <PageHeader
         title="Projects"
         description="Each project is a workspace for documents, analysis, and its review queue."
-        actions={<button onClick={() => setCreating((v) => !v)} className="btn-orange">{creating ? "Cancel" : "New project"}</button>}
+        actions={
+          <button onClick={() => setCreating((v) => !v)} className="btn-orange">
+            {creating ? "Cancel" : "New project"}
+          </button>
+        }
       />
 
       {error && <ErrorNote message={error} />}
@@ -113,14 +146,24 @@ export default function ProjectsPage() {
         <Card className="mb-6 p-5">
           <form onSubmit={create} className="flex flex-wrap items-end gap-3">
             <div className="min-w-[220px] flex-1">
-              <label className="ip-label mb-1 block">Project name</label>
-              <input className="ip-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sydney Metro — Package 4" minLength={1} maxLength={300} required />
+              <label htmlFor="project-name" className="ip-label mb-1 block">Project name</label>
+              <input
+                id="project-name"
+                className="ip-input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Sydney Metro — Package 4"
+                minLength={1}
+                maxLength={300}
+                required
+              />
             </div>
             <div>
-              <label className="ip-label mb-1 block">State</label>
+              <label htmlFor="project-state" className="ip-label mb-1 block">State</label>
               <div className="relative">
                 <select
-                  className="ip-input w-28 appearance-none pr-7"
+                  id="project-state"
+                  className="ip-input w-28 appearance-none pr-8"
                   value={state}
                   onChange={(e) => setState(e.target.value)}
                   required
@@ -129,96 +172,183 @@ export default function ProjectsPage() {
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
-                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-ip-ink-3">▼</span>
+                <ChevronDown
+                  className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ip-ink-3"
+                  aria-hidden
+                />
               </div>
             </div>
+
+            <button className="btn-navy" disabled={busy}>
+              {busy ? "Creating…" : "Create project"}
+            </button>
+
+            {/* The scope baseline is optional and long — it shouldn't set the
+                visual weight of a two-field create form. */}
             <div className="w-full">
-              <label className="ip-label mb-1 block">Contract / scope text (optional)</label>
-              <textarea className="ip-input" rows={3} value={contract} onChange={(e) => setContract(e.target.value)} maxLength={500000} placeholder="Paste the agreed scope baseline, or upload a document later from Documents." />
+              {!showScope ? (
+                <button
+                  type="button"
+                  onClick={() => setShowScope(true)}
+                  className="text-[12px] font-semibold text-ip-navy transition-colors hover:text-ip-navy/75"
+                >
+                  Add scope baseline
+                </button>
+              ) : (
+                <>
+                  <label htmlFor="project-scope" className="ip-label mb-1 block">
+                    Contract / scope text
+                  </label>
+                  <textarea
+                    id="project-scope"
+                    className="ip-input"
+                    rows={3}
+                    value={contract}
+                    onChange={(e) => setContract(e.target.value)}
+                    maxLength={500000}
+                    placeholder="Paste the agreed scope baseline, or upload a document later from Documents."
+                  />
+                </>
+              )}
             </div>
-            <button className="btn-navy" disabled={busy}>{busy ? "Creating…" : "Create project"}</button>
           </form>
         </Card>
       )}
 
-      <div className="mb-6 flex gap-1 rounded-md border border-ip-line bg-ip-card p-1 text-sm" style={{ width: "fit-content" }}>
-        {(["active", "archived"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`rounded-sm px-3.5 py-1.5 font-semibold capitalize transition-colors ${tab === t ? "bg-ip-navy-fill text-white" : "text-ip-ink-2 hover:text-ip-ink"}`}>
-            {t}{t === "archived" && archived ? ` (${archived.length})` : ""}
-          </button>
-        ))}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div
+          className="flex w-fit gap-1 rounded-md border border-ip-line bg-ip-card p-1 text-sm"
+          role="tablist"
+          aria-label="Project lifecycle"
+        >
+          {(["active", "archived"] as const).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={`rounded-xs px-3.5 py-1.5 font-semibold capitalize transition-colors ${
+                tab === t ? "bg-ip-navy-fill text-white" : "text-ip-ink-2 hover:text-ip-ink"
+              }`}
+            >
+              {t}
+              {t === "archived" && archived ? ` (${archived.length})` : ""}
+            </button>
+          ))}
+        </div>
+
+        {showSearch && (
+          <div className="relative w-full sm:w-64">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ip-ink-3"
+              aria-hidden
+            />
+            <input
+              className="ip-input pl-8"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter projects"
+              aria-label="Filter projects by name"
+            />
+          </div>
+        )}
       </div>
 
       {!data && !error && <Spinner />}
 
-      {tab === "active" && data && data.projects.length === 0 && !creating && (
-        <EmptyState title="No projects yet" body="Create a project to start ingesting documents and detecting unclaimed variations." action={<button onClick={() => setCreating(true)} className="btn-orange">Create project</button>} />
+      {tab === "active" && data && totalActive === 0 && !creating && (
+        <EmptyState
+          title="No projects yet"
+          body="Create a project to start ingesting documents and detecting unclaimed variations."
+          action={<button onClick={() => setCreating(true)} className="btn-orange">Create project</button>}
+        />
       )}
 
-      {tab === "active" && data && data.projects.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.projects.map((p) => (
-            <Link key={p.id} href={`/app/projects/${p.id}`} className="ip-card group p-5 transition-colors hover:bg-ip-card-2">
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="min-w-0 flex-1 truncate font-bold tracking-tight text-ip-ink">{p.name}</h3>
-                <div className="flex shrink-0 items-center gap-1.5">
+      {tab === "active" && data && totalActive > 0 && (
+        <Card className="divide-y divide-ip-line">
+          {active.length === 0 && (
+            <div className="px-4 py-12 text-center text-[13px] text-ip-ink-2">
+              No project matches “{query}”.
+            </div>
+          )}
+          {active.map((p) => (
+            <ProjectRow
+              key={p.id}
+              href={`/app/projects/${p.id}`}
+              name={p.name}
+              chips={
+                <>
                   <Chip tone={statusTone(p.status)}>{p.status.replace(/_/g, " ")}</Chip>
-                  <ProjectActionsMenu
-                    project={{ archived_at: null }}
-                    isAdmin={isAdmin}
-                    busy={lifecycleBusyId === p.id}
-                    onArchive={() => archiveOne(p.id)}
-                    onRestore={() => {}}
-                    onRequestDelete={() => {}}
-                  />
-                </div>
-              </div>
-              <div className="mt-1 flex items-center gap-2 text-[12px]">
-                {!p.has_contract && <Chip tone="orange">no contract</Chip>}
-                {p.time_bar_at_risk > 0 && <span className="font-semibold text-ip-risk">⚠ {p.time_bar_at_risk} time-bar</span>}
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 border-t border-ip-line pt-4 text-center">
-                <Mini label="Pending" value={String(p.counts.pending)} />
-                <Mini label="Confirmed" value={String(p.counts.confirmed)} />
-                <Mini label="Recoverable" value={aud(p.recoverable_confirmed)} recovery />
-              </div>
-            </Link>
+                  {p.time_bar_at_risk > 0 && (
+                    <Chip tone="risk">
+                      <TriangleAlert className="h-3 w-3" aria-hidden />
+                      {p.time_bar_at_risk} time-barred
+                    </Chip>
+                  )}
+                  {p.counts.pending > 0 && <Chip tone="navy">{p.counts.pending} pending</Chip>}
+                  {!p.has_contract && <Chip tone="orange">No contract</Chip>}
+                </>
+              }
+              money={aud(p.recoverable_confirmed)}
+              moneyLabel="confirmed"
+              actions={
+                <ProjectActionsMenu
+                  project={{ archived_at: null }}
+                  isAdmin={isAdmin}
+                  busy={lifecycleBusyId === p.id}
+                  onArchive={() => archiveOne(p.id)}
+                  onRestore={() => {}}
+                  onRequestDelete={() => {}}
+                />
+              }
+            />
           ))}
-        </div>
+        </Card>
       )}
 
       {tab === "archived" && archived && archived.length === 0 && (
-        <EmptyState title="No archived projects" body="Archive a project from its details page to hide it from the dashboard without losing anything." />
+        <EmptyState
+          title="No archived projects"
+          body="Archive a project to hide it from the dashboard without losing anything."
+        />
       )}
 
+      {/* Same row shape as active, muted — switching tabs must not reflow the page. */}
       {tab === "archived" && archived && archived.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {archived.map((p) => (
-            <div key={p.id} className="ip-card p-5 opacity-90">
-              <div className="flex items-start justify-between gap-2">
-                <Link href={`/app/projects/${p.id}`} className="min-w-0 flex-1 truncate font-bold tracking-tight text-ip-ink hover:text-ip-navy">{p.name}</Link>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <Chip>archived</Chip>
-                  <ProjectActionsMenu
-                    project={p}
-                    isAdmin={isAdmin}
-                    busy={lifecycleBusyId === p.id}
-                    onArchive={() => {}}
-                    onRestore={() => restore(p.id)}
-                    onRequestDelete={() => setDeleteTarget(p)}
-                  />
-                </div>
-              </div>
-              <div className="mt-1 text-[12px] text-ip-ink-3">
-                {p.state || "—"} · archived {fmtDate(p.archived_at)}
-              </div>
-              {lifecycleBusyId === p.id && (
-                <div className="mt-4 border-t border-ip-line pt-4 text-[12px] text-ip-ink-3">Restoring…</div>
-              )}
+        <Card className="divide-y divide-ip-line">
+          {archivedList.length === 0 && (
+            <div className="px-4 py-12 text-center text-[13px] text-ip-ink-2">
+              No project matches “{query}”.
             </div>
+          )}
+          {archivedList.map((p) => (
+            <ProjectRow
+              key={p.id}
+              href={`/app/projects/${p.id}`}
+              name={p.name}
+              muted
+              chips={
+                <>
+                  <Chip>archived</Chip>
+                  <span className="text-[12px] text-ip-ink-3">
+                    {p.state || "—"} · {fmtDate(p.archived_at)}
+                  </span>
+                </>
+              }
+              money={lifecycleBusyId === p.id ? "Restoring…" : undefined}
+              actions={
+                <ProjectActionsMenu
+                  project={p}
+                  isAdmin={isAdmin}
+                  busy={lifecycleBusyId === p.id}
+                  onArchive={() => {}}
+                  onRestore={() => restore(p.id)}
+                  onRequestDelete={() => setDeleteTarget(p)}
+                />
+              }
+            />
           ))}
-        </div>
+        </Card>
       )}
 
       {deleteTarget && (
@@ -233,11 +363,56 @@ export default function ProjectsPage() {
   );
 }
 
-function Mini({ label, value, recovery }: { label: string; value: string; recovery?: boolean }) {
+/**
+ * Whole-row navigation via a stretched overlay link rather than wrapping the
+ * row in an <a>. The actions menu is a real button, and interactive content
+ * cannot legally nest inside an anchor — the previous card markup did exactly
+ * that, which also meant opening the menu navigated away.
+ */
+function ProjectRow({
+  href,
+  name,
+  chips,
+  money,
+  moneyLabel,
+  actions,
+  muted,
+}: {
+  href: string;
+  name: string;
+  chips: React.ReactNode;
+  money?: string;
+  moneyLabel?: string;
+  actions: React.ReactNode;
+  muted?: boolean;
+}) {
   return (
-    <div>
-      <div className={`text-sm font-bold tabular-nums ${recovery ? "text-ip-recovery" : "text-ip-ink"}`}>{value}</div>
-      <div className="ip-label mt-0.5 text-ip-ink-3">{label}</div>
+    <div className="group relative flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-ip-card-2">
+      <div className="min-w-0 flex-1">
+        <Link
+          href={href}
+          className="truncate text-[14px] font-semibold text-ip-ink outline-none after:absolute after:inset-0 after:content-[''] focus-visible:underline"
+        >
+          {name}
+        </Link>
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">{chips}</div>
+      </div>
+
+      {money && (
+        <div className="shrink-0 text-right">
+          <div
+            className={`text-[14px] font-bold tabular-nums tracking-display ${
+              muted ? "text-ip-ink-2" : "text-ip-ink"
+            }`}
+          >
+            {money}
+          </div>
+          {moneyLabel && <div className="text-[11px] text-ip-ink-3">{moneyLabel}</div>}
+        </div>
+      )}
+
+      {/* Sits above the stretched link so the menu is clickable. */}
+      <div className="relative z-10 shrink-0">{actions}</div>
     </div>
   );
 }

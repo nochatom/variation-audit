@@ -95,9 +95,16 @@ describe("branding regression guard", () => {
     // LogoMark) would defeat the whole point of having one canonical
     // component — this catches that even if it doesn't match the "V"
     // placeholder pattern above.
+    // These must track whatever glyph LogoMark actually draws. They were left
+    // pointing at the retired "V" + sparkle artwork after the mark changed to
+    // the Bodoni Q, so the check passed without guarding anything.
+    //
+    // The Q outline itself cannot serve as the signature: Wordmark.tsx draws
+    // "VariationIQ" from the same Bodoni source, so that exact path legitimately
+    // appears there too. The squared datum is drawn only by the mark, which
+    // makes it the one fragment that uniquely identifies a copied LogoMark.
     const BRAND_PATH_FRAGMENTS = [
-      "M24,24 L50,72 L76,24", // the V glyph, as used in LogoMark
-      "M50,27.5 C50.975,28.475", // the sparkle, as used in LogoMark
+      'x="47.72" y="53.72"', // the squared datum beside the Q — mark-only
     ];
     const offenders: string[] = [];
     for (const file of nonLogoFiles) {
@@ -132,6 +139,29 @@ describe("branding regression guard", () => {
     const content = fs.readFileSync(ICON_SVG, "utf-8").trim();
     expect(content.startsWith("<svg")).toBe(true);
     expect(content).toContain("</svg>");
+  });
+
+  it("app/icon.svg draws the same brand mark as LogoMark", () => {
+    // The original guard only proved the favicon was *a* file starting with
+    // <svg>. That let the retired Arial "V" placeholder survive in the
+    // browser tab long after it had been purged from every component — the
+    // app showed a Bodoni Q and the tab showed a V. Assert the artwork
+    // matches, not merely that a file exists.
+    const icon = fs.readFileSync(ICON_SVG, "utf-8");
+    const logo = fs.readFileSync(LOGO_COMPONENT, "utf-8");
+    const qOutline = "M1225 -373V-424Q1191 -428 1118 -428";
+    expect(logo, "LogoMark no longer contains the expected Q outline — update both").toContain(qOutline);
+    expect(icon, "favicon artwork has drifted from the canonical LogoMark").toContain(qOutline);
+    expect(icon).toContain('x="47.72" y="53.72"');
+  });
+
+  it("app/icon.svg has no text element, so it never depends on an installed font", () => {
+    // A favicon built from <text font-family="Arial"> renders differently (or
+    // not at all) wherever that face is missing. LogoMark uses outlined paths
+    // for exactly this reason; the icon must too.
+    const content = fs.readFileSync(ICON_SVG, "utf-8");
+    expect(content).not.toMatch(/<text\b/);
+    expect(content).not.toMatch(/font-family/);
   });
 
   it("page metadata title uses VariationIQ, not the old product name", () => {

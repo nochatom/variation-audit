@@ -2,8 +2,12 @@
 
 Subscription rows are created lazily (Free/active) the first time an org's
 billing page is viewed — no signup-flow change was needed. Usage numbers are
-always real (counted from actual Document/AnalysisJob rows for the current
-calendar month), never a separate fabricated counter.
+always real, never a separate fabricated counter: documents/projects are
+counted live from Document/Project rows, and analysis runs are counted from
+the immutable analysis_usage_events ledger (see AnalysisUsageEvent's
+docstring in app/models.py — NOT a count of analysis_jobs rows, which are
+deleted along with their project on project deletion and would otherwise let
+a free org reset its usage by deleting and recreating a project).
 
 .24 adds: server-side plan-limit enforcement, webhook idempotency (stripe_events
 ledger), a billing audit trail (reuses the existing immutable audit_log table),
@@ -30,7 +34,7 @@ from app.billing.provider import BillingNotConfigured, get_billing_provider
 from app.config import get_settings
 from app.logging_config import security_logger
 from app.models import (
-    AnalysisJob,
+    AnalysisUsageEvent,
     AuditLog,
     Document,
     Invoice,
@@ -145,10 +149,17 @@ def _included_seats(sub: Subscription) -> int | None:
 
 
 # -- subscription lifecycle --------------------------------------------------
-def get_or_create_subscription(session: Session, company_id: uuid.UUID) -> Subscription:
-    sub = session.execute(
-        select(Subscription).where(Subscription.company_id == company_id)
-    ).scalar_one_or_none()
+def get_or_create_subscription(session: Session, company_id: uuid.UUID, *,
+                               for_update: bool = False) -> Subscription:
+    """`for_update=True` takes a Postgres row lock (`SELECT ... FOR UPDATE`)
+    that's held for the rest of the current transaction — see
+    enforce_analysis_limit, which uses this to serialize concurrent quota
+    checks for the same org instead of two racing requests both reading
+    "room for one more"."""
+    stmt = select(Subscription).where(Subscription.company_id == company_id)
+    if for_update:
+        stmt = stmt.with_for_update()
+    sub = session.execute(stmt).scalar_one_or_none()
     if sub is None:
         sub = Subscription(id=uuid.uuid4(), company_id=company_id,
                            plan=PlanTier.free, status=SubscriptionStatus.active)
@@ -179,7 +190,7 @@ def get_usage(session: Session, company_id: uuid.UUID) -> dict:
     since = _month_start()
 
     doc_count = _count_since(session, Document, company_id, since)
-    job_count = _count_since(session, AnalysisJob, company_id, since)
+    job_count = _count_since(session, AnalysisUsageEvent, company_id, since)
     project_count = len(session.execute(
         select(Project.id).where(Project.company_id == company_id, Project.archived_at.is_(None))
     ).scalars().all())
@@ -396,12 +407,23 @@ def enforce_document_limit(session: Session, company_id: uuid.UUID, *, additiona
 
 
 def enforce_analysis_limit(session: Session, company_id: uuid.UUID) -> None:
-    sub = get_or_create_subscription(session, company_id)
+    """Row-locks the org's subscription for the rest of the current
+    transaction (Postgres `SELECT ... FOR UPDATE`, via for_update=True below)
+    — a second, concurrent call for the same company_id blocks here until the
+    first transaction commits or rolls back, instead of both reading "room
+    for one more" and both proceeding (the classic check-then-act quota
+    race). This only closes the race because the caller
+    (routers/projects.py:analyze) passes this same request-scoped session on
+    to jobs.enqueue_analysis's INSERT + commit right after — the lock
+    releases the moment that commits (or the request ends and the session
+    closes), letting the next blocked request in to see the incremented
+    count."""
+    sub = get_or_create_subscription(session, company_id, for_update=True)
     _check_not_suspended(sub)
     limit = PLAN_LIMITS[sub.plan]["analysis_runs_per_month"]
     if limit is None:
         return
-    current = _count_since(session, AnalysisJob, company_id, _month_start())
+    current = _count_since(session, AnalysisUsageEvent, company_id, _month_start())
     if current + 1 > limit:
         raise PlanLimitExceeded("analysis_limit_exceeded",
                                 f"plan limit of {limit} analysis runs/month reached")

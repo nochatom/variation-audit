@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { api, ApiError, InvitationPreview, getToken, setCompanyId, storeTokens } from "@/lib/api";
+import { api, InvitationPreview, getToken, setCompanyId, storeTokens } from "@/lib/api";
+import { mapAuthError } from "@/lib/auth-errors";
 import { useTheme } from "@/lib/use-theme";
 import { ErrorNote } from "@/components/ui";
 import { LogoMark } from "@/components/ui/Logo";
@@ -34,14 +35,9 @@ export default function AcceptInvitePage() {
       let preview: InvitationPreview;
       try {
         preview = await api.previewInvitation(token);
-      } catch (e: any) {
+      } catch (e) {
         if (!cancelled) {
-          setStage({
-            kind: "invalid",
-            message: e instanceof ApiError && e.status === 410
-              ? "This invitation has expired, been revoked, or already been used."
-              : "This invitation link isn't valid.",
-          });
+          setStage({ kind: "invalid", message: mapAuthError(e, "invite-preview") });
         }
         return;
       }
@@ -79,8 +75,8 @@ export default function AcceptInvitePage() {
       setCompanyId(res.company_id);
       setStage({ kind: "done" });
       router.replace("/app/dashboard");
-    } catch (e: any) {
-      setError(e.message || "Failed to accept invitation");
+    } catch (e) {
+      setError(mapAuthError(e, "invite-accept"));
     } finally {
       setBusy(false);
     }
@@ -97,8 +93,8 @@ export default function AcceptInvitePage() {
       if (me.organizations[0]) setCompanyId(me.organizations[0].id);
       setStage({ kind: "done" });
       router.replace("/app/dashboard");
-    } catch (e: any) {
-      setError(e.message || "Failed to accept invitation");
+    } catch (e) {
+      setError(mapAuthError(e, "invite-register"));
     } finally {
       setBusy(false);
     }
