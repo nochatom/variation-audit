@@ -146,15 +146,16 @@ function LoginForm() {
           <form onSubmit={submit} className="space-y-3">
             {mode === "signup" && (
               <div>
-                <label className="ip-label mb-1 block">Organization name</label>
-                <input className="ip-input" placeholder="e.g. Harbourside Electrical Pty Ltd" value={orgName} onChange={(e) => setOrgName(e.target.value)} minLength={1} maxLength={200} required />
+                <label htmlFor="orgName" className="ip-label mb-1 block">Organization name</label>
+                <input id="orgName" className="ip-input" placeholder="e.g. Harbourside Electrical Pty Ltd" value={orgName} onChange={(e) => setOrgName(e.target.value)} minLength={1} maxLength={200} required />
               </div>
             )}
             <div>
-              <label className="ip-label mb-1 block">Email</label>
+              <label htmlFor="email" className="ip-label mb-1 block">Email</label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ip-ink-3" />
                 <input
+                  id="email"
                   className="ip-input pl-9"
                   type="email"
                   placeholder="name@company.com.au"
@@ -166,10 +167,11 @@ function LoginForm() {
               </div>
             </div>
             <div>
-              <label className="ip-label mb-1 block">Password</label>
+              <label htmlFor="password" className="ip-label mb-1 block">Password</label>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ip-ink-3" />
                 <input
+                  id="password"
                   className="ip-input pl-9 pr-9"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
