@@ -27,7 +27,12 @@ class FakeResult:
         return self._scalar
 
     def scalar_one(self):
-        return self._scalar
+        # Support scalar_one returning the scalar itself, or len of scalars if scalar is None but scalars exist
+        if self._scalar is not None:
+            return self._scalar
+        if self._scalars:
+            return len(self._scalars)
+        return None
 
     def scalars(self):
         return FakeScalars(self._scalars)
