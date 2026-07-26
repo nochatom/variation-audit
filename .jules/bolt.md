@@ -1,0 +1,3 @@
+## 2026-07-26 - [Database Count Optimization in Billing Service]
+**Learning:** In SQLAlchemy/PostgreSQL applications, loading matching rows or IDs into memory (`len(session.execute(select(Model.id)...).scalars().all())`) just to count them is a massive performance and memory bottleneck. Replacing it with a database-side count (`select(func.count(Model.id))`) reduces network payload, memory allocation, and database CPU usage significantly, shifting complexity from $O(N)$ to $O(1)$.
+**Action:** Always use `select(func.count(...))` for matching counts in SQL database queries rather than fetching all rows/scalars and calculating the length in Python.
