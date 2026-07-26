@@ -73,8 +73,9 @@ export default function ForgotPasswordPage() {
               </p>
               <form onSubmit={submit} className="space-y-3">
                 <div>
-                  <label className="ip-label mb-1 block">Email</label>
+                  <label htmlFor="email" className="ip-label mb-1 block">Email</label>
                   <input
+                    id="email"
                     className="ip-input"
                     type="email"
                     placeholder="name@company.com.au"

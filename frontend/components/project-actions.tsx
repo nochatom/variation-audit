@@ -36,7 +36,7 @@ export function ProjectActionsMenu({
         aria-label="Project actions"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="grid h-7 w-7 place-items-center rounded-md text-ip-ink-2 transition-colors hover:bg-ip-card-2 hover:text-ip-ink disabled:opacity-50"
+        className="grid h-7 w-7 place-items-center rounded-md text-ip-ink-2 transition-colors hover:bg-ip-card-2 hover:text-ip-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ip-navy/40 disabled:opacity-50"
       >
         <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
           <circle cx="12" cy="5" r="1.8" />
@@ -86,7 +86,7 @@ function MenuItem({ children, danger, onClick }: {
     <button
       role="menuitem"
       onClick={onClick}
-      className={`block w-full rounded-md px-3 py-2 text-left text-[13px] font-medium transition-colors ${
+      className={`block w-full rounded-md px-3 py-2 text-left text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ip-navy/40 ${
         danger ? "text-ip-risk hover:bg-ip-risk/10" : "text-ip-ink-2 hover:bg-ip-card-2 hover:text-ip-ink"
       }`}
     >
@@ -110,8 +110,8 @@ export function DeleteProjectModal({ projectName, busy, onCancel, onConfirm }: {
           document, analysis job, variation, evidence record and comment in it.{" "}
           <span className="font-semibold text-ip-risk">This action cannot be undone.</span>
         </p>
-        <label className="ip-label mb-1 mt-4 block">Type the project name to confirm</label>
-        <input className="ip-input" value={typed} onChange={(e) => setTyped(e.target.value)}
+        <label htmlFor="delete-confirm" className="ip-label mb-1 mt-4 block">Type the project name to confirm</label>
+        <input id="delete-confirm" className="ip-input" value={typed} onChange={(e) => setTyped(e.target.value)}
                placeholder={projectName} autoFocus />
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onCancel} className="btn-ghost" disabled={busy}>Cancel</button>

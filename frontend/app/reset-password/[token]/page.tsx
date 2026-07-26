@@ -83,10 +83,11 @@ export default function ResetPasswordPage() {
               <p className="mb-5 text-[13px] text-ip-ink-2">Choose a new password for your account.</p>
               <form onSubmit={submit} className="space-y-3">
                 <div>
-                  <label className="ip-label mb-1 block">New password</label>
+                  <label htmlFor="password" className="ip-label mb-1 block">New password</label>
                   <div className="relative">
                     <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ip-ink-3" />
                     <input
+                      id="password"
                       className="ip-input pl-9 pr-9"
                       type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
@@ -109,8 +110,9 @@ export default function ResetPasswordPage() {
                   <p className="mt-1 text-[11px] text-ip-ink-3">At least 8 characters.</p>
                 </div>
                 <div>
-                  <label className="ip-label mb-1 block">Confirm password</label>
+                  <label htmlFor="confirm" className="ip-label mb-1 block">Confirm password</label>
                   <input
+                    id="confirm"
                     className="ip-input"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
