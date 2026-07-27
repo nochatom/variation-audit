@@ -135,10 +135,11 @@ def test_add_member_endpoint_blocked_at_seat_limit():
     invitation flow does — it was previously a way around it."""
     user, cid = _user(), uuid.uuid4()
     admin_m = _membership(user.id, cid, MembershipRole.admin)
-    seat_ids = [uuid.uuid4(), uuid.uuid4(), uuid.uuid4()]   # Free plan cap = 3, already full
+    # Free plan cap = 3, already full. The seat check is a SELECT COUNT(...),
+    # so the fake returns the count itself rather than rows to be measured.
     session = FakeSession(results=[FakeResult(scalar=admin_m),
                                    FakeResult(scalar=None),
-                                   FakeResult(scalars=seat_ids)])
+                                   FakeResult(scalar=3)])
     resp = _client(session, user).post(f"/orgs/{cid}/members",
                                        json={"email": "new@firm.com", "role": "member"})
     assert resp.status_code == 402
