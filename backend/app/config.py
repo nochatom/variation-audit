@@ -201,6 +201,18 @@ class Settings(BaseSettings):
             )
         return v
 
+    @field_validator("jwt_secret")
+    @classmethod
+    def _validate_jwt_secret(cls, v: str) -> str:
+        if len(v) < 32:
+            raise ValueError(
+                "VA_JWT_SECRET is too weak — it must be at least 32 characters "
+                "to secure HS256 JWT signatures against offline brute-force/dictionary attacks. "
+                "Please generate a strong secret (e.g. `openssl rand -hex 32`) and set "
+                "it in your environment."
+            )
+        return v
+
     # Circuit breaker defaults (docs/decisions/26-provider-router.md §9).
     # Independent per-provider state; these thresholds are conservative on
     # purpose — tune only once real provider_call_log data suggests they
