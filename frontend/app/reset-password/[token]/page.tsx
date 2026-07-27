@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Eye, EyeOff, Lock } from "lucide-react";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
+import { mapAuthError } from "@/lib/auth-errors";
 import { useTheme } from "@/lib/use-theme";
 import { ErrorNote } from "@/components/ui";
 import { LogoMark } from "@/components/ui/Logo";
@@ -34,12 +35,8 @@ export default function ResetPasswordPage() {
       // auto-login here — the user logs back in fresh, everywhere.
       await api.resetPassword(token, password);
       setDone(true);
-    } catch (err: any) {
-      setError(
-        err instanceof ApiError && err.status === 400
-          ? "This reset link is invalid or has expired. Request a new one."
-          : err.message || "Failed to reset password",
-      );
+    } catch (err) {
+      setError(mapAuthError(err, "reset-password"));
     } finally {
       setBusy(false);
     }

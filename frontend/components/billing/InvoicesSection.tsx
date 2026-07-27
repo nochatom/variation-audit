@@ -24,13 +24,14 @@ export function InvoicesSection({ invoices }: { invoices: Invoice[] }) {
         <h2 className="text-sm font-bold text-ip-ink">Invoices ({invoices.length})</h2>
       </div>
       <table className="w-full">
+        <caption className="sr-only">Billing history</caption>
         <thead>
           <tr className="border-b border-ip-line">
-            <th className="ip-th">Period</th>
-            <th className="ip-th">Plan</th>
-            <th className="ip-th">Amount</th>
-            <th className="ip-th">Status</th>
-            <th className="ip-th text-right">Invoice</th>
+            <th scope="col" className="ip-th">Period</th>
+            <th scope="col" className="ip-th">Plan</th>
+            <th scope="col" className="ip-th">Amount</th>
+            <th scope="col" className="ip-th">Status</th>
+            <th scope="col" className="ip-th text-right">Invoice</th>
           </tr>
         </thead>
         <tbody>
@@ -42,7 +43,13 @@ export function InvoicesSection({ invoices }: { invoices: Invoice[] }) {
               <td className="px-4 py-3 text-sm capitalize text-ip-ink-2">{inv.status}</td>
               <td className="px-4 py-3 text-right">
                 {inv.hosted_invoice_url ? (
-                  <a href={inv.hosted_invoice_url} target="_blank" rel="noreferrer" className="btn-ghost px-2.5 py-1 text-xs">
+                  <a
+                    href={inv.hosted_invoice_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Download invoice for ${fmtDate(inv.period_start)} – ${fmtDate(inv.period_end)}`}
+                    className="btn-ghost px-2.5 py-1 text-xs"
+                  >
                     Download PDF
                   </a>
                 ) : (

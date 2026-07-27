@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import AnalysisJob, JobStatus
+from app.models import AnalysisJob, AnalysisUsageEvent, JobStatus
 
 
 class IdempotencyConflict(Exception):
@@ -58,6 +58,18 @@ def enqueue_analysis(
         status=JobStatus.queued,
     )
     session.add(job)
+    session.flush()  # assigns job.id for the usage-event FK below
+    # Consumes one unit of the org's monthly analysis quota. Written in the
+    # same commit as the job row so "job created" and "quota consumed" can
+    # never disagree; deliberately a row in the immutable
+    # analysis_usage_events ledger, not a re-count of analysis_jobs — see
+    # AnalysisUsageEvent's docstring for why (project-delete cascade would
+    # otherwise silently refund usage). The caller (routers/projects.py)
+    # holds the org's Subscription row lock (billing_service.
+    # enforce_analysis_limit) across this same session/transaction, so this
+    # insert is what a concurrent request's blocked quota check sees once it
+    # proceeds.
+    session.add(AnalysisUsageEvent(company_id=company_id, project_id=project_id, job_id=job.id))
     session.commit()
     session.refresh(job)
     return job

@@ -134,6 +134,30 @@ def test_login_endpoint_success_and_bad_password():
     assert bad.post("/auth/login", json={"email": "l@firm.com", "password": "no"}).status_code == 401
 
 
+def test_login_endpoint_returns_organizations_in_one_round_trip():
+    """Login-latency fix: the frontend used to follow every login with a
+    separate GET /auth/me purely to learn the user's default company_id.
+    TokenResponse now carries `organizations` itself, so that extra round
+    trip is no longer necessary — verify the field is actually populated,
+    not just present-but-empty."""
+    from app.models import Membership, MembershipRole
+
+    user = User(id=uuid.uuid4(), email="org@firm.com", password_hash=hash_password("good"),
+               is_active=True)
+    org = Organization(id=uuid.uuid4(), name="Acme Pty Ltd")
+    membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=org.id,
+                            role=MembershipRole.admin)
+    session = FakeSession(results=[
+        FakeResult(scalar=user),                    # authenticate(): user lookup
+        FakeResult(rows=[(membership, org)]),        # _user_organizations(): membership+org join
+    ])
+    client = _client_with(session)
+    resp = client.post("/auth/login", json={"email": "org@firm.com", "password": "good"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["organizations"] == [{"id": str(org.id), "name": "Acme Pty Ltd", "role": "admin"}]
+
+
 # -- PATCH /me (editable profile: full name) -------------------------------
 from app.auth.deps import get_current_user  # noqa: E402
 

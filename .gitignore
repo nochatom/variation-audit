@@ -44,3 +44,6 @@ backend/.uvicorn.log
 backend/.worker.log
 frontend/.devserver.log
 frontend/.next-dev.log
+
+# Local document store — uploaded project files written at runtime.
+backend/.docstore/

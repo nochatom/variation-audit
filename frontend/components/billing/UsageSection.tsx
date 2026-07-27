@@ -2,6 +2,7 @@
 
 import { Card } from "@/components/ui";
 import { Usage } from "@/lib/billing/api";
+import { FreeUsageMeter } from "./FreeUsageMeter";
 
 function Meter({ label, used, limit }: { label: string; used: number; limit: number | null }) {
   const pct = limit == null ? 100 : Math.min(100, Math.round((used / Math.max(limit, 1)) * 100));
@@ -37,7 +38,7 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
   );
 }
 
-export function UsageSection({ usage }: { usage: Usage }) {
+export function UsageSection({ usage, onUpgrade }: { usage: Usage; onUpgrade?: () => void }) {
   const periodLabel = new Date(usage.period_start).toLocaleDateString("en-AU", { month: "long", year: "numeric" });
   return (
     <Card className="p-5">
@@ -48,7 +49,11 @@ export function UsageSection({ usage }: { usage: Usage }) {
       <div className="mt-4 space-y-4">
         <Meter label="Active projects" used={usage.projects_active} limit={usage.projects_limit} />
         <Meter label="Documents processed" used={usage.documents_processed} limit={usage.documents_limit} />
-        <Meter label="Analysis runs" used={usage.analysis_runs} limit={usage.analysis_runs_limit} />
+        {usage.analysis_runs_limit == null ? (
+          <Meter label="Analysis runs" used={usage.analysis_runs} limit={usage.analysis_runs_limit} />
+        ) : (
+          <FreeUsageMeter usage={usage} onUpgrade={onUpgrade} />
+        )}
       </div>
       {usage.seats_limit != null && (
         <p className="mt-4 text-[12px] text-ip-ink-3">Seat limit for the {usage.plan} plan: {usage.seats_limit}.</p>

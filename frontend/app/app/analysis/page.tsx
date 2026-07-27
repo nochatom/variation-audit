@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import Link from "next/link";
 import { api, API_BASE, getToken, ProjectDashboard } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
+import { billingApi, Usage } from "@/lib/billing/api";
+import { FreeUsageMeter } from "@/components/billing/FreeUsageMeter";
 import { PageHeader, Card, Chip, ErrorNote, Spinner, EmptyState, aud } from "@/components/ui";
 
 /* ------------------------------------------------------------------ *
@@ -238,17 +240,30 @@ function useAnalysisStream(
 export default function AnalysisPage() {
   const { companyId } = useApp();
   const [rows, setRows] = useState<ProjectDashboard[] | null>(null);
+  const [usage, setUsage] = useState<Usage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // `load` is the single refresh path for this page — it's called on mount,
+  // right after a run/cancel request is accepted, AND as the SSE stream's
+  // onEnd callback the moment a job reaches a terminal event (see
+  // useAnalysisStream below). Fetching usage here alongside the dashboard
+  // means the quota meter updates immediately after every completed
+  // analysis, always from the backend's own count (never computed
+  // client-side) — the backend stays the sole source of truth, the frontend
+  // only re-displays what it returns.
   const load = useCallback(async () => {
     if (!companyId) return;
-    const dash = await api.orgDashboard(companyId);
+    const [dash, freshUsage] = await Promise.all([
+      api.orgDashboard(companyId),
+      billingApi.getUsage(companyId).catch(() => null),
+    ]);
     const details = await Promise.all(dash.projects.map((p) => api.projectDashboard(p.id).catch(() => null)));
     const list = details.filter((d): d is ProjectDashboard => d !== null);
     setRows(list);
     setSelectedId((cur) => cur ?? list[0]?.project.id ?? null);
+    if (freshUsage) setUsage(freshUsage);
   }, [companyId]);
 
   useEffect(() => { load().catch((e) => setError(e.message)); }, [load]);
@@ -320,19 +335,23 @@ export default function AnalysisPage() {
             connected={connected}
             busy={selected ? running === selected.project.id : false}
             cancelling={cancelling}
+            quotaExhausted={!!usage && usage.analysis_runs_limit != null && usage.analysis_runs >= usage.analysis_runs_limit}
             onRun={() => selected && run(selected.project.id)}
             onCancel={() => {
               if (selected?.latest_job) cancel(selected.project.id, selected.latest_job.id);
             }}
           />
-          <ProjectRail
-            rows={rows}
-            selectedId={selectedId}
-            runningId={running}
-            livePct={live && streamActive ? live.percentage : null}
-            onSelect={setSelectedId}
-            onRun={run}
-          />
+          <div className="flex flex-col gap-4">
+            {usage && <FreeUsageMeter usage={usage} />}
+            <ProjectRail
+              rows={rows}
+              selectedId={selectedId}
+              runningId={running}
+              livePct={live && streamActive ? live.percentage : null}
+              onSelect={setSelectedId}
+              onRun={run}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -569,7 +588,7 @@ function ConfirmStopDialog({ busy, onConfirm, onDismiss }: { busy: boolean; onCo
 
 /* ---------------- run panel (hero) ---------------- */
 function RunPanel({
-  d, live, stages, log, stalled, streamActive, connected, busy, cancelling, onRun, onCancel,
+  d, live, stages, log, stalled, streamActive, connected, busy, cancelling, quotaExhausted, onRun, onCancel,
 }: {
   d: ProjectDashboard | null;
   live: ProgressEvent | null;
@@ -580,6 +599,7 @@ function RunPanel({
   connected: boolean;
   busy: boolean;
   cancelling: boolean;
+  quotaExhausted: boolean;
   onRun: () => void;
   onCancel: () => void;
 }) {
@@ -631,8 +651,13 @@ function RunPanel({
               {cancelling ? "Stopping…" : "Stop Analysis"}
             </button>
           ) : (
-            <button onClick={onRun} disabled={busy} className="btn-orange">
-              {busy ? "Queuing…" : vm.state === "idle" ? "Run analysis" : "Re-run"}
+            <button
+              onClick={onRun}
+              disabled={busy || quotaExhausted}
+              title={quotaExhausted ? "Monthly analysis quota reached — upgrade to run more." : undefined}
+              className="btn-orange disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy ? "Queuing…" : quotaExhausted ? "Quota reached" : vm.state === "idle" ? "Run analysis" : "Re-run"}
             </button>
           )}
         </div>

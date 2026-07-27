@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { mapAuthError } from "@/lib/auth-errors";
 import { useTheme } from "@/lib/use-theme";
 import { ErrorNote } from "@/components/ui";
 import { LogoMark } from "@/components/ui/Logo";
@@ -25,8 +26,8 @@ export default function ForgotPasswordPage() {
       // varies on the actual lookup result.
       await api.forgotPassword(email.trim());
       setSent(true);
-    } catch (err: any) {
-      setError(err.message || "Failed to send reset link");
+    } catch (err) {
+      setError(mapAuthError(err, "forgot-password"));
     } finally {
       setBusy(false);
     }

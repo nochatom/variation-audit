@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { billingApi, BillingInterval } from "@/lib/billing/api";
 import { useFeatures, useInvoices, useSeats, useSubscription, useUsage } from "@/lib/billing/hooks";
@@ -28,11 +29,15 @@ function BillingPageInner() {
   const { companyId, isAdmin } = useApp();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const sub = useSubscription(companyId);
-  const usage = useUsage(companyId);
-  const invoices = useInvoices(companyId);
-  const seats = useSeats(companyId);
-  const features = useFeatures(companyId);
+  // Every billing endpoint is admin-only. Passing null for non-admins keeps
+  // the hook call unconditional (rules of hooks) while avoiding five
+  // guaranteed-403 requests on a page they can't see anyway.
+  const billingId = isAdmin ? companyId : null;
+  const sub = useSubscription(billingId);
+  const usage = useUsage(billingId);
+  const invoices = useInvoices(billingId);
+  const seats = useSeats(billingId);
+  const features = useFeatures(billingId);
 
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
@@ -77,6 +82,9 @@ function BillingPageInner() {
     }
   }
 
+  // These two intentionally let rejections propagate: UpgradeModal and
+  // CancelModal each catch and render the message inline, which keeps the
+  // error next to the choice that caused it instead of behind the modal.
   async function checkout(plan: "pro" | "enterprise", billingInterval: BillingInterval) {
     if (!companyId) return;
     const { url } = await billingApi.startCheckout(companyId, plan, billingInterval);
@@ -110,8 +118,11 @@ function BillingPageInner() {
 
   return (
     <div>
-      <Link href="/app/settings" className="mb-3 inline-flex items-center gap-1 text-[13px] font-medium text-ip-ink-2 hover:text-ip-ink">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5"><path d="M15 18l-6-6 6-6" /></svg>
+      <Link
+        href="/app/settings"
+        className="mb-3 inline-flex items-center gap-1 text-[13px] font-medium text-ip-ink-2 transition-colors hover:text-ip-ink"
+      >
+        <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
         Settings
       </Link>
       <PageHeader title="Billing & subscription" description="Manage your organization's plan, usage, and payment details." />
@@ -130,30 +141,41 @@ function BillingPageInner() {
 
       {sub.loading && !sub.data && <Spinner />}
       {sub.data && (
-        <div className="space-y-6">
-          <GracePeriodBanner subscription={sub.data} onManage={manageBilling} />
+        <>
+          {/* Plan and the limits it imposes are one subject — what you're on,
+              and whether it still fits. They sit together, above everything
+              else, and the upgrade path lives inside the pressure. */}
+          <div className="space-y-4">
+            <GracePeriodBanner subscription={sub.data} onManage={manageBilling} />
 
-          <PlanCard
-            subscription={sub.data}
-            busy={busy}
-            onUpgrade={() => setShowUpgrade(true)}
-            onManage={manageBilling}
-            onCancel={() => setShowCancel(true)}
-            onResume={resumeSubscription}
-          />
+            <PlanCard
+              subscription={sub.data}
+              busy={busy}
+              onUpgrade={() => setShowUpgrade(true)}
+              onManage={manageBilling}
+              onCancel={() => setShowCancel(true)}
+              onResume={resumeSubscription}
+            />
 
-          {usage.data && <UsageSection usage={usage.data} />}
+            {usage.data && (
+              <UsageSection usage={usage.data} onUpgrade={() => setShowUpgrade(true)} />
+            )}
 
-          {seats.data && features.data && (
-            <SeatsAndFeaturesSection seats={seats.data} features={features.data} />
-          )}
+            {seats.data && features.data && (
+              <SeatsAndFeaturesSection seats={seats.data} features={features.data} />
+            )}
+          </div>
 
+          {/* Payment and history are administrative records, not decisions —
+              demoted behind a heading and real separation. */}
+          <h2 className="ip-label mb-3 mt-10">Payment method</h2>
           <PaymentMethodSection subscription={sub.data} onManage={manageBilling} busy={busy} />
 
+          <h2 className="ip-label mb-3 mt-8">Billing history</h2>
           {invoices.error && <ErrorNote message={invoices.error} />}
           {invoices.loading && !invoices.data && <Spinner />}
           {invoices.data && <InvoicesSection invoices={invoices.data} />}
-        </div>
+        </>
       )}
 
       {showUpgrade && sub.data && (
