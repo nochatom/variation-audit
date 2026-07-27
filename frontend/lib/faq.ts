@@ -102,9 +102,12 @@ const ITEMS: FaqItem[] = [
     group: "claims",
     q: "What if it misses a variation, or flags one that isn't real?",
     a:
-      "Both happen, which is why nothing is submitted automatically. Analysis is a first pass over " +
-      "a record no one has time to read end to end — you review, accept and discard.",
-    draft: true,
+      "VariationIQ is designed to accelerate document review, not replace professional judgment. " +
+      "Every finding includes supporting evidence from the source documents whenever possible, " +
+      "and nothing is submitted or acted on automatically. You remain in control — review each " +
+      "finding, accept or dismiss it, and make the final decision before taking any contractual " +
+      "or commercial action.",
+    pricing: true,
   },
 
   // ---------------- How it works ----------------
