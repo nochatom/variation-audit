@@ -15,6 +15,7 @@ import { InvoicesSection } from "@/components/billing/InvoicesSection";
 import { UpgradeModal } from "@/components/billing/UpgradeModal";
 import { CancelModal } from "@/components/billing/CancelModal";
 import { GracePeriodBanner } from "@/components/billing/GracePeriodBanner";
+import { BindingConstraint } from "@/components/billing/BindingConstraint";
 import { SeatsAndFeaturesSection } from "@/components/billing/SeatsAndFeaturesSection";
 
 export default function BillingPage() {
@@ -142,11 +143,17 @@ function BillingPageInner() {
       {sub.loading && !sub.data && <Spinner />}
       {sub.data && (
         <>
-          {/* Plan and the limits it imposes are one subject — what you're on,
-              and whether it still fits. They sit together, above everything
-              else, and the upgrade path lives inside the pressure. */}
+          {/* Ordered by what the user came here to do. A blocked limit is the
+              reason billing gets opened at all, so it leads — above the plan,
+              which is a fact rather than a decision. BindingConstraint renders
+              nothing when nothing binds, so a healthy org drops straight to
+              the plan with no reassuring empty box in the way. */}
           <div className="space-y-4">
             <GracePeriodBanner subscription={sub.data} onManage={manageBilling} />
+
+            {usage.data && (
+              <BindingConstraint usage={usage.data} onUpgrade={() => setShowUpgrade(true)} />
+            )}
 
             <PlanCard
               subscription={sub.data}
@@ -157,9 +164,7 @@ function BillingPageInner() {
               onResume={resumeSubscription}
             />
 
-            {usage.data && (
-              <UsageSection usage={usage.data} onUpgrade={() => setShowUpgrade(true)} />
-            )}
+            {usage.data && <UsageSection usage={usage.data} />}
 
             {seats.data && features.data && (
               <SeatsAndFeaturesSection seats={seats.data} features={features.data} />
