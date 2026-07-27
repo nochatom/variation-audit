@@ -60,11 +60,12 @@ const ITEMS: FaqItem[] = [
   {
     id: "data-on-downgrade",
     group: "data",
-    q: "What happens to our data if we downgrade or cancel?",
+    q: "What happens to my data if I downgrade to the Free plan?",
     a:
-      "Nothing is deleted. Projects and documents above the Free limits become read-only " +
-      "rather than removed — you keep the record and any reports already generated.",
-    draft: true,
+      "Your projects and documents remain safe. If you exceed the Free plan limits after " +
+      "downgrading, your workspace becomes read-only until you upgrade or reduce usage. No " +
+      "projects or documents are automatically deleted because of a downgrade.",
+    pricing: true,
   },
 
   // ---------------- Evidence & claims ----------------
@@ -79,23 +80,22 @@ const ITEMS: FaqItem[] = [
     pricing: true,
   },
   {
-    id: "hold-up",
+    // Renamed from "hold-up" while it was still a draft — never rendered, so
+    // no link can break. The id now matches what the question actually asks.
+    id: "citations",
     group: "claims",
-    q: "Will this hold up when I put it in front of a superintendent?",
+    q: "Does VariationIQ cite the source documents for its findings?",
     a:
-      "VariationIQ produces a cited position, not a verdict. Every detected variation points back " +
-      "to the documents and passages it was drawn from, so your commercial team can check the " +
-      "reasoning before anything is submitted.",
-    draft: true,
+      "Yes. Every finding is linked to the relevant source document and supporting passage " +
+      "whenever available, so you can verify the evidence behind each result.",
   },
   {
     id: "time-bars",
     group: "claims",
-    q: "Does it account for time bars and notice periods?",
+    q: "Does VariationIQ identify notice periods and potential time bars?",
     a:
-      "Notice periods are surfaced against each detected variation rather than left for you to " +
-      "work out. Treat the dates as a prompt to check your contract, not as legal advice.",
-    draft: true,
+      "Yes. When supported by the uploaded contract and project documents, VariationIQ highlights " +
+      "relevant notice periods and potential time-bar risks associated with detected variations.",
   },
   {
     id: "missed-something",
@@ -121,11 +121,11 @@ const ITEMS: FaqItem[] = [
   {
     id: "file-types",
     group: "how",
-    q: "What documents can I upload?",
+    q: "Which file types does VariationIQ support?",
     a:
-      "The contract and the correspondence around it — contracts and variations, RFIs and " +
-      "responses, site instructions, meeting minutes, and email threads.",
-    draft: true,
+      "VariationIQ supports PDF, DOCX, XLSX, XLS, CSV, and common image formats such as PNG and " +
+      "JPG. Support for additional formats will continue to expand over time.",
+    pricing: true,
   },
   {
     id: "roi",
