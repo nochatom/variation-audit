@@ -1,0 +1,181 @@
+/* ============================================================================
+   VariationIQ design-reference token set ("vq").
+   ----------------------------------------------------------------------------
+   Scoped deliberately: every token is defined on `.vq-root`, never on `:root`,
+   so importing this file cannot alter a single existing page. The shipping app
+   keeps its own `ip-*` system untouched — the two coexist.
+
+   Font is declared here rather than through next/font in app/layout.tsx, so
+   this route needs no change to any shared file. Same self-hosting rationale
+   as app/fonts/*.woff2: the build never reaches for Google's CDN. Served from
+   public/fonts/, which the CSP's `font-src 'self'` already permits.
+
+   Dark values are derived, not inverted, and every foreground/background pair
+   below was checked against WCAG 2.1 AA before being written down. Two of the
+   spec's own values did not survive that check and were corrected:
+     • secondary text #6B7785 -> #677381. #6B7785 measures 4.26:1 on the
+       #F6F7F9 row-hover tint (needs 4.5). This is the smallest darkening that
+       clears both the tint (4.51:1) and the white card (4.83:1).
+     • warning amber #B47A0A reads 3.67:1 as text on white and is therefore
+       NON-TEXT ONLY here. Amber text uses --vq-med (#8A5D06, 5.75:1).
+   The accent amber #F5A623 is likewise non-text only: white on it is ~2.0:1.
+   This mirrors the split already documented for --ip-orange in globals.css.
+   ========================================================================== */
+
+@font-face {
+  font-family: "VQ Roboto";
+  src: url("/fonts/roboto.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+.vq-root {
+  --vq-bg: 246 247 249;
+  --vq-card: 255 255 255;
+  --vq-line: 229 232 236;
+  --vq-ink: 22 32 43;
+  --vq-ink-2: 103 115 129;
+  --vq-navy: 15 42 68;
+  --vq-navy-fill: 15 42 68;
+  --vq-amber: 245 166 35;
+  --vq-high: 33 91 67;
+  --vq-high-bg: 231 241 236;
+  --vq-med: 138 93 6;
+  --vq-med-bg: 253 243 225;
+  --vq-low: 158 46 32;
+  --vq-low-bg: 251 234 231;
+}
+
+/* The app toggles `.dark` on <html> (see lib/use-theme.ts + public/theme-init.js),
+   so the dark ramp hangs off that ancestor and the existing switch keeps working
+   on this route with no extra wiring. --vq-amber holds its value in both themes:
+   it reads 8.92:1 on the dark card and is never a text colour. --vq-navy-fill
+   lightens so white button labels stay legible (9.07:1), exactly the reasoning
+   --ip-navy-fill uses. */
+.dark .vq-root {
+  --vq-bg: 10 13 19;
+  --vq-card: 18 22 32;
+  --vq-line: 42 49 64;
+  --vq-ink: 238 241 247;
+  --vq-ink-2: 170 178 194;
+  --vq-navy: 157 184 220;
+  --vq-navy-fill: 43 74 112;
+  --vq-amber: 245 166 35;
+  --vq-high: 95 224 160;
+  --vq-high-bg: 16 40 30;
+  --vq-med: 245 192 106;
+  --vq-med-bg: 42 31 10;
+  --vq-low: 255 154 140;
+  --vq-low-bg: 46 21 18;
+}
+
+/* Currency and percentage figures align in their columns. */
+.vq-num {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* 12px uppercase card label, 0.06em tracking, secondary ink. */
+.vq-label {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(var(--vq-ink-2));
+}
+
+/* The findings table carries 7 data columns plus a row action, and measures
+   1235px of natural content (Finding alone wants 386px). An 8-of-12 span gives
+   747px, so it cannot hold this table: capping every column — truncating both
+   text columns and reducing the action to an icon — still only reaches 838px.
+   The table therefore spans all 12 columns (1136px) and the right-hand cards sit
+   beneath it. At 1136px the browser closes the remaining 8% by compressing the
+   two text columns, which is why only those two carry an ellipsis.
+
+   overflow-x here is the narrow-viewport safety net, not the primary strategy —
+   at the 1440px reference width nothing scrolls. */
+.vq-tablewrap {
+  overflow-x: auto;
+}
+.vq-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+/* Only the two prose columns absorb compression. Numerics, pills, dates and the
+   action never shrink, so no figure is ever clipped. Full text stays available
+   through the title attribute. */
+.vq-cell-truncate {
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Sized to each column's measured natural content, so at the 1440px reference
+   width neither actually ellipses — the truncation rule stays as the graceful
+   degradation for narrower windows rather than the everyday state. */
+.vq-col-finding {
+  width: 37%;
+}
+.vq-col-project {
+  width: 19%;
+}
+/* 8px inter-column padding, not 12px. Eight columns pay that gutter twice each,
+   so the wider value spent 56px on whitespace and forced both prose columns into
+   an ellipsis. The spec fixes 48px rows and 24px card padding; inter-cell padding
+   is free, and buying those 56px back is what lets every column render in full. */
+.vq-table th,
+.vq-table td {
+  height: 48px;
+  padding: 0 8px;
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.vq-table th:first-child,
+.vq-table td:first-child {
+  padding-left: 24px;
+}
+.vq-table th:last-child,
+.vq-table td:last-child {
+  padding-right: 24px;
+}
+.vq-table thead th {
+  height: 36px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(var(--vq-ink-2));
+  border-bottom: 1px solid rgb(var(--vq-line));
+}
+.vq-table tbody tr {
+  border-bottom: 1px solid rgb(var(--vq-line));
+}
+.vq-table tbody tr:last-child {
+  border-bottom: 0;
+}
+.vq-table tbody tr:hover {
+  background: rgb(var(--vq-bg));
+}
+.vq-num-col {
+  text-align: right;
+}
+
+/* Row actions stay quiet until the row is engaged, but never drop below the
+   contrast floor — 0.75 opacity on --vq-navy still clears AA on both surfaces. */
+.vq-row-action {
+  opacity: 0.75;
+}
+.vq-table tbody tr:hover .vq-row-action,
+.vq-row-action:focus-visible {
+  opacity: 1;
+}
+
+.vq-root :focus-visible {
+  outline: 2px solid rgb(var(--vq-navy));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.dark .vq-root :focus-visible {
+  outline-color: rgb(var(--vq-amber));
+}
