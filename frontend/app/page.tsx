@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CtaBanner, Features, Hero, HowItWorks, Nav, ProductCapabilities, SiteFooter } from "@/components/home/sections";
+import { CtaBanner, Features, Hero, HowItWorks, Nav, SiteFooter } from "@/components/home/sections";
 
 export const metadata: Metadata = {
   title: "VariationIQ — Recover every unclaimed variation",
@@ -14,7 +14,6 @@ export default function Home() {
       <Hero />
       <HowItWorks />
       <Features />
-      <ProductCapabilities />
       <CtaBanner />
       <SiteFooter />
     </div>

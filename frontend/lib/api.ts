@@ -10,6 +10,34 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 // (EventSource) can build its URL against the identical backend.
 export const API_BASE = BASE;
 
+// fetch() has no default timeout. If the API host accepts the TCP connection
+// but never answers (backend wedged mid-request, laptop resumed from sleep,
+// proxy black-holing the socket), the promise never settles — so callers'
+// `finally` blocks never run and any spinner tied to them spins forever. A
+// refused connection rejects immediately and was always handled; this covers
+// the stalled case, rejecting so the UI shows the network error it already
+// knows how to render (mapAuthError's non-ApiError branch).
+const REQUEST_TIMEOUT_MS = 30_000;
+// Uploads stream real files through the same client, so the 30s budget above
+// would abort legitimate large transfers. They get their own, longer one.
+const UPLOAD_TIMEOUT_MS = 5 * 60_000;
+
+/** fetch() + an abort-based deadline, preserving any caller-supplied signal. */
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const external = init.signal;
+  if (external) {
+    if (external.aborted) controller.abort();
+    else external.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const TOKEN_KEY = "va_token";
 const REFRESH_KEY = "va_refresh_token";
 const COMPANY_KEY = "va_company_id";
@@ -71,9 +99,21 @@ export function logout() {
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** Machine-readable error code from the backend's {"error":{"code",...}}
+   * envelope (see backend app/errors.py), e.g. "UNAUTHORIZED",
+   * "VALIDATION_ERROR", "RATE_LIMITED". Undefined for responses that don't
+   * use the envelope (rare — kept optional rather than widening every call
+   * site). */
+  code?: string;
+  /** Field-level validation errors (422 VALIDATION_ERROR only) — {loc,
+   * message} pairs straight from FastAPI's RequestValidationError, e.g.
+   * {loc: ["body", "email"], message: "value is not a valid email address"}. */
+  fields?: { loc: string[]; message: string }[];
+  constructor(status: number, message: string, code?: string, fields?: { loc: string[]; message: string }[]) {
     super(message);
     this.status = status;
+    this.code = code;
+    this.fields = fields;
   }
 }
 
@@ -90,11 +130,15 @@ let refreshInFlight: Promise<{ access_token: string; refresh_token: string }> | 
 async function doRefresh(): Promise<{ access_token: string; refresh_token: string }> {
   const rt = getRefreshToken();
   if (!rt) throw new ApiError(401, "no refresh token");
-  const res = await fetch(`${BASE}/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: rt }),
-  });
+  const res = await fetchWithTimeout(
+    `${BASE}/auth/refresh`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: rt }),
+    },
+    REQUEST_TIMEOUT_MS,
+  );
   if (!res.ok) throw new ApiError(res.status, "session expired");
   const body = await res.json();
   storeTokens(body);
@@ -110,35 +154,62 @@ async function refreshOnce(): Promise<{ access_token: string; refresh_token: str
   return refreshInFlight;
 }
 
-async function parseErrorDetail(res: Response): Promise<string> {
-  let detail = res.statusText;
+type ErrorBody = { message: string; code?: string; fields?: { loc: string[]; message: string }[] };
+
+/** Parses the backend's standard {"error":{"code","message","fields"?}}
+ * envelope (app/errors.py). Also tolerates two non-standard shapes seen in
+ * practice: slowapi's own rate-limit handler, which responds with a bare
+ * {"error": "Rate limit exceeded: ..."} string instead of the envelope; and
+ * a legacy {"detail": "..."} body. Never surfaces anything beyond what the
+ * backend put in the body — no stack traces reach the client either way. */
+async function parseErrorBody(res: Response): Promise<ErrorBody> {
+  let message = res.statusText || "Request failed.";
+  let code: string | undefined;
+  let fields: { loc: string[]; message: string }[] | undefined;
   try {
     const body = await res.json();
-    detail = body.detail || body.error?.message || detail;
+    if (body && typeof body === "object") {
+      if (body.error && typeof body.error === "object") {
+        if (typeof body.error.message === "string") message = body.error.message;
+        if (typeof body.error.code === "string") code = body.error.code;
+        if (Array.isArray(body.error.fields)) fields = body.error.fields;
+      } else if (typeof body.error === "string") {
+        message = body.error;
+        code = "RATE_LIMITED";
+      } else if (typeof body.detail === "string") {
+        message = body.detail;
+      }
+    }
   } catch {
-    /* non-JSON error */
+    /* non-JSON error body */
   }
-  return detail;
+  return { message, code, fields };
 }
 
 export async function request<T>(path: string, opts: RequestInit = {}, _retried = false): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+  const res = await fetchWithTimeout(
+    `${BASE}${path}`,
+    { ...opts, headers: { ...headers, ...(opts.headers || {}) } },
+    REQUEST_TIMEOUT_MS,
+  );
 
   if (res.status === 401 && !_retried && !NO_REFRESH_PATHS.includes(path) && getRefreshToken()) {
     try {
       await refreshOnce();
     } catch {
       logout();
-      throw new ApiError(401, await parseErrorDetail(res));
+      const { message, code, fields } = await parseErrorBody(res);
+      throw new ApiError(401, message, code, fields);
     }
     return request<T>(path, opts, true); // retry exactly once with the new access token
   }
 
   if (!res.ok) {
-    throw new ApiError(res.status, await parseErrorDetail(res));
+    const { message, code, fields } = await parseErrorBody(res);
+    throw new ApiError(res.status, message, code, fields);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -151,31 +222,39 @@ async function upload<T>(path: string, file: File, field = "file", _retried = fa
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, { method: "POST", headers, body: fd });
+  const res = await fetchWithTimeout(`${BASE}${path}`, { method: "POST", headers, body: fd }, UPLOAD_TIMEOUT_MS);
 
   if (res.status === 401 && !_retried && getRefreshToken()) {
     try {
       await refreshOnce();
     } catch {
       logout();
-      throw new ApiError(401, await parseErrorDetail(res));
+      const { message, code, fields } = await parseErrorBody(res);
+      throw new ApiError(401, message, code, fields);
     }
     return upload<T>(path, file, field, true);
   }
 
   if (!res.ok) {
-    throw new ApiError(res.status, await parseErrorDetail(res));
+    const { message, code, fields } = await parseErrorBody(res);
+    throw new ApiError(res.status, message, code, fields);
   }
   return (await res.json()) as T;
 }
 
 // ---- auth ----------------------------------------------------------------
-export type TokenResponse = { access_token: string; refresh_token: string; user_id: string; email: string };
+export type Org = { id: string; name: string; role: string };
+// `organizations` lets a post-login/signup redirect read the default
+// company_id straight off this response instead of an extra GET /auth/me
+// round trip made purely to learn it (see login-latency fix).
+export type TokenResponse = {
+  access_token: string; refresh_token: string; user_id: string; email: string; organizations: Org[];
+};
 export type Me = {
   user_id: string;
   email: string;
   full_name: string | null;
-  organizations: { id: string; name: string; role: string }[];
+  organizations: Org[];
 };
 
 export const api = {
@@ -215,11 +294,15 @@ export const api = {
     const rt = getRefreshToken();
     if (rt) {
       try {
-        await fetch(`${BASE}/auth/logout`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: rt }),
-        });
+        await fetchWithTimeout(
+          `${BASE}/auth/logout`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refresh_token: rt }),
+          },
+          REQUEST_TIMEOUT_MS,
+        );
       } catch {
         /* best-effort — still clear local state even if the network call fails */
       }
@@ -278,6 +361,30 @@ export const api = {
     kind: "comms" | "rfis" | "site-instructions" | "meeting-minutes",
     file: File,
   ) => upload<UploadResult>(`/projects/${projectId}/${kind}`, file),
+  /** Single arbitrary supporting document (PDF/text) — source_type=document. */
+  uploadDocument: (projectId: string, file: File) =>
+    upload<DocumentOut>(`/projects/${projectId}/documents`, file),
+
+  // organization profile + offices (0017)
+  getOrganization: (companyId: string) => request<OrganizationOut>(`/orgs/${companyId}`),
+  updateOrganization: (companyId: string, changes: Partial<OrganizationUpdate>) =>
+    request<OrganizationOut>(`/orgs/${companyId}`, {
+      method: "PATCH",
+      body: JSON.stringify(changes),
+    }),
+  listOffices: (companyId: string) => request<OfficeOut[]>(`/orgs/${companyId}/offices`),
+  createOffice: (companyId: string, office: OfficeInput) =>
+    request<OfficeOut>(`/orgs/${companyId}/offices`, {
+      method: "POST",
+      body: JSON.stringify(office),
+    }),
+  updateOffice: (companyId: string, officeId: string, changes: Partial<OfficeInput>) =>
+    request<OfficeOut>(`/orgs/${companyId}/offices/${officeId}`, {
+      method: "PATCH",
+      body: JSON.stringify(changes),
+    }),
+  deleteOffice: (companyId: string, officeId: string) =>
+    request<void>(`/orgs/${companyId}/offices/${officeId}`, { method: "DELETE" }),
 
   // organization members
   orgMembers: (companyId: string) => request<MemberOut[]>(`/orgs/${companyId}/members`),
@@ -324,16 +431,21 @@ export const api = {
   markAllNotificationsRead: () => request<{ marked: number }>("/notifications/read-all", { method: "POST" }),
 
   // reports — PDF fetched as a blob so we can attach the bearer token
-  async reportPdf(projectId: string): Promise<Blob> {
-    const res = await fetch(`${BASE}/projects/${projectId}/report.pdf`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
+  async reportPdf(projectId: string, reviewStatus: "confirmed" | "pending" | "rejected" = "confirmed"): Promise<Blob> {
+    // PDF generation is server-side rendering work over a whole project, so
+    // it gets the upload-sized budget rather than the 30s interactive one.
+    const res = await fetchWithTimeout(
+      `${BASE}/projects/${projectId}/report.pdf?review_status=${reviewStatus}`,
+      { headers: { Authorization: `Bearer ${getToken()}` } },
+      UPLOAD_TIMEOUT_MS,
+    );
     if (!res.ok) {
       // Surface the REAL backend error (e.g. the 403 "the 'exports' feature
       // isn't available on your current plan — upgrade to access it", or a
       // 500's detail) instead of a generic "report failed". The body carries
-      // the actionable message — parseErrorDetail reads {error:{message}}.
-      throw new ApiError(res.status, await parseErrorDetail(res));
+      // the actionable message — parseErrorBody reads {error:{message}}.
+      const { message, code, fields } = await parseErrorBody(res);
+      throw new ApiError(res.status, message, code, fields);
     }
     return res.blob();
   },
@@ -394,6 +506,37 @@ export type ProjectOut = {
   archived_at: string | null;
 };
 export type UploadResult = { project_id: string; documents_added: number };
+export type DocumentOut = {
+  id: string;
+  project_id: string;
+  source_type: string;
+  storage_key: string;
+  size_bytes: number;
+};
+export type OrganizationOut = {
+  id: string;
+  name: string;
+  legal_name: string | null;
+  abn: string | null;
+  acn: string | null;
+  website: string | null;
+  phone: string | null;
+  logo_key: string | null;
+  primary_state: string | null;
+};
+/** Writable subset — logo_key is set by the upload route, not by PATCH. */
+export type OrganizationUpdate = Omit<OrganizationOut, "id" | "logo_key">;
+export type OfficeOut = {
+  id: string;
+  label: string;
+  address: string | null;
+  suburb: string | null;
+  state: string | null;
+  postcode: string | null;
+  phone: string | null;
+  is_primary: boolean;
+};
+export type OfficeInput = Omit<OfficeOut, "id">;
 export type MemberOut = { user_id: string; email: string; full_name: string | null; role: string };
 export type InvitationOut = {
   id: string;

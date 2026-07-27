@@ -1,34 +1,68 @@
 import Link from "next/link";
-import { FileCheck2, Files, Gavel, Inbox, Link2, ScanSearch, ShieldAlert } from "lucide-react";
+import { Gavel, Inbox, Link2, ScanSearch } from "lucide-react";
 import { Chip, ConfidenceBar, StatCard, TimeBarFlag, aud } from "@/components/ui";
+import { MobileMenu } from "@/components/home/mobile-menu";
 import { LogoMark } from "@/components/ui/Logo";
 import { Wordmark } from "@/components/ui/Wordmark";
 
-/* ---------------- nav ---------------- */
+/* ---------------- nav ----------------
+   Root-relative (/#id), not bare #id — this nav renders on every marketing
+   page, and a bare hash silently no-ops anywhere the target section doesn't
+   exist (e.g. /pricing).
+
+   "Product" used to point at /#preview, the sample panel inside the hero —
+   i.e. it scrolled you to the top of the page you were already on. It now
+   names what it actually reaches. */
+const NAV_LINKS = [
+  { href: "/#how", label: "How it works" },
+  { href: "/#capabilities", label: "Capabilities" },
+  { href: "/pricing", label: "Pricing" },
+];
+
 export function Nav() {
   return (
     <header className="sticky top-0 z-30 h-14 border-b border-ip-line bg-ip-bg/85 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-6 sm:px-12 lg:px-16">
-        <Link href="/" className="flex items-center gap-2.5" aria-label="VariationIQ home">
+        <Link
+          href="/"
+          className="-ml-2 flex min-h-[44px] items-center gap-2.5 rounded-md px-2"
+          aria-label="VariationIQ home"
+        >
           <LogoMark size={28} />
           <Wordmark height={17} className="text-ip-ink" />
         </Link>
-        <nav className="hidden items-center gap-8 text-sm text-ip-ink-2 md:flex">
-          {/* Root-relative (/#id), not bare #id — this nav renders on every
-              marketing page, and a bare hash silently no-ops anywhere the
-              target section doesn't exist (e.g. /pricing). */}
-          <Link href="/#preview" className="transition-colors hover:text-ip-ink">Product</Link>
-          <Link href="/#how" className="transition-colors hover:text-ip-ink">How it works</Link>
-          <Link href="/#capabilities" className="transition-colors hover:text-ip-ink">Capabilities</Link>
-          <Link href="/pricing" className="transition-colors hover:text-ip-ink">Pricing</Link>
+
+        {/* Links sit at 44px tall (they were 20px) — the hit area grows, the
+            type does not. */}
+        <nav className="hidden items-center gap-2 text-sm text-ip-ink-2 md:flex">
+          {NAV_LINKS.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className="flex min-h-[44px] items-center rounded-md px-3 transition-colors hover:text-ip-ink"
+            >
+              {l.label}
+            </Link>
+          ))}
         </nav>
-        <div className="flex items-center gap-2">
-          <Link href="/login" className="rounded-md px-3 py-1.5 text-sm font-medium text-ip-ink-2 transition-colors hover:text-ip-ink">
+
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* Sign in stays a quiet text link and Get started keeps the fill:
+              one action leads. They also now resolve to different tabs —
+              previously both hit /login and both opened the login form. */}
+          <Link
+            href="/login"
+            className="hidden min-h-[44px] items-center rounded-md px-3 text-sm font-medium text-ip-ink-2 transition-colors hover:text-ip-ink sm:flex"
+          >
             Sign in
           </Link>
-          <Link href="/login" className="btn-navy px-3.5 py-1.5 text-sm">
+          {/* Stays visible at every width. Hiding it behind the mobile menu
+              traded the header's one job for a hamburger — wayfinding belongs
+              in the menu, the primary action does not. */}
+          <Link href="/login?mode=signup" className="btn-navy min-h-[44px] px-4 text-sm">
             Get started
           </Link>
+          <MobileMenu links={NAV_LINKS} />
         </div>
       </div>
     </header>
@@ -64,30 +98,31 @@ export function Hero() {
             minutes to surface unclaimed variations before the time-bar closes.
           </p>
 
-          <div className="animate-fade-up mt-9 flex flex-wrap items-center gap-3" style={{ animationDelay: "180ms" }}>
+          {/* Secondary CTA says what it actually does. It is an in-page anchor
+              to the sample panel (#preview) — labelling it "Book a Demo" made a
+              promise the button never kept, and on desktop its target is already
+              on screen. It earns its place on mobile, where the proof sits below
+              the fold. */}
+          <div className="animate-fade-up mt-10 flex flex-wrap items-center gap-3" style={{ animationDelay: "180ms" }}>
             <Link href="/login" className="btn-navy px-6 py-3 text-[15px]">
               Start Free Analysis
             </Link>
-            <a href="#preview" className="btn-ghost px-6 py-3 text-[15px]">
-              Book a Demo
+            <a href="#preview" className="btn-ghost px-6 py-3 text-[15px] lg:hidden">
+              See a sample analysis
             </a>
           </div>
 
-          <div className="animate-fade-up mt-12" style={{ animationDelay: "240ms" }}>
-            <p className="ip-label mb-3">Built for AU construction trades</p>
-            <div className="flex flex-wrap gap-2">
-              {["General Contractors", "Electrical", "Plumbing", "HVAC", "Civil Engineering"].map((t) => (
-                <span key={t} className="rounded-md border border-ip-line bg-ip-card px-2.5 py-1 text-[12px] text-ip-ink-3">
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
+          {/* DELETED: the "Built for AU construction trades" chips. The eyebrow
+              and headline already establish the market, Features() renders the
+              same list (plus one more) further down, and on mobile the block
+              wedged itself between the CTA and the product proof. */}
         </div>
 
+        {/* DELETED: WorkflowChain. HowItWorks() below is the same pipeline
+            (Ingest → Detect → Recover) told properly — the hero was explaining
+            mechanics before the visitor had accepted the premise. */}
         <div className="animate-fade-up" style={{ animationDelay: "150ms" }}>
           <ScreenshotPreview />
-          <WorkflowChain />
         </div>
       </div>
     </section>
@@ -112,12 +147,12 @@ function ScreenshotPreview() {
         </div>
 
         <div className="p-4 sm:p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] text-ip-ink-3">Projects / Sydney Metro</div>
-              <div className="text-sm font-semibold text-ip-ink">Package 4 — Electrical</div>
-            </div>
-            <Chip tone="recovery">Analysis complete</Chip>
+          {/* The "Analysis complete" chip was a fifth colour signal saying what
+              the panel already shows. Cut, so green means one thing here:
+              money recovered. */}
+          <div className="mb-4">
+            <div className="text-[11px] text-ip-ink-3">Projects / Sydney Metro</div>
+            <div className="text-sm font-semibold text-ip-ink">Package 4 — Electrical</div>
           </div>
 
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
@@ -148,62 +183,15 @@ function PreviewRow({ title, score, value, timeBar }: { title: string; score: nu
     <div className="flex items-center justify-between gap-3 border-b border-ip-line px-3 py-2.5 last:border-0">
       <div className="min-w-0">
         <div className="truncate text-[12.5px] font-medium text-ip-ink">{title}</div>
+        {/* The flag only appears when there IS risk. A green "on track" on every
+            other row spent a colour to say "nothing to see here", while the
+            Time-bar risk stat card above already carries the count. */}
         <div className="mt-1 flex items-center gap-2">
           <ConfidenceBar score={score} />
-          <TimeBarFlag risk={!!timeBar} />
+          {timeBar && <TimeBarFlag risk />}
         </div>
       </div>
       <span className="shrink-0 text-[13px] font-semibold tabular-nums text-ip-ink">{value}</span>
-    </div>
-  );
-}
-
-/* ---------------- hero right side: workflow chain ---------------- */
-const WORKFLOW: { label: string; tone: "input" | "core" | "output" }[] = [
-  { label: "Contract", tone: "input" },
-  { label: "Email", tone: "input" },
-  { label: "RFI", tone: "input" },
-  { label: "Site Instruction", tone: "input" },
-  { label: "Meeting Minutes", tone: "input" },
-  { label: "AI Detection", tone: "core" },
-  { label: "Variation", tone: "output" },
-  { label: "Recoverable Value", tone: "output" },
-  { label: "Evidence-linked Report", tone: "output" },
-];
-
-const CHAIN_TONE: Record<string, string> = {
-  input: "border border-ip-line bg-ip-card text-ip-ink-2",
-  core: "border border-ip-navy-fill bg-ip-navy-fill text-white",
-  output: "border border-ip-recovery/25 bg-ip-recovery/10 text-ip-recovery",
-};
-
-function WorkflowChain() {
-  return (
-    <div className="mt-5">
-      <p className="ip-label mb-3">How it gets there</p>
-      <div className="flex flex-wrap items-center gap-y-2">
-        {WORKFLOW.map((step, i) => (
-          <div key={step.label} className="flex items-center">
-            {i > 0 && (
-              <svg
-                viewBox="0 0 24 24"
-                className="mx-1 h-3.5 w-3.5 shrink-0 text-ip-line-strong"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M9 6l6 6-6 6" />
-              </svg>
-            )}
-            <span className={`inline-flex items-center whitespace-nowrap rounded-pill px-3 py-1.5 text-[12px] font-semibold ${CHAIN_TONE[step.tone]}`}>
-              {step.label}
-            </span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -218,59 +206,189 @@ function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) 
   );
 }
 
-/* ---------------- section: how it works ---------------- */
+/* ---------------- section: how it works ----------------
+   Deliberately NOT three equal cards. Ingest is table stakes (every tool
+   accepts uploads) and Recover is output formatting; detection against the
+   contract baseline is the only step a competitor can't trivially copy. So
+   Detect gets the width, the word budget and — most importantly — the only
+   thing on this section that isn't a claim: a worked example. The supporting
+   steps shrink to a single line each. */
 export function HowItWorks() {
-  const steps = [
-    { n: "01", title: "Ingest", body: "Connect your project record — RFIs, site instructions, meeting minutes and comms, by upload or CSV. VariationIQ normalises every source into one timeline." },
-    { n: "02", title: "Detect", body: "AI reads the agreed contract baseline against every communication and surfaces work that was instructed or performed but never claimed." },
-    { n: "03", title: "Recover", body: "Each variation arrives with a confidence score, an AUD estimate, a time-bar countdown, and evidence linked to its source — ready for your commercial team." },
-  ];
   return (
     <section id="how" className="relative border-b border-ip-line">
       <div className="mx-auto max-w-[1440px] px-6 py-24 sm:px-12 lg:px-16">
         <SectionHeading eyebrow="How it works" title="From project records to recoverable revenue." />
-        <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
-          {steps.map((s) => (
-            <div key={s.n} className="ip-card p-6">
-              <div className="flex items-center gap-3">
-                <span className="grid h-9 w-9 place-items-center rounded-lg border border-ip-line bg-ip-card-2 font-mono text-sm text-ip-navy">
-                  {s.n}
-                </span>
-                <h3 className="text-lg font-semibold tracking-tight text-ip-ink">{s.title}</h3>
-              </div>
-              <p className="mt-4 text-sm leading-relaxed text-ip-ink-2">{s.body}</p>
+
+        {/* Source order is 01 → 02 → 03 so the stacked mobile layout reads in
+            sequence; the two-column desktop arrangement is produced by explicit
+            placement, not by source order. Nesting the asides in their own
+            column made mobile read 01 → 03 → 02. */}
+        <div className="mt-12 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_1.85fr] lg:items-start">
+          <StepAside
+            n="01"
+            title="Ingest"
+            body="RFIs, site instructions, meeting minutes and comms — by upload or CSV, normalised into one timeline."
+            className="lg:col-start-1 lg:row-start-1"
+          />
+
+          {/* the protagonist */}
+          <div className="ip-card-lg p-6 sm:p-8 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-sm text-ip-ink-3">02</span>
+              <h3 className="text-[22px] font-bold tracking-tight text-ip-ink">Detect</h3>
             </div>
-          ))}
+            <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-ip-ink-2">
+              VariationIQ reads the agreed contract baseline against every communication on the job,
+              and flags work that was instructed or performed but never claimed.
+            </p>
+            <DetectionExample />
+          </div>
+
+          <StepAside
+            n="03"
+            title="Recover"
+            body="Every variation lands with its dollar estimate, time-bar countdown and evidence, ready to claim."
+            className="lg:col-start-1 lg:row-start-2"
+          />
         </div>
       </div>
     </section>
   );
 }
 
-/* ---------------- section: capabilities (feature cards + trades) ---------------- */
+/** Supporting step: no card fill, no bordered numeral box. The number is just a
+ *  number — the reading order already communicates sequence, so the box that
+ *  used to hold it was decoration. */
+function StepAside({ n, title, body, className = "" }: { n: string; title: string; body: string; className?: string }) {
+  return (
+    // Sizes to its content (the grid is items-start): stretching these to match
+    // Detect's height left a band of dead space under each, which reads as a
+    // layout bug rather than restraint.
+    <div className={`rounded-lg border border-ip-line p-5 ${className}`}>
+      <div className="flex items-center gap-3">
+        <span className="font-mono text-sm text-ip-ink-3">{n}</span>
+        <h3 className="text-base font-semibold tracking-tight text-ip-ink">{title}</h3>
+      </div>
+      <p className="mt-2 text-[13.5px] leading-relaxed text-ip-ink-2">{body}</p>
+    </div>
+  );
+}
+
+/** The worked example — the one thing in this section that isn't a claim.
+ *  Shows the actual transformation: an ordinary line in a site instruction on
+ *  the left, the variation it produces on the right. Built from the same
+ *  primitives the product renders (ConfidenceBar, Chip, aud) rather than
+ *  drawn, and labelled as illustrative — the hero makes the same promise and
+ *  breaking it here would cost more than the section is worth. */
+function DetectionExample() {
+  return (
+    <div className="mt-6">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
+        {/* evidence in */}
+        <div className="rounded-lg border border-ip-line bg-ip-card-2 p-4">
+          <p className="ip-label mb-2">Site instruction · 14 Mar</p>
+          <p className="text-[13px] leading-relaxed text-ip-ink-2">
+            &ldquo;Confirming site walk today — client wants{" "}
+            <mark className="rounded bg-ip-orange/20 px-0.5 text-ip-ink">four extra GPOs in the plant room</mark>{" "}
+            before ceilings close. Proceed and we&rsquo;ll sort the paperwork later.&rdquo;
+          </p>
+        </div>
+
+        {/* ink-3, not line-strong: this arrow carries the meaning of the whole
+            example (evidence becomes variation). At #c5c6cd it sat near 1.9:1
+            and failed the 3:1 floor for meaningful non-text graphics. */}
+        <svg
+          viewBox="0 0 24 24"
+          className="mx-auto h-5 w-5 shrink-0 rotate-90 text-ip-ink-3 md:rotate-0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+
+        {/* variation out */}
+        <div className="rounded-lg border border-ip-line bg-ip-card p-4">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-[13px] font-semibold text-ip-ink">Additional GPOs beyond contract scope</p>
+            <span className="shrink-0 text-[13px] font-semibold tabular-nums text-ip-recovery">{aud(4200)}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <ConfidenceBar score={0.86} />
+            <Chip tone="orange">Time bar in 6 days</Chip>
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-3 text-[11px] text-ip-ink-3">
+        Illustrative example — not live data. &ldquo;Sort the paperwork later&rdquo; is where the money goes missing.
+      </p>
+    </div>
+  );
+}
+
+/* ---------------- section: capabilities ----------------
+   Four capabilities, not seven cards across two sections. Security of Payment
+   is the protagonist: ingestion, detection and audit trails are things a
+   competent document-AI vendor can build, but jurisdiction-specific time-bar
+   logic is the part that requires knowing Australian construction law, and it
+   is the reason a missed variation becomes unrecoverable rather than merely
+   late. It gets the width; the rest support it. */
 export function Features() {
-  const caps = [
+  const supporting = [
     { title: "Multi-source ingestion", body: "RFIs, site instructions, meeting minutes and project comms — parsed and normalised, not just stored.", icon: Inbox },
     { title: "AI variation detection", body: "Finds out-of-scope and unclaimed work across the entire project record, clustered with its rationale.", icon: ScanSearch },
-    { title: "AUD value & time-bar risk", body: "Recoverable estimates in AUD, plus Security of Payment notice deadlines flagged before they lapse.", icon: ShieldAlert },
-    { title: "Evidence-linked audit trail", body: "Every finding traces back to the exact source document, with an immutable record of each review decision.", icon: Link2 },
+    { title: "Evidence-linked audit trail", body: "Every finding traces back to its source document, with an immutable record of each review decision.", icon: Link2 },
   ];
   const trades = ["General Contractors", "Electrical", "Plumbing", "HVAC", "Civil Engineering", "Large builders"];
   return (
     <section id="capabilities" className="relative border-b border-ip-line">
       <div className="mx-auto max-w-[1440px] px-6 py-24 sm:px-12 lg:px-16">
         <SectionHeading eyebrow="Capabilities" title="A revenue-recovery engine, not another document store." />
-        <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {caps.map((c) => (
-            <div
-              key={c.title}
-              className="group rounded-xl border border-ip-line bg-ip-card p-7 shadow-ip-card transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-ip-line-strong hover:shadow-ip-pop"
-            >
-              <div className="grid h-11 w-11 place-items-center rounded-lg border border-ip-navy/15 bg-ip-navy/8 text-ip-navy transition-colors duration-200 group-hover:bg-ip-navy/12">
-                <c.icon className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+
+        {/* Protagonist. Two columns rather than one long line: a single text
+            block stopped around 60% of the card, leaving the border drawing a
+            box around empty space — which reads as unfinished rather than as
+            restraint. Heading left, argument right, both using the width. */}
+        <div className="ip-card-lg mt-12 p-7 sm:p-9">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14">
+            <div className="flex gap-5">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-ip-navy/15 bg-ip-navy/8 text-ip-navy">
+                <Gavel className="h-6 w-6" strokeWidth={1.6} aria-hidden />
               </div>
-              <h3 className="mt-5 text-base font-semibold leading-snug tracking-tight text-ip-ink">{c.title}</h3>
-              <p className="mt-2.5 text-sm leading-relaxed text-ip-ink-2">{c.body}</p>
+              <h3 className="text-[26px] font-bold leading-[1.15] tracking-tight text-ip-ink">
+                Time-bar risk,
+                <br className="hidden sm:block" /> by jurisdiction
+              </h3>
+            </div>
+
+            <div>
+              {/* Absorbs the one sentence worth keeping from the deleted
+                  "Product capabilities" section — the state/territory nuance. */}
+              <p className="text-[15px] leading-relaxed text-ip-ink-2">
+                Recoverable estimates in AUD, with Security of Payment notice deadlines flagged before
+                they lapse. Notice periods and time-bar logic account for state and territory SoP regimes.
+              </p>
+              <p className="mt-4 text-[15px] font-semibold leading-relaxed text-ip-ink">
+                Entitlement doesn&rsquo;t weaken when a deadline passes. It ends.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* supporting — no hover lift: these aren't clickable, and a card that
+            rises under the cursor promises an interaction that never arrives. */}
+        <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+          {supporting.map((c) => (
+            <div key={c.title} className="rounded-xl border border-ip-line bg-ip-card p-6">
+              <div className="grid h-10 w-10 place-items-center rounded-lg border border-ip-navy/15 bg-ip-navy/8 text-ip-navy">
+                <c.icon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
+              </div>
+              <h3 className="mt-4 text-[15px] font-semibold leading-snug tracking-tight text-ip-ink">{c.title}</h3>
+              <p className="mt-2 text-[13.5px] leading-relaxed text-ip-ink-2">{c.body}</p>
             </div>
           ))}
         </div>
@@ -279,43 +397,11 @@ export function Features() {
           <p className="ip-label mb-4">Built for every trade</p>
           <div className="flex flex-wrap gap-2.5">
             {trades.map((t) => (
-              <span key={t} className="rounded-lg border border-ip-line bg-ip-card px-3.5 py-2 text-[13px] text-ip-ink-2 transition-colors hover:border-ip-line-strong hover:text-ip-ink">
+              <span key={t} className="rounded-lg border border-ip-line bg-ip-card px-3.5 py-2 text-[13px] text-ip-ink-2">
                 {t}
               </span>
             ))}
           </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ---------------- section: product capabilities (factual, no metrics/claims) ---------------- */
-export function ProductCapabilities() {
-  const items = [
-    { title: "Australia-wide Security of Payment awareness", body: "Notice periods and time-bar logic account for state and territory SoP regimes.", icon: Gavel },
-    { title: "Four supported document sources", body: "RFIs, site instructions, meeting minutes and project communications.", icon: Files },
-    { title: "Every variation linked to supporting evidence", body: "Each finding traces back to the source document it was detected from.", icon: FileCheck2 },
-  ];
-  return (
-    <section className="relative border-b border-ip-line">
-      <div className="mx-auto max-w-[1440px] px-6 py-20 sm:px-12 lg:px-16">
-        <p className="ip-label mb-7">Product capabilities</p>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-          {items.map((i) => (
-            <div
-              key={i.title}
-              className="group rounded-xl border border-ip-line bg-ip-card p-6 shadow-ip-card transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-ip-line-strong hover:shadow-ip-pop"
-            >
-              <div className="flex items-center gap-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-ip-navy/15 bg-ip-navy/8 text-ip-navy transition-colors duration-200 group-hover:bg-ip-navy/12">
-                  <i.icon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
-                </span>
-                <div className="text-sm font-semibold leading-snug text-ip-ink">{i.title}</div>
-              </div>
-              <p className="mt-3 text-[13px] leading-relaxed text-ip-ink-3">{i.body}</p>
-            </div>
-          ))}
         </div>
       </div>
     </section>
@@ -348,12 +434,23 @@ export function CtaBanner() {
   );
 }
 
-/* ---------------- footer ---------------- */
+/* ---------------- footer ----------------
+   Two columns, not four. "Company" and "Legal" held one and two links; a 12px
+   uppercase header plus its spacing is more chrome than a single line of
+   content deserves, so they're merged into one column that earns its label.
+   Contact moved into the brand block — an email address is identity, not
+   navigation, and as a standalone column it was the fifth child in a
+   four-track grid, wrapping to its own row with the full width of the footer
+   empty beside it.
+
+   "Product preview" (/#preview) is gone: it scrolled to the sample panel near
+   the top of the page you were already on. The header nav dropped that same
+   link earlier, and a footer that contradicts the header is worse than one
+   link short. */
 const FOOTER_COLUMNS: { label: string; links: { title: string; href: string }[] }[] = [
   {
     label: "Product",
     links: [
-      { title: "Product preview", href: "/#preview" },
       { title: "How it works", href: "/#how" },
       { title: "Capabilities", href: "/#capabilities" },
       { title: "Pricing", href: "/pricing" },
@@ -361,11 +458,8 @@ const FOOTER_COLUMNS: { label: string; links: { title: string; href: string }[] 
   },
   {
     label: "Company",
-    links: [{ title: "About", href: "/about" }],
-  },
-  {
-    label: "Legal",
     links: [
+      { title: "About", href: "/about" },
       { title: "Privacy Policy", href: "/privacy" },
       { title: "Terms of Service", href: "/terms" },
     ],
@@ -376,9 +470,17 @@ export function SiteFooter() {
   return (
     <footer className="relative border-t border-ip-line">
       <div className="mx-auto max-w-[1440px] px-6 py-12 sm:px-12 lg:px-16">
-        <div className="grid grid-cols-2 gap-8 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        {/* Track count now matches the child count — brand + two columns.
+            The link columns stay side by side on mobile: stacking them made the
+            footer taller than the four-column version it replaced (769px vs
+            617px), which is the opposite of the point. */}
+        <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-[1.6fr_1fr_1fr] sm:gap-8">
           <div className="col-span-2 sm:col-span-1">
-            <Link href="/" className="flex items-center gap-2.5" aria-label="VariationIQ home">
+            <Link
+              href="/"
+              className="-ml-2 flex min-h-[44px] w-fit items-center gap-2.5 rounded-md px-2"
+              aria-label="VariationIQ home"
+            >
               <LogoMark size={28} />
               <Wordmark height={17} className="text-ip-ink" />
             </Link>
@@ -386,15 +488,26 @@ export function SiteFooter() {
               AI revenue recovery for Australian construction — surfacing unclaimed variations from your project
               records before the time bar closes.
             </p>
+            <a
+              href="mailto:hello@variationiq.com"
+              className="mt-3 inline-flex min-h-[44px] items-center text-[13px] text-ip-ink-2 transition-colors hover:text-ip-ink"
+            >
+              hello@variationiq.com
+            </a>
           </div>
 
           {FOOTER_COLUMNS.map((col) => (
             <div key={col.label}>
               <h3 className="text-[12px] font-semibold uppercase tracking-wide text-ip-ink-3">{col.label}</h3>
-              <ul className="mt-3 space-y-2.5">
+              {/* Rows are 44px tall with the type unchanged: the hit area grows,
+                  the visual density doesn't. */}
+              <ul className="mt-1">
                 {col.links.map((link) => (
                   <li key={link.title}>
-                    <Link href={link.href} className="text-[13px] text-ip-ink-2 transition-colors hover:text-ip-ink">
+                    <Link
+                      href={link.href}
+                      className="flex min-h-[44px] items-center text-[13px] text-ip-ink-2 transition-colors hover:text-ip-ink"
+                    >
                       {link.title}
                     </Link>
                   </li>
@@ -402,17 +515,6 @@ export function SiteFooter() {
               </ul>
             </div>
           ))}
-
-          <div>
-            <h3 className="text-[12px] font-semibold uppercase tracking-wide text-ip-ink-3">Contact</h3>
-            <ul className="mt-3 space-y-2.5">
-              <li>
-                <a href="mailto:hello@variationiq.com" className="text-[13px] text-ip-ink-2 transition-colors hover:text-ip-ink">
-                  hello@variationiq.com
-                </a>
-              </li>
-            </ul>
-          </div>
         </div>
 
         <div className="mt-10 flex flex-col gap-2 border-t border-ip-line pt-6 sm:flex-row sm:items-center sm:justify-between">

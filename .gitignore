@@ -33,3 +33,14 @@ frontend/.next-prod.err
 # business-dev docs (contain third-party personal data — not for repo history)
 linkedin-profile-package.md
 prospect-list-*
+
+# Session credentials written by local dev/CLI login — contains a live JWT
+# access token and refresh token. Never commit.
+backend/.login.json
+
+# Local runtime logs (server.log lives inside .pgdata, these land at the root)
+.pgdata_*.log
+backend/.uvicorn.log
+backend/.worker.log
+frontend/.devserver.log
+frontend/.next-dev.log

@@ -64,8 +64,13 @@
     --ip-navy-3: 60 71 93;
     --ip-navy-fill: 5 17 37;
     --ip-navy-fill-2: 27 38 59;
-    --ip-orange: 255 122 38;
-    --ip-orange-2: 158 67 0;
+    --ip-orange: 255 122 38;     /* accent ONLY — non-text: indicators, dots, borders, tints, focus rings */
+    --ip-orange-2: 158 67 0;     /* orange TEXT on light surfaces (6.45:1 on white) */
+    /* Solid fill behind white text. Same value as --ip-orange-2 and fixed in
+       both themes, exactly like --ip-navy-fill: white on --ip-orange (#ff7a26)
+       measures 2.60:1 and fails AA outright, while white on this reads 6.45:1.
+       #ff7a26 keeps every non-text job, so the brand accent is unchanged. */
+    --ip-orange-fill: 158 67 0;
     --ip-recovery: 8 110 45;   /* darkened from 10 125 52 to clear WCAG AA for the small recovery-green chips on their tinted background */
     --ip-recovery-2: 0 164 55;
     --ip-risk: 186 26 26;
@@ -88,6 +93,10 @@
     --ip-navy-fill-2: 68 88 131;
     --ip-orange: 255 138 61;
     --ip-orange-2: 255 178 122;
+    /* Deliberately NOT lightened for dark like --ip-navy-fill is: the dark
+       orange ramp runs lighter (#ffb27a), and white text on any of it fails.
+       Holding #9e4300 keeps the label at 6.45:1 in both themes. */
+    --ip-orange-fill: 158 67 0;
     --ip-recovery: 61 220 120;
     --ip-recovery-2: 84 225 102;
     --ip-risk: 255 107 94;
@@ -190,9 +199,17 @@
     @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-ip-navy-fill px-3.5 py-2
            text-sm font-semibold text-white hover:bg-ip-navy-fill-2 disabled:opacity-50;
   }
+  /* Resting fill is the darker orange so the white label clears AA (6.45:1).
+     Hover brightens the same fill rather than swapping to a second token:
+     the light ramp has no darker orange to step toward, and stepping *up* to
+     #ff7a26 is what produced the old bug where the button was only legible
+     while hovered. brightness(1.15) lands at ~#b64d00 / 5.18:1, still AA. */
   .btn-orange {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-ip-orange px-3.5 py-2
-           text-sm font-semibold text-white hover:bg-ip-orange-2 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-ip-orange-fill px-3.5 py-2
+           text-sm font-semibold text-white disabled:opacity-50;
+  }
+  .btn-orange:hover:not(:disabled) {
+    filter: brightness(1.15);
   }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-ip-line-strong

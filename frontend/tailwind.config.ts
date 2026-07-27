@@ -37,12 +37,35 @@ const config: Config = {
           "navy-3": "rgb(var(--ip-navy-3) / <alpha-value>)",
           "navy-fill": "rgb(var(--ip-navy-fill) / <alpha-value>)",     // solid fill for white-text buttons/badges — stays dark-navy in both themes
           "navy-fill-2": "rgb(var(--ip-navy-fill-2) / <alpha-value>)",
-          orange: "rgb(var(--ip-orange) / <alpha-value>)",            // construction orange (actions + time-bar)
-          "orange-2": "rgb(var(--ip-orange-2) / <alpha-value>)",
+          orange: "rgb(var(--ip-orange) / <alpha-value>)",            // construction orange — NON-TEXT accents only (indicators, borders, tints, focus rings)
+          "orange-2": "rgb(var(--ip-orange-2) / <alpha-value>)",       // orange text (adapts per theme for legibility)
+          "orange-fill": "rgb(var(--ip-orange-fill) / <alpha-value>)", // solid fill for white-text buttons — stays #9e4300 in both themes
           recovery: "rgb(var(--ip-recovery) / <alpha-value>)",        // recovered margin (green text)
           "recovery-2": "rgb(var(--ip-recovery-2) / <alpha-value>)",
           risk: "rgb(var(--ip-risk) / <alpha-value>)",                // time-bar / error
           "risk-bg": "rgb(var(--ip-risk-bg) / <alpha-value>)",
+        },
+
+        // ---- "vq" = VariationIQ design reference (/dashboard-v2 only) ----
+        // Resolves from custom properties scoped to `.vq-root`, NOT :root — see
+        // components/v2/vq.css. A new namespace, so no existing utility changes.
+        // amber is a NON-TEXT accent (indicator bars, chart fill, dark focus
+        // ring): white on #F5A623 is ~2.0:1. Amber text uses `med` (#8A5D06).
+        vq: {
+          bg: "rgb(var(--vq-bg) / <alpha-value>)",
+          card: "rgb(var(--vq-card) / <alpha-value>)",
+          line: "rgb(var(--vq-line) / <alpha-value>)",
+          ink: "rgb(var(--vq-ink) / <alpha-value>)",
+          "ink-2": "rgb(var(--vq-ink-2) / <alpha-value>)",
+          navy: "rgb(var(--vq-navy) / <alpha-value>)",            // adaptive: text/icons, lightens in dark
+          "navy-fill": "rgb(var(--vq-navy-fill) / <alpha-value>)", // solid fill behind white text
+          amber: "rgb(var(--vq-amber) / <alpha-value>)",
+          high: "rgb(var(--vq-high) / <alpha-value>)",
+          "high-bg": "rgb(var(--vq-high-bg) / <alpha-value>)",
+          med: "rgb(var(--vq-med) / <alpha-value>)",
+          "med-bg": "rgb(var(--vq-med-bg) / <alpha-value>)",
+          low: "rgb(var(--vq-low) / <alpha-value>)",
+          "low-bg": "rgb(var(--vq-low-bg) / <alpha-value>)",
         },
       },
       borderRadius: {
@@ -51,6 +74,9 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-inter)", "SF Pro Display", "-apple-system", "system-ui", "Segoe UI", "Roboto", "sans-serif"],
         ip: ["var(--font-public-sans)", "Public Sans", "system-ui", "Segoe UI", "sans-serif"],
+        // Declared via @font-face in components/v2/vq.css (self-hosted from
+        // public/fonts/), so /dashboard-v2 needs no next/font entry in layout.tsx.
+        vq: ['"VQ Roboto"', "Roboto", "system-ui", "Segoe UI", "sans-serif"],
       },
       letterSpacing: { tighter: "-0.02em", tightest: "-0.04em", display: "-0.025em" },
       boxShadow: {

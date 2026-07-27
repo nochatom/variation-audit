@@ -35,12 +35,31 @@ const POSTHOG_ASSETS_DESTINATION = "https://eu-assets.i.posthog.com";
 // can't be embedded in HTML generated once at build time, and forcing every
 // route to render dynamically just for CSP purity isn't worth the cost here
 // (verified: no nonce-based approach works without that trade-off). This is
-// a known, common limitation for Next.js App Router CSPs. style-src has no
-// such exception — verified no inline <style> is ever emitted.
+// a known, common limitation for Next.js App Router CSPs.
+//
+// style-src needs it too. React renders the `style` prop as an inline style
+// ATTRIBUTE, and CSP hashes/nonces do not apply to style attributes (only to
+// <style> elements) — so 'self' alone silently blocks every dynamic style in
+// the app. That is not cosmetic: the analysis progress bar's width={pct%},
+// the Logo's height/width, and the marketing hero's staggered animationDelay
+// are all computed values that cannot be static Tailwind classes. Verified in
+// a real browser: without 'unsafe-inline' Chrome logs ~15 "Applying inline
+// style violates ... 'style-src self'" errors per page load and drops those
+// styles. (An earlier version of this comment claimed no inline styles were
+// ever emitted — that was measured before those components existed.)
+//
+// 'unsafe-eval' is DEV-ONLY. React's development build uses eval() for
+// debugging features (reconstructing callstacks across environments) and logs
+// a console error on every load without it; React never uses eval() in the
+// production build, so production keeps the stricter policy. Gating on
+// NODE_ENV rather than adding it outright avoids paying a real security cost
+// for a dev-only convenience.
+const IS_DEV = process.env.NODE_ENV !== "production";
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
-  "style-src 'self'",
+  `script-src 'self' 'unsafe-inline'${IS_DEV ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "font-src 'self'",
   `connect-src 'self' ${API_ORIGIN} ${SENTRY_INGEST_ORIGIN}${SUPABASE_ORIGIN ? ` ${SUPABASE_ORIGIN}` : ""}`,
