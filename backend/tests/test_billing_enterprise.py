@@ -1,4 +1,4 @@
-"""Enterprise billing (.24): webhook idempotency, plan-limit enforcement,
+﻿"""Enterprise billing (.24): webhook idempotency, plan-limit enforcement,
 grace period, seat-based billing, feature flags, billing audit trail, RBAC.
 """
 import uuid
@@ -53,7 +53,7 @@ class _RaceSession(FakeSession):
     """Simulates a concurrent duplicate webhook delivery winning the race:
     the dedup lookup says "not seen yet" for both requests, but the second
     request's reservation hits the stripe_events unique-key violation when
-    flushed (the reservation is flushed — taking the row lock — before the
+    flushed (the reservation is flushed â€” taking the row lock â€” before the
     event is actually applied; see handle_webhook_event's docstring)."""
 
     def __init__(self, *, results=None):
@@ -92,14 +92,14 @@ def test_webhook_duplicate_event_already_recorded_is_ignored():
     session = FakeSession(get_obj=existing_event)  # StripeEvent lookup: already processed
     event = {"id": "evt_1", "type": "invoice.paid", "data": {"object": {"id": "in_1"}}}
     billing_service.handle_webhook_event(session, event)
-    # No further processing at all — no queries, no new rows.
+    # No further processing at all â€” no queries, no new rows.
     assert session.added == []
     assert session.commits == 0
 
 
 def test_webhook_concurrent_duplicate_caught_by_integrity_error():
     """Two requests both pass the "not seen yet" check at the same time;
-    only one may actually record the event — the loser's commit fails with
+    only one may actually record the event â€” the loser's commit fails with
     IntegrityError and must back off cleanly rather than double-apply."""
     session = _RaceSession(results=[FakeResult(scalar=None), FakeResult(scalar=None)])
     event = {"id": "evt_1", "type": "invoice.paid", "data": {"object": {"id": "in_1", "subscription": "sub_abc"}}}
@@ -110,7 +110,7 @@ def test_webhook_concurrent_duplicate_caught_by_integrity_error():
 
 def test_webhook_missing_event_id_still_processes_but_skips_dedup():
     """Defensive: an event with no id (shouldn't happen with real Stripe, but
-    malformed input must not crash) still gets applied — just without the
+    malformed input must not crash) still gets applied â€” just without the
     idempotency guard, matching the pre-.24 behaviour for such input."""
     cid = uuid.uuid4()
     sub = _sub(cid)
@@ -126,7 +126,7 @@ def test_enforce_document_limit_under_limit_passes():
     cid = uuid.uuid4()
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.free)),
-        FakeResult(scalars=list(range(5))),   # 5 documents so far this month
+        FakeResult(scalar=5),   # COUNT: 5 documents so far this month
     ])
     billing_service.enforce_document_limit(session, cid, additional=1)  # 6 <= 20, fine
 
@@ -135,7 +135,7 @@ def test_enforce_document_limit_over_limit_raises_with_code():
     cid = uuid.uuid4()
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.free)),
-        FakeResult(scalars=list(range(20))),  # already at the Free cap
+        FakeResult(scalar=20),  # COUNT: already at the Free cap
     ])
     with pytest.raises(billing_service.PlanLimitExceeded) as ei:
         billing_service.enforce_document_limit(session, cid, additional=1)
@@ -152,7 +152,7 @@ def test_enforce_analysis_limit_over_limit_raises():
     cid = uuid.uuid4()
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.free)),
-        FakeResult(scalars=list(range(5))),  # already at the Free cap of 5/month
+        FakeResult(scalar=5),  # COUNT: already at the Free cap of 5/month
     ])
     with pytest.raises(billing_service.PlanLimitExceeded) as ei:
         billing_service.enforce_analysis_limit(session, cid)
@@ -165,7 +165,7 @@ def test_enforce_storage_limit_over_limit_raises():
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.free)),
         # storage_bytes_used() is ONE combined execute (doc blobs + project
-        # contract/scope text) → one scalar, nearly at the 500MB cap.
+        # contract/scope text) â†’ one scalar, nearly at the 500MB cap.
         FakeResult(scalar=free_limit_bytes - 100),
     ])
     with pytest.raises(billing_service.PlanLimitExceeded) as ei:
@@ -174,7 +174,7 @@ def test_enforce_storage_limit_over_limit_raises():
 
 
 def test_storage_bytes_used_is_single_authoritative_calc():
-    """storage_bytes_used is the one source of truth used by enforcement —
+    """storage_bytes_used is the one source of truth used by enforcement â€”
     it resolves to a single aggregated scalar (documents + project text),
     computed live so it needs no separate usage counter to keep in sync."""
     cid = uuid.uuid4()
@@ -201,7 +201,7 @@ def test_enforce_seat_limit_over_limit_raises():
     cid = uuid.uuid4()
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.free)),
-        FakeResult(scalars=list(range(3))),  # already at the Free cap of 3 seats
+        FakeResult(scalar=3),  # COUNT: already at the Free cap of 3 seats
     ])
     with pytest.raises(billing_service.PlanLimitExceeded) as ei:
         billing_service.enforce_seat_limit(session, cid)
@@ -213,7 +213,7 @@ def test_enforce_seat_limit_respects_included_seats_override():
     sub = _sub(cid, plan=PlanTier.free, included_seats=10)  # negotiated override
     session = FakeSession(results=[
         FakeResult(scalar=sub),
-        FakeResult(scalars=list(range(5))),
+        FakeResult(scalar=5),
     ])
     billing_service.enforce_seat_limit(session, cid)  # 6 <= 10, fine despite Free's default of 3
 
@@ -304,7 +304,7 @@ def test_get_seats_free_plan():
     cid = uuid.uuid4()
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.free)),
-        FakeResult(scalars=list(range(2))),
+        FakeResult(scalar=2),
     ])
     seats = billing_service.get_seats(session, cid)
     assert seats == {"current_seats": 2, "included_seats": 3, "billable_seats": 0, "additional_seats": 0}
@@ -314,7 +314,7 @@ def test_get_seats_over_included_reports_billable():
     cid = uuid.uuid4()
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.pro)),
-        FakeResult(scalars=list(range(20))),
+        FakeResult(scalar=20),
     ])
     seats = billing_service.get_seats(session, cid)
     assert seats["included_seats"] == 15
@@ -325,7 +325,7 @@ def test_get_seats_enterprise_unlimited():
     cid = uuid.uuid4()
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.enterprise)),
-        FakeResult(scalars=list(range(500))),
+        FakeResult(scalar=500),
     ])
     seats = billing_service.get_seats(session, cid)
     assert seats["included_seats"] is None
@@ -350,7 +350,7 @@ def test_enforce_seat_limit_blocks_free_even_with_overage_configured(monkeypatch
     cid = uuid.uuid4()
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.free)),
-        FakeResult(scalars=list(range(3))),
+        FakeResult(scalar=3),
     ])
     with pytest.raises(billing_service.PlanLimitExceeded):
         billing_service.enforce_seat_limit(session, cid)
@@ -367,7 +367,7 @@ def test_enforce_seat_limit_blocks_pro_without_overage_price_configured(monkeypa
     sub = _sub(cid, plan=PlanTier.pro, stripe_subscription_id="sub_abc")
     session = FakeSession(results=[
         FakeResult(scalar=sub),
-        FakeResult(scalars=list(range(15))),
+        FakeResult(scalar=15),
     ])
     try:
         with pytest.raises(billing_service.PlanLimitExceeded):
@@ -384,7 +384,7 @@ def test_enforce_seat_limit_allows_overage_for_paid_plan_with_live_subscription(
     sub = _sub(cid, plan=PlanTier.pro, stripe_subscription_id="sub_abc")
     session = FakeSession(results=[
         FakeResult(scalar=sub),
-        FakeResult(scalars=list(range(15))),  # already at the 15-seat included cap
+        FakeResult(scalar=15),  # COUNT: already at the 15-seat included cap
     ])
     billing_service.enforce_seat_limit(session, cid)  # 16th seat allowed through as overage
     get_settings.cache_clear()
@@ -401,7 +401,7 @@ def test_get_seats_syncs_overage_quantity_to_stripe(monkeypatch):
     sub = _sub(cid, plan=PlanTier.pro, stripe_subscription_id="sub_abc")
     session = FakeSession(results=[
         FakeResult(scalar=sub),
-        FakeResult(scalars=list(range(20))),  # 5 seats over the 15 included
+        FakeResult(scalar=20),  # COUNT: 5 seats over the 15 included
     ])
     seats = billing_service.get_seats(session, cid)
     assert seats["billable_seats"] == 5
@@ -426,7 +426,7 @@ def test_get_seats_overage_sync_failure_does_not_break_the_view(monkeypatch):
     sub = _sub(cid, plan=PlanTier.pro, stripe_subscription_id="sub_abc")
     session = FakeSession(results=[
         FakeResult(scalar=sub),
-        FakeResult(scalars=list(range(20))),
+        FakeResult(scalar=20),
     ])
     seats = billing_service.get_seats(session, cid)  # must not raise
     assert seats["billable_seats"] == 5
@@ -440,7 +440,7 @@ def test_enforce_project_limit_free_over_cap_raises():
     cid = uuid.uuid4()
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.free)),
-        FakeResult(scalars=list(range(1))),  # already at Free's 1-project cap
+        FakeResult(scalar=1),  # COUNT: already at Free's 1-project cap
     ])
     with pytest.raises(billing_service.PlanLimitExceeded) as ei:
         billing_service.enforce_project_limit(session, cid)
@@ -451,7 +451,7 @@ def test_enforce_project_limit_pro_under_cap_passes():
     cid = uuid.uuid4()
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.pro)),
-        FakeResult(scalars=list(range(24))),
+        FakeResult(scalar=24),
     ])
     billing_service.enforce_project_limit(session, cid)  # 25 <= 25, fine
 

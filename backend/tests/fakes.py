@@ -27,6 +27,11 @@ class FakeResult:
         return self._scalar
 
     def scalar_one(self):
+        # Deliberately returns only what the test supplied. It must NOT fall
+        # back to len(self._scalars): a COUNT query is now the thing under
+        # test, and inferring its result from however many rows happen to be
+        # staged would let a query with a wrong or missing WHERE clause pass.
+        # Tests that exercise a count pass `scalar=N` explicitly.
         return self._scalar
 
     def scalars(self):

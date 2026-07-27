@@ -78,9 +78,11 @@ def test_get_usage_counts_real_rows_against_plan_limits():
                        status=SubscriptionStatus.active)
     session = FakeSession(results=[
         FakeResult(scalar=sub),                       # get_or_create_subscription
-        FakeResult(scalars=list(range(7))),           # document count
-        FakeResult(scalars=list(range(2))),           # analysis job count
-        FakeResult(scalars=list(range(1))),           # active project count
+        # These three are SELECT COUNT(...) queries, so the fake returns the
+        # count itself rather than rows to be measured.
+        FakeResult(scalar=7),                         # document count
+        FakeResult(scalar=2),                         # analysis usage-event count
+        FakeResult(scalar=1),                         # active project count
     ])
     usage = billing_service.get_usage(session, cid)
     assert usage["plan"] == "free"
