@@ -447,35 +447,26 @@ export function CtaBanner() {
    the top of the page you were already on. The header nav dropped that same
    link earlier, and a footer that contradicts the header is worse than one
    link short. */
-const FOOTER_COLUMNS: { label: string; links: { title: string; href: string }[] }[] = [
-  {
-    label: "Product",
-    links: [
-      { title: "How it works", href: "/#how" },
-      { title: "Capabilities", href: "/#capabilities" },
-      { title: "Pricing", href: "/pricing" },
-    ],
-  },
-  {
-    label: "Company",
-    links: [
-      { title: "About", href: "/about" },
-      { title: "Privacy Policy", href: "/privacy" },
-      { title: "Terms of Service", href: "/terms" },
-    ],
-  },
+/* One flat row rather than two labelled columns. "Product" and "Company" each
+   spent a heading row organising three items — more chrome than content at this
+   link count. FAQ is included because it is otherwise reachable only from the
+   bottom of /pricing. */
+const FOOTER_LINKS: { title: string; href: string }[] = [
+  { title: "How it works", href: "/#how" },
+  { title: "Capabilities", href: "/#capabilities" },
+  { title: "Pricing", href: "/pricing" },
+  { title: "FAQ", href: "/faq" },
+  { title: "About", href: "/about" },
+  { title: "Privacy", href: "/privacy" },
+  { title: "Terms", href: "/terms" },
 ];
 
 export function SiteFooter() {
   return (
     <footer className="relative border-t border-ip-line">
       <div className="mx-auto max-w-[1440px] px-6 py-12 sm:px-12 lg:px-16">
-        {/* Track count now matches the child count — brand + two columns.
-            The link columns stay side by side on mobile: stacking them made the
-            footer taller than the four-column version it replaced (769px vs
-            617px), which is the opposite of the point. */}
-        <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-[1.6fr_1fr_1fr] sm:gap-8">
-          <div className="col-span-2 sm:col-span-1">
+        <div className="grid gap-8 sm:grid-cols-[1.5fr_1fr] sm:gap-10">
+          <div>
             <Link
               href="/"
               className="-ml-2 flex min-h-[44px] w-fit items-center gap-2.5 rounded-md px-2"
@@ -496,30 +487,58 @@ export function SiteFooter() {
             </a>
           </div>
 
-          {FOOTER_COLUMNS.map((col) => (
-            <div key={col.label}>
-              <h3 className="text-[12px] font-semibold uppercase tracking-wide text-ip-ink-3">{col.label}</h3>
-              {/* Rows are 44px tall with the type unchanged: the hit area grows,
-                  the visual density doesn't. */}
-              <ul className="mt-1">
-                {col.links.map((link) => (
-                  <li key={link.title}>
-                    <Link
-                      href={link.href}
-                      className="flex min-h-[44px] items-center text-[13px] text-ip-ink-2 transition-colors hover:text-ip-ink"
-                    >
-                      {link.title}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {/* Rows stay 44px tall with the type unchanged: the hit area is
+              generous, the visual density isn't. */}
+          <nav className="flex flex-wrap gap-x-7 gap-y-0" aria-label="Footer">
+            {FOOTER_LINKS.map((link) => (
+              <Link
+                key={link.title}
+                href={link.href}
+                className="inline-flex min-h-[44px] items-center text-[13.5px] text-ip-ink-2 transition-colors hover:text-ip-ink"
+              >
+                {link.title}
+              </Link>
+            ))}
+          </nav>
         </div>
 
-        <div className="mt-10 flex flex-col gap-2 border-t border-ip-line pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[12px] text-ip-ink-3">© {new Date().getFullYear()} VariationIQ · Estimates only — not legal advice.</p>
-          <p className="text-[12px] text-ip-ink-3">Sydney, Australia</p>
+        {/* Trust band. This footer sits on every page, and the question a
+            commercial manager has before uploading head-contract correspondence
+            is where it goes and who sees it — not which marketing page to read
+            next. Residency is stated because the API already reports it
+            (GET /health → region). Nothing here asserts anything unverified:
+            the retention-on-downgrade answer is still in FAQ_DRAFTS and stays
+            out until it is confirmed. */}
+        <dl className="mt-10 grid gap-x-10 gap-y-5 border-t border-ip-line pt-6 sm:grid-cols-2">
+          <div>
+            <dt className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-ip-ink-3">Your data</dt>
+            <dd className="mt-1 text-[13px] leading-relaxed text-ip-ink-2">
+              Stored in Australia — <span className="font-mono text-[11.5px]">ap-southeast-2</span> (Sydney).
+              Each analysis is isolated to your workspace, and your documents are never used to
+              train AI models.
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-ip-ink-3">Company</dt>
+            <dd className="mt-1 text-[13px] leading-relaxed text-ip-ink-2">
+              VariationIQ<br />
+              Sydney, New South Wales
+            </dd>
+          </div>
+        </dl>
+
+        {/* Was a clause on the end of the copyright line, at 12px in tertiary
+            ink. For a product that surfaces contractual entitlement this is the
+            most consequential sentence in the footer, so it is set as one. */}
+        <p className="mt-6 max-w-[78ch] rounded-lg border border-ip-line border-l-[3px] border-l-ip-ink-3 bg-ip-card px-4 py-3 text-[13px] leading-relaxed text-ip-ink-2">
+          <strong className="font-semibold text-ip-ink">Not legal advice.</strong> VariationIQ reads
+          your project record and shows you what it finds. Whether to claim, how to frame
+          entitlement, and what a contract clause means in your circumstances are decisions for your
+          commercial and legal team.
+        </p>
+
+        <div className="mt-6 border-t border-ip-line pt-5">
+          <p className="text-[12px] text-ip-ink-3">© {new Date().getFullYear()} VariationIQ</p>
         </div>
       </div>
     </footer>
