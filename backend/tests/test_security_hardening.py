@@ -252,3 +252,25 @@ def test_non_admin_cannot_reach_admin_only_endpoint():
         assert resp.status_code == 403
     finally:
         app.dependency_overrides.clear()
+
+
+def test_jwt_secret_strength_validation(monkeypatch):
+    """Enforce that settings fail to load if VA_JWT_SECRET is weak."""
+    from pydantic import ValidationError
+    from app.config import Settings, get_settings
+
+    # Clear cache so we can construct fresh Settings
+    get_settings.cache_clear()
+
+    # 1. Test weak key
+    monkeypatch.setenv("VA_JWT_SECRET", "weakkey")
+    with pytest.raises(ValidationError) as exc_info:
+        Settings()
+    assert "VA_JWT_SECRET is too weak" in str(exc_info.value)
+
+    # 2. Test strong key (>= 32 characters)
+    monkeypatch.setenv("VA_JWT_SECRET", "this-is-a-strong-jwt-secret-key-32-chars-long")
+    settings = Settings()
+    assert settings.jwt_secret == "this-is-a-strong-jwt-secret-key-32-chars-long"
+
+    get_settings.cache_clear()
