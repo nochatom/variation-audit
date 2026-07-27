@@ -51,8 +51,11 @@ const ITEMS: FaqItem[] = [
     id: "model-training",
     group: "data",
     q: "Do you train AI models on our documents?",
-    a: "No. Documents are processed to produce your analyses and are not used to train models.",
-    draft: true,
+    a:
+      "No. Customer data and uploaded documents are never used to train AI models. Each analysis " +
+      "is isolated to your workspace — your documents are read to produce your result and nothing " +
+      "else.",
+    pricing: true,
   },
   {
     id: "data-on-downgrade",

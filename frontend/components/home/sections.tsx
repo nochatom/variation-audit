@@ -507,14 +507,15 @@ export function SiteFooter() {
             is where it goes and who sees it — not which marketing page to read
             next. Residency is stated because the API already reports it
             (GET /health → region). Nothing here asserts anything unverified:
-            retention and model-training answers are still in FAQ_DRAFTS and
-            deliberately absent until confirmed. */}
+            the retention-on-downgrade answer is still in FAQ_DRAFTS and stays
+            out until it is confirmed. */}
         <dl className="mt-10 grid gap-x-10 gap-y-5 border-t border-ip-line pt-6 sm:grid-cols-2">
           <div>
             <dt className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-ip-ink-3">Your data</dt>
             <dd className="mt-1 text-[13px] leading-relaxed text-ip-ink-2">
               Stored in Australia — <span className="font-mono text-[11.5px]">ap-southeast-2</span> (Sydney).
-              Scoped to your organisation and not visible to other customers.
+              Each analysis is isolated to your workspace, and your documents are never used to
+              train AI models.
             </dd>
           </div>
           <div>
