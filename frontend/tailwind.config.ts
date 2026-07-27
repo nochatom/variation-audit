@@ -44,6 +44,9 @@ const config: Config = {
           "recovery-2": "rgb(var(--ip-recovery-2) / <alpha-value>)",
           risk: "rgb(var(--ip-risk) / <alpha-value>)",                // time-bar / error
           "risk-bg": "rgb(var(--ip-risk-bg) / <alpha-value>)",
+          "recovery-bg": "rgb(var(--ip-recovery-bg) / <alpha-value>)", // tint behind recovery text — completes the pair risk already had
+          warn: "rgb(var(--ip-warn) / <alpha-value>)",                 // middle severity, TEXT-SAFE (unlike orange) — 6.45:1 on card
+          "warn-bg": "rgb(var(--ip-warn-bg) / <alpha-value>)",
         },
 
         // ---- "vq" = VariationIQ design reference (/dashboard-v2 only) ----
