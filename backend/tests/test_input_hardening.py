@@ -1,5 +1,6 @@
 """OWASP hardening: input validation limits, upload size caps, rate limiting."""
 import uuid
+import pytest
 
 from fastapi.testclient import TestClient
 
@@ -45,6 +46,30 @@ def test_oversized_rfi_csv_upload_rejected():
     oversized = b"a" * (11 * 1024 * 1024)  # 11MB > 10MB cap; content need not parse
     resp = client.post(f"/projects/{project.id}/rfis", files={"file": ("rfis.csv", oversized, "text/csv")})
     assert resp.status_code == 413
+
+
+@pytest.mark.parametrize("endpoint", ["rfis", "comms", "site-instructions", "meeting-minutes"])
+def test_csv_upload_endpoints_reject_invalid_inputs(endpoint):
+    # 1. Reject non-CSV extension
+    client, project = _project_client()
+    resp = client.post(f"/projects/{project.id}/{endpoint}",
+                       files={"file": ("test.txt", b"header,val", "text/csv")})
+    assert resp.status_code == 400
+    assert "only CSV files (.csv) are allowed" in resp.json()["error"]["message"]
+
+    # 2. Reject mismatched/invalid content type
+    client, project = _project_client()
+    resp = client.post(f"/projects/{project.id}/{endpoint}",
+                       files={"file": ("test.csv", b"header,val", "text/html")})
+    assert resp.status_code == 400
+    assert "invalid CSV content type" in resp.json()["error"]["message"]
+
+    # 3. Reject empty file
+    client, project = _project_client()
+    resp = client.post(f"/projects/{project.id}/{endpoint}",
+                       files={"file": ("test.csv", b"", "text/csv")})
+    assert resp.status_code == 400
+    assert "uploaded file is empty" in resp.json()["error"]["message"]
 
 
 # -- upload parse hardening (.26 security fixes) ------------------------------

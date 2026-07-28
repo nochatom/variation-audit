@@ -47,6 +47,17 @@ def _parse_or_400(parse_fn, *args):
 # filename with a non-PDF content type is rejected before parsing.
 _PDF_CONTENT_TYPES = {"application/pdf", "application/x-pdf", "application/octet-stream"}
 
+# Content types browsers legitimately send for CSV register uploads.
+_CSV_CONTENT_TYPES = {
+    "text/csv",
+    "application/csv",
+    "text/x-csv",
+    "application/x-csv",
+    "text/plain",
+    "application/vnd.ms-excel",
+    "application/octet-stream",
+}
+
 
 async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
     """Read an upload, rejecting it (413) if it exceeds max_bytes.
@@ -68,6 +79,28 @@ async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
             )
         chunks.append(chunk)
     return b"".join(chunks)
+
+
+async def _validate_and_read_csv(file: UploadFile) -> bytes:
+    """Validate CSV upload (extension, content-type, size, empty file) and read its content."""
+    filename = file.filename or ""
+    if not filename.lower().endswith(".csv"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "only CSV files (.csv) are allowed",
+        )
+    if file.content_type and file.content_type not in _CSV_CONTENT_TYPES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "file has a .csv name but an invalid CSV content type",
+        )
+    data = await _read_capped(file, MAX_CSV_BYTES)
+    if not data:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "uploaded file is empty",
+        )
+    return data
 
 
 # ---- schemas -------------------------------------------------------------
@@ -374,7 +407,8 @@ async def upload_comms(request: Request, response: Response,
                        user: User = Depends(get_current_user),
                        session: Session = Depends(get_db)) -> CommsUploadResponse:
     project = _load_project(session, user, project_id)
-    rows = _parse_or_400(parsing.parse_comms_csv, await _read_capped(file, MAX_CSV_BYTES))
+    data = await _validate_and_read_csv(file)
+    rows = _parse_or_400(parsing.parse_comms_csv, data)
     _check_upload_limits(session, project.company_id, rows)
     store = build_loader()
     for r in rows:
@@ -400,7 +434,8 @@ async def upload_rfis(request: Request, response: Response,
                       store=Depends(get_store)) -> RfiUploadResponse:
     """Ingest an RFI register CSV — one source_type=rfi Document per RFI row."""
     project = _load_project(session, user, project_id)
-    rows = _parse_or_400(parsing.parse_rfi_csv, await _read_capped(file, MAX_CSV_BYTES))
+    data = await _validate_and_read_csv(file)
+    rows = _parse_or_400(parsing.parse_rfi_csv, data)
     _check_upload_limits(session, project.company_id, rows)
     for r in rows:
         project_service.add_document(
@@ -426,7 +461,8 @@ async def upload_site_instructions(request: Request, response: Response,
                                    store=Depends(get_store)) -> SiteInstructionUploadResponse:
     """Ingest a site-instruction register CSV — one source_type=site_instruction Document per row."""
     project = _load_project(session, user, project_id)
-    rows = _parse_or_400(parsing.parse_site_instructions_csv, await _read_capped(file, MAX_CSV_BYTES))
+    data = await _validate_and_read_csv(file)
+    rows = _parse_or_400(parsing.parse_site_instructions_csv, data)
     _check_upload_limits(session, project.company_id, rows)
     for r in rows:
         project_service.add_document(
@@ -452,7 +488,8 @@ async def upload_meeting_minutes(request: Request, response: Response,
                                  store=Depends(get_store)) -> MeetingMinutesUploadResponse:
     """Ingest a meeting-minutes register CSV — one source_type=meeting_note Document per item."""
     project = _load_project(session, user, project_id)
-    rows = _parse_or_400(parsing.parse_meeting_minutes_csv, await _read_capped(file, MAX_CSV_BYTES))
+    data = await _validate_and_read_csv(file)
+    rows = _parse_or_400(parsing.parse_meeting_minutes_csv, data)
     _check_upload_limits(session, project.company_id, rows)
     for r in rows:
         project_service.add_document(
