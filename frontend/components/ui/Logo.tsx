@@ -1,23 +1,48 @@
 /**
- * Canonical VariationIQ brand mark — the single source of truth for the icon
- * in the navbar, footer, dashboard sidebar, login/auth and error pages.
+ * Canonical brand mark — the single source of truth for the icon in the
+ * navbar, footer, dashboard sidebar, login/auth and error pages.
  *
- * The mark is the brand monogram: the high-contrast Bodoni "Q" with its
- * squared datum, rendered in white (currentColor) inside the app's existing
- * `bg-ip-navy-fill` square token (theme-aware for free). Outlined vector
- * paths, no font dependency. Source: public/brand/variationiq-appicon.svg.
- * Every call site renders through this one component — see
- * tests/branding-guard.test.ts for the regression guard.
+ * The mark is the Breakline: two datum runs at different reduced levels joined
+ * by a descending riser, terminated with staff ticks. Runs are deliberately
+ * unequal (46 : 28) so it reads as a change in level rather than a stair tread,
+ * and the riser descends because a breakline records a drop.
+ *
+ * Two cuts, switched on `size`:
+ *   • primary (>= 24px) — stroke 7, butt caps, staff ticks at both ends
+ *   • small   (<  24px) — stroke 10, ticks removed; at 16px the primary's
+ *     stroke lands at 1.12px and the ticks close up against the runs
+ *
+ * Rendered as vector paths in the app's existing `bg-ip-navy-fill` square
+ * (theme-aware for free) — no font dependency, no file fetch. Every call site
+ * renders through this one component; see tests/branding-guard.test.ts.
+ *
+ * Geometry mirrors public/brand/breakline-primary.svg and breakline-small.svg,
+ * which are reference copies only — nothing loads them at runtime, so a change
+ * there does NOT reach the app unless the paths below change too.
  */
+const SMALL_CUT_BELOW = 24;
+
 export function LogoMark({ size = 28, className = "" }: { size?: number; className?: string }) {
+  const small = size < SMALL_CUT_BELOW;
   return (
     <span
       className={`grid shrink-0 place-items-center overflow-hidden rounded-md bg-ip-navy-fill text-white ${className}`}
       style={{ height: size, width: size }}
     >
-      <svg viewBox="0 0 100 100" width={size} height={size} fill="currentColor" aria-hidden="true">
-        <g transform="translate(25.83,65.73) scale(0.03333,-0.03333)"><path d="M1225 -373V-424Q1191 -428 1118 -428Q934 -428 751.5 -336.5Q569 -245 569 0Q354 72 228.0 265.5Q102 459 102 674Q102 948 288.0 1160.0Q474 1372 727 1372Q962 1372 1155.0 1167.0Q1348 962 1348 680Q1348 450 1204.0 249.0Q1060 48 850 0Q850 -218 923.5 -296.5Q997 -375 1225 -373ZM729 1321Q618 1321 525.5 1265.0Q433 1209 407.0 1083.0Q381 957 381 639Q381 423 398.0 301.5Q415 180 489.5 100.0Q564 20 725 20Q845 20 931.5 82.5Q1018 145 1043.5 284.5Q1069 424 1069 717Q1069 998 1035.5 1111.5Q1002 1225 909.5 1273.0Q817 1321 729 1321Z" fill="currentColor"/></g>
-        <rect x="47.72" y="53.72" width="4.57" height="4.57" fill="currentColor"/>
+      <svg
+        viewBox="0 0 100 100" width={size} height={size}
+        fill="none" stroke="currentColor" strokeLinejoin="miter" strokeMiterlimit={10}
+        aria-hidden="true"
+      >
+        {small ? (
+          <path d="M12 30 H59 V70 H88" strokeWidth={10} strokeLinecap="square" />
+        ) : (
+          <g strokeWidth={7} strokeLinecap="butt">
+            <path d="M13 30 H59 V70 H87" />
+            <path d="M13 20 V40" />
+            <path d="M87 60 V80" />
+          </g>
+        )}
       </svg>
     </span>
   );

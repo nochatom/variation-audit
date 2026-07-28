@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Breakline mark">
+  <title>Breakline mark — small cut, below 24px</title>
+  <!-- REFERENCE COPY ONLY. Nothing in the app loads this file: the mark is
+       rendered from vector paths inside components/ui/Logo.tsx, and the
+       favicon has its own copy in app/icon.svg. Editing this file does NOT
+       change the app.
+
+       Ticks removed and stroke opened to 10, holding the run ratio. Use below
+       24px — favicon, app badge, embroidery, etch — where the primary cut's
+       stroke lands near 1px and its ticks close up against the runs. -->
+  <g fill="none" stroke="currentColor" stroke-width="10"
+     stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="10">
+    <path d="M12 30 H59 V70 H88"/>
+  </g>
+</svg>

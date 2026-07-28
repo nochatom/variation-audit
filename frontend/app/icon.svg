@@ -1,7 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="VariationIQ">
   <rect x="4" y="4" width="92" height="92" rx="21" fill="#051125"/>
-  <g fill="#FFFFFF">
-    <g transform="translate(25.83,65.73) scale(0.03333,-0.03333)"><path d="M1225 -373V-424Q1191 -428 1118 -428Q934 -428 751.5 -336.5Q569 -245 569 0Q354 72 228.0 265.5Q102 459 102 674Q102 948 288.0 1160.0Q474 1372 727 1372Q962 1372 1155.0 1167.0Q1348 962 1348 680Q1348 450 1204.0 249.0Q1060 48 850 0Q850 -218 923.5 -296.5Q997 -375 1225 -373ZM729 1321Q618 1321 525.5 1265.0Q433 1209 407.0 1083.0Q381 957 381 639Q381 423 398.0 301.5Q415 180 489.5 100.0Q564 20 725 20Q845 20 931.5 82.5Q1018 145 1043.5 284.5Q1069 424 1069 717Q1069 998 1035.5 1111.5Q1002 1225 909.5 1273.0Q817 1321 729 1321Z"/></g>
-    <rect x="47.72" y="53.72" width="4.57" height="4.57"/>
-  </g>
+  <!-- Breakline, small cut: ticks removed and stroke opened to 10, because a
+       favicon renders at 16-32px where the primary cut's 7-wide stroke lands
+       near 1px and its staff ticks close up against the runs. Mirrors the
+       small branch of LogoMark in components/ui/Logo.tsx. -->
+  <path d="M12 30 H59 V70 H88" fill="none" stroke="#FFFFFF" stroke-width="10"
+        stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="10"/>
 </svg>

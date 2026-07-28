@@ -97,14 +97,16 @@ describe("branding regression guard", () => {
     // placeholder pattern above.
     // These must track whatever glyph LogoMark actually draws. They were left
     // pointing at the retired "V" + sparkle artwork after the mark changed to
-    // the Bodoni Q, so the check passed without guarding anything.
+    // the Bodoni Q, so the check passed without guarding anything — and had to
+    // be updated again when the mark became the Breakline. If you change the
+    // artwork, change these in the same commit or this test guards nothing.
     //
-    // The Q outline itself cannot serve as the signature: Wordmark.tsx draws
-    // "VariationIQ" from the same Bodoni source, so that exact path legitimately
-    // appears there too. The squared datum is drawn only by the mark, which
-    // makes it the one fragment that uniquely identifies a copied LogoMark.
+    // The runs cannot serve as the signature on their own: the small cut's
+    // "M12 30 H59 V70 H88" also lives in app/icon.svg by design. The staff tick
+    // is drawn only by the primary cut inside LogoMark, which makes it the one
+    // fragment that uniquely identifies a copied mark.
     const BRAND_PATH_FRAGMENTS = [
-      'x="47.72" y="53.72"', // the squared datum beside the Q — mark-only
+      "M13 20 V40", // left staff tick — primary cut, mark-only
     ];
     const offenders: string[] = [];
     for (const file of nonLogoFiles) {
@@ -149,10 +151,14 @@ describe("branding regression guard", () => {
     // matches, not merely that a file exists.
     const icon = fs.readFileSync(ICON_SVG, "utf-8");
     const logo = fs.readFileSync(LOGO_COMPONENT, "utf-8");
-    const qOutline = "M1225 -373V-424Q1191 -428 1118 -428";
-    expect(logo, "LogoMark no longer contains the expected Q outline — update both").toContain(qOutline);
-    expect(icon, "favicon artwork has drifted from the canonical LogoMark").toContain(qOutline);
-    expect(icon).toContain('x="47.72" y="53.72"');
+    // A favicon renders at 16-32px, so it draws the small cut — the same path
+    // LogoMark uses below 24px. That shared string is what ties the two
+    // together; if either is re-drawn without the other, this fails.
+    const smallCut = "M12 30 H59 V70 H88";
+    expect(logo, "LogoMark no longer draws the expected Breakline small cut — update both").toContain(smallCut);
+    expect(icon, "favicon artwork has drifted from the canonical LogoMark").toContain(smallCut);
+    // And the favicon must not have quietly reverted to the retired Bodoni Q.
+    expect(icon).not.toContain("M1225 -373V-424");
   });
 
   it("app/icon.svg has no text element, so it never depends on an installed font", () => {
