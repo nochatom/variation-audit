@@ -66,26 +66,19 @@ def verify_supabase_token(token: str) -> SupabaseClaims:
     if not sub or not email:
         raise TokenError("Supabase token missing sub/email claim")
 
-    # TEMPORARY diagnostic (.27 investigation): log the claim shape (keys +
-    # user_metadata keys only, never values — this can contain PII) so we
-    # can see exactly where Google-OAuth logins carry email_verified. Remove
-    # once the real claim path is confirmed and hardcoded below.
-    security_logger.info("supabase token claim shape (diagnostic)", extra={
-        "event": "supabase_claim_shape_diagnostic",
-        "top_level_keys": sorted(payload.keys()),
-        "user_metadata_keys": sorted((payload.get("user_metadata") or {}).keys()),
-        "app_metadata_keys": sorted((payload.get("app_metadata") or {}).keys()),
-        "top_level_email_verified": payload.get("email_verified"),
-        "user_metadata_email_verified": (payload.get("user_metadata") or {}).get("email_verified"),
-        "provider": (payload.get("app_metadata") or {}).get("provider"),
-    })
+    # Robustly resolve email_verified: check the top-level claim, and fall back
+    # to the nested user_metadata field (standard for social/OAuth providers
+    # like Google under Supabase GoTrue), failing closed to False if neither is set.
+    email_verified = payload.get("email_verified")
+    if email_verified is None:
+        user_metadata = payload.get("user_metadata") or {}
+        email_verified = user_metadata.get("email_verified")
+
+    if email_verified is None:
+        email_verified = False
 
     return SupabaseClaims(
-        sub=sub, email=email,
-        # Fail closed: a token without an explicit email_verified claim is
-        # treated as UNVERIFIED. Supabase always emits this claim for both
-        # password and OAuth users, so a legitimate token never hits the
-        # default — only a malformed/unexpected one does, and that must not
-        # be allowed to link into an existing account by email.
-        email_verified=payload.get("email_verified", False),
+        sub=sub,
+        email=email,
+        email_verified=bool(email_verified),
     )
