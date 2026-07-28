@@ -1,18 +1,32 @@
 /**
- * VariationIQ wordmark — high-contrast Bodoni Didone, outlined to portable
+ * VariationiQ wordmark — high-contrast Bodoni Didone, outlined to portable
  * vector paths (no font dependency). fill=currentColor so it inherits the
  * surrounding text colour and adapts to light/dark automatically.
  * Source of truth: public/brand/variationiq-wordmark.svg.
+ *
+ * The tenth glyph is a LOWERCASE i, not a capital I — the brand is
+ * "VariationiQ". It reuses the identical outline already drawn twice in
+ * "Var-i-at-i-on", so the two i's in the word and the one before the Q are the
+ * same shape rather than a redrawn approximation.
+ *
+ * Substituting it re-spaced everything after: the capital I advanced 45.36
+ * units (425.44 -> 470.80), the lowercase i advances 29.79 (165.38 -> 195.17),
+ * so the Q and the datum square shift left by 15.57 and the viewBox narrows by
+ * the same amount. Height is unchanged, so the `height` prop and every call
+ * site behave exactly as before; only the rendered width shrinks slightly.
  */
+const VIEW_W = 561.61;
+const VIEW_H = 130.64;
+
 export function Wordmark({ height = 16, className = "" }: { height?: number; className?: string }) {
   return (
     <svg
-      viewBox="-19.18 -22.16 577.18 130.64"
+      viewBox="-19.18 -22.16 561.61 130.64"
       height={height}
-      width={height * (577.18 / 130.64)}
+      width={height * (VIEW_W / VIEW_H)}
       fill="currentColor"
       role="img"
-      aria-label="VariationIQ"
+      aria-label="VariationiQ"
       className={className}
     >
       <g transform="translate(0.00,66.21) scale(0.04883,-0.04883)"><path d="M45 1341H686V1290H473L821 344H825L1147 1290H930V1341H1405V1290H1200L750 -31H723L225 1290H45Z"/></g>
@@ -24,9 +38,9 @@ export function Wordmark({ height = 16, className = "" }: { height?: number; cla
 <g transform="translate(287.06,66.21) scale(0.04883,-0.04883)"><path d="M188 1186Q188 1230 220.5 1262.0Q253 1294 297 1294Q341 1294 373.5 1262.5Q406 1231 406 1186Q406 1139 374.0 1108.0Q342 1077 297 1077Q252 1077 220.0 1108.5Q188 1140 188 1186ZM389 801V51H520V0H55V51H195V735H55V786H197Q299 786 389 801Z"/></g>
 <g transform="translate(316.85,66.21) scale(0.04883,-0.04883)"><path d="M90 395Q90 568 209.0 689.5Q328 811 504 811Q676 811 795.5 694.5Q915 578 915 403Q915 224 791.0 99.5Q667 -25 498 -25Q332 -25 211.0 96.5Q90 218 90 395ZM690 395Q690 579 677.5 638.0Q665 697 621.5 731.5Q578 766 502 766Q430 766 383.5 730.5Q337 695 326.0 636.0Q315 577 315 393Q315 208 328.5 148.0Q342 88 387.5 54.0Q433 20 502 20Q572 20 618.5 54.5Q665 89 677.5 150.5Q690 212 690 395Z"/></g>
 <g transform="translate(368.55,66.21) scale(0.04883,-0.04883)"><path d="M203 51V735H61V786H152Q287 786 397 801V606H401Q504 811 692 811Q780 811 836.5 766.0Q893 721 913.5 660.0Q934 599 934 471V51H1090V0H606V51H739V551Q739 666 724.5 710.0Q710 754 649 754Q552 754 474.5 654.5Q397 555 397 387V51H528V0H61V51Z"/></g>
-<g transform="translate(425.44,66.21) scale(0.04883,-0.04883)"><path d="M317 51V1290H98V1341H776V1290H555V51H776V0H98V51Z"/></g>
-<g transform="translate(470.80,66.21) scale(0.04883,-0.04883)"><path d="M1225 -373V-424Q1191 -428 1118 -428Q934 -428 751.5 -336.5Q569 -245 569 0Q354 72 228.0 265.5Q102 459 102 674Q102 948 288.0 1160.0Q474 1372 727 1372Q962 1372 1155.0 1167.0Q1348 962 1348 680Q1348 450 1204.0 249.0Q1060 48 850 0Q850 -218 923.5 -296.5Q997 -375 1225 -373ZM729 1321Q618 1321 525.5 1265.0Q433 1209 407.0 1083.0Q381 957 381 639Q381 423 398.0 301.5Q415 180 489.5 100.0Q564 20 725 20Q845 20 931.5 82.5Q1018 145 1043.5 284.5Q1069 424 1069 717Q1069 998 1035.5 1111.5Q1002 1225 909.5 1273.0Q817 1321 729 1321Z"/></g>
-<rect x="502.85" y="48.61" width="6.69" height="6.69"/>
+<g transform="translate(425.44,66.21) scale(0.04883,-0.04883)"><path d="M188 1186Q188 1230 220.5 1262.0Q253 1294 297 1294Q341 1294 373.5 1262.5Q406 1231 406 1186Q406 1139 374.0 1108.0Q342 1077 297 1077Q252 1077 220.0 1108.5Q188 1140 188 1186ZM389 801V51H520V0H55V51H195V735H55V786H197Q299 786 389 801Z"/></g>
+<g transform="translate(455.23,66.21) scale(0.04883,-0.04883)"><path d="M1225 -373V-424Q1191 -428 1118 -428Q934 -428 751.5 -336.5Q569 -245 569 0Q354 72 228.0 265.5Q102 459 102 674Q102 948 288.0 1160.0Q474 1372 727 1372Q962 1372 1155.0 1167.0Q1348 962 1348 680Q1348 450 1204.0 249.0Q1060 48 850 0Q850 -218 923.5 -296.5Q997 -375 1225 -373ZM729 1321Q618 1321 525.5 1265.0Q433 1209 407.0 1083.0Q381 957 381 639Q381 423 398.0 301.5Q415 180 489.5 100.0Q564 20 725 20Q845 20 931.5 82.5Q1018 145 1043.5 284.5Q1069 424 1069 717Q1069 998 1035.5 1111.5Q1002 1225 909.5 1273.0Q817 1321 729 1321Z"/></g>
+<rect x="487.28" y="48.61" width="6.69" height="6.69"/>
     </svg>
   );
 }

@@ -1,7 +1,7 @@
-import { test, expect } from "@playwright/test";
+﻿import { test, expect } from "@playwright/test";
 
 /**
- * Smoke tests — public pages render, key content is present, and navigation
+ * Smoke tests â€” public pages render, key content is present, and navigation
  * works. Runs on both the desktop-chromium and mobile-chromium projects
  * (see playwright.config.ts), so every assertion is implicitly a
  * responsive-viewport check too.
@@ -10,10 +10,10 @@ import { test, expect } from "@playwright/test";
 test.describe("landing page", () => {
   test("renders hero, brand, and primary CTAs", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle(/VariationIQ/);
+    await expect(page).toHaveTitle(/VariationiQ/);
     await expect(page.getByRole("heading", { level: 1 })).toContainText(/variation revenue/i);
     // Brand mark + wordmark (canonical LogoMark).
-    await expect(page.getByRole("link", { name: /VariationIQ home/i }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /VariationiQ home/i }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /Start Free Analysis/i }).first()).toBeVisible();
   });
 
@@ -27,7 +27,7 @@ test.describe("landing page", () => {
 });
 
 test.describe("navigation", () => {
-  test("landing → pricing → login are reachable", async ({ page }) => {
+  test("landing â†’ pricing â†’ login are reachable", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: "Pricing", exact: true }).first().click();
     await expect(page).toHaveURL(/\/pricing/);
@@ -60,7 +60,7 @@ test.describe("pricing page", () => {
   test("renders plans, billing toggle, and Most Popular", async ({ page }) => {
     await page.goto("/pricing");
     await expect(page.getByRole("button", { name: "Monthly", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Annual · 2 months free/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Annual Â· 2 months free/i })).toBeVisible();
     await expect(page.getByText("Most Popular")).toBeVisible();
     await expect(page.getByRole("link", { name: "Contact Sales", exact: true }).first()).toBeVisible();
   });
@@ -68,7 +68,7 @@ test.describe("pricing page", () => {
   test("billing interval toggle switches price period", async ({ page }) => {
     await page.goto("/pricing");
     await expect(page.getByText(/\/ month/i).first()).toBeVisible();
-    await page.getByRole("button", { name: /Annual · 2 months free/i }).click();
+    await page.getByRole("button", { name: /Annual Â· 2 months free/i }).click();
     await expect(page.getByText(/\/ year/i).first()).toBeVisible();
   });
 });

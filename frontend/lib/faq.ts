@@ -1,10 +1,10 @@
-/** The single FAQ source. Consumed by /faq (the full page) and by the pricing
- * page, which renders the `pricing` subset — so an answer can never drift
+﻿/** The single FAQ source. Consumed by /faq (the full page) and by the pricing
+ * page, which renders the `pricing` subset â€” so an answer can never drift
  * between the two places a buyer might read it. */
 export type FaqGroup = "data" | "claims" | "how" | "billing";
 
 export type FaqItem = {
-  /** URL fragment. Stable — support links point at these, so treat a rename
+  /** URL fragment. Stable â€” support links point at these, so treat a rename
    *  as a breaking change. */
   id: string;
   group: FaqGroup;
@@ -13,7 +13,7 @@ export type FaqItem = {
   /** Shown on the pricing page as well as /faq. */
   pricing?: boolean;
   /** Written, but the underlying behaviour has NOT been confirmed against the
-   *  product. Nothing with this flag renders anywhere — see FAQ_DRAFTS below.
+   *  product. Nothing with this flag renders anywhere â€” see FAQ_DRAFTS below.
    *  Confirm the behaviour, delete the flag, and it goes live. A wrong answer
    *  about retention or model training is worse than no answer. */
   draft?: true;
@@ -44,7 +44,7 @@ const ITEMS: FaqItem[] = [
     id: "where-stored",
     group: "data",
     q: "Where is our data stored?",
-    a: "In Australia — ap-southeast-2 (Sydney). Your project record does not leave the region.",
+    a: "In Australia â€” ap-southeast-2 (Sydney). Your project record does not leave the region.",
     pricing: true,
   },
   {
@@ -53,7 +53,7 @@ const ITEMS: FaqItem[] = [
     q: "Do you train AI models on our documents?",
     a:
       "No. Customer data and uploaded documents are never used to train AI models. Each analysis " +
-      "is isolated to your workspace — your documents are read to produce your result and nothing " +
+      "is isolated to your workspace â€” your documents are read to produce your result and nothing " +
       "else.",
     pricing: true,
   },
@@ -74,17 +74,17 @@ const ITEMS: FaqItem[] = [
     group: "claims",
     q: "Is this legal advice?",
     a:
-      "No. VariationIQ reads your project record and shows you what it finds. Whether to claim, " +
+      "No. VariationiQ reads your project record and shows you what it finds. Whether to claim, " +
       "how to frame entitlement, and what a clause means in your circumstances are decisions for " +
       "your commercial and legal team.",
     pricing: true,
   },
   {
-    // Renamed from "hold-up" while it was still a draft — never rendered, so
+    // Renamed from "hold-up" while it was still a draft â€” never rendered, so
     // no link can break. The id now matches what the question actually asks.
     id: "citations",
     group: "claims",
-    q: "Does VariationIQ cite the source documents for its findings?",
+    q: "Does VariationiQ cite the source documents for its findings?",
     a:
       "Yes. Every finding is linked to the relevant source document and supporting passage " +
       "whenever available, so you can verify the evidence behind each result.",
@@ -92,9 +92,9 @@ const ITEMS: FaqItem[] = [
   {
     id: "time-bars",
     group: "claims",
-    q: "Does VariationIQ identify notice periods and potential time bars?",
+    q: "Does VariationiQ identify notice periods and potential time bars?",
     a:
-      "Yes. When supported by the uploaded contract and project documents, VariationIQ highlights " +
+      "Yes. When supported by the uploaded contract and project documents, VariationiQ highlights " +
       "relevant notice periods and potential time-bar risks associated with detected variations.",
   },
   {
@@ -102,9 +102,9 @@ const ITEMS: FaqItem[] = [
     group: "claims",
     q: "What if it misses a variation, or flags one that isn't real?",
     a:
-      "VariationIQ is designed to accelerate document review, not replace professional judgment. " +
+      "VariationiQ is designed to accelerate document review, not replace professional judgment. " +
       "Every finding includes supporting evidence from the source documents whenever possible, " +
-      "and nothing is submitted or acted on automatically. You remain in control — review each " +
+      "and nothing is submitted or acted on automatically. You remain in control â€” review each " +
       "finding, accept or dismiss it, and make the final decision before taking any contractual " +
       "or commercial action.",
     pricing: true,
@@ -124,9 +124,9 @@ const ITEMS: FaqItem[] = [
   {
     id: "file-types",
     group: "how",
-    q: "Which file types does VariationIQ support?",
+    q: "Which file types does VariationiQ support?",
     a:
-      "VariationIQ supports PDF, DOCX, XLSX, XLS, CSV, and common image formats such as PNG and " +
+      "VariationiQ supports PDF, DOCX, XLSX, XLS, CSV, and common image formats such as PNG and " +
       "JPG. Support for additional formats will continue to expand over time.",
     pricing: true,
   },
@@ -135,7 +135,7 @@ const ITEMS: FaqItem[] = [
     group: "how",
     q: "How does the ROI actually work?",
     a:
-      "VariationIQ doesn't create revenue — it surfaces revenue you already earned but haven't " +
+      "VariationiQ doesn't create revenue â€” it surfaces revenue you already earned but haven't " +
       "claimed. Pro is AUD 149/month, so the question is simply whether a year of that is worth " +
       "less than the variations currently going unclaimed on your projects. Start on the Free " +
       "plan with one finished job and judge it against your own numbers rather than ours.",
@@ -148,8 +148,8 @@ const ITEMS: FaqItem[] = [
     group: "billing",
     q: "What happens if I go over my plan's limits?",
     a:
-      "Billing tells you which limit is binding and what it blocks. Monthly limits — analyses and " +
-      "documents — reset on the first of the month. Project slots don't reset; archiving frees " +
+      "Billing tells you which limit is binding and what it blocks. Monthly limits â€” analyses and " +
+      "documents â€” reset on the first of the month. Project slots don't reset; archiving frees " +
       "one. Nothing is deleted when you hit a cap.",
     pricing: true,
   },
@@ -167,7 +167,7 @@ const ITEMS: FaqItem[] = [
     group: "billing",
     q: "Can I switch between monthly and annual billing?",
     a:
-      "Yes — annual billing is roughly 2 months free compared to paying monthly. Use \"Manage " +
+      "Yes â€” annual billing is roughly 2 months free compared to paying monthly. Use \"Manage " +
       "billing\" in Settings to change your billing interval, or contact us if you need help " +
       "switching.",
     pricing: true,
@@ -177,7 +177,7 @@ const ITEMS: FaqItem[] = [
     group: "billing",
     q: "Do you offer a free trial of Pro?",
     a:
-      "The Free plan itself has no time limit — it's scoped to 1 project so you can fully test " +
+      "The Free plan itself has no time limit â€” it's scoped to 1 project so you can fully test " +
       "variation detection on a real project before upgrading, rather than a countdown trial.",
     pricing: true,
   },
@@ -196,7 +196,7 @@ const ITEMS: FaqItem[] = [
  *  each call site, so an unconfirmed answer cannot reach a page by accident. */
 export const FAQ: FaqItem[] = ITEMS.filter((i) => !i.draft);
 
-/** Written but unconfirmed. Not exported into any page — kept so the wording
+/** Written but unconfirmed. Not exported into any page â€” kept so the wording
  *  isn't lost while the behaviour is being checked. */
 export const FAQ_DRAFTS: FaqItem[] = ITEMS.filter((i) => i.draft);
 

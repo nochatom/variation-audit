@@ -1,12 +1,12 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Nav, SiteFooter } from "@/components/home/sections";
 import { FaqList } from "@/components/faq/FaqList";
 import { FAQ } from "@/lib/faq";
 
 export const metadata: Metadata = {
-  title: "FAQ — VariationIQ",
+  title: "FAQ â€” VariationiQ",
   description:
-    "How VariationIQ handles your project record, what it can and can't claim, and how plans work.",
+    "How VariationiQ handles your project record, what it can and can't claim, and how plans work.",
 };
 
 export default function FaqPage() {
@@ -21,7 +21,7 @@ export default function FaqPage() {
               Questions, answered.
             </h1>
             <p className="mt-4 max-w-[54ch] text-[17px] leading-relaxed text-ip-ink-2">
-              Everything about how VariationIQ handles your project record, what it can and
+              Everything about how VariationiQ handles your project record, what it can and
               can&apos;t claim, and how plans work.
             </p>
           </div>
@@ -29,7 +29,7 @@ export default function FaqPage() {
 
         <section>
           <div className="mx-auto max-w-[880px] px-6 py-16 sm:px-12">
-            {/* Grouped and filterable here — sixteen questions get scanned, not
+            {/* Grouped and filterable here â€” sixteen questions get scanned, not
                 read. The pricing page renders the same source unfiltered. */}
             <FaqList items={FAQ} grouped filterable />
 

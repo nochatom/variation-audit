@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Nav, SiteFooter } from "@/components/home/sections";
 
 export const metadata: Metadata = {
-  title: "About — VariationIQ",
-  description: "VariationIQ helps Australian construction companies recover variation revenue they'd otherwise leave on the table.",
+  title: "About â€” VariationiQ",
+  description: "VariationiQ helps Australian construction companies recover variation revenue they'd otherwise leave on the table.",
 };
 
 export default function AboutPage() {
@@ -17,19 +17,19 @@ export default function AboutPage() {
         </h1>
         <div className="mt-8 space-y-5 text-[15px] leading-relaxed text-ip-ink-2">
           <p>
-            Variations get missed constantly on construction projects — not because the entitlement isn&apos;t there,
+            Variations get missed constantly on construction projects â€” not because the entitlement isn&apos;t there,
             but because the evidence for it is scattered across contracts, RFIs, emails, site instructions and
             meeting minutes, and nobody has the hours to read all of it before a time-bar clause closes the window.
           </p>
           <p>
-            VariationIQ reads that project record with AI, cross-references it against the contract, and surfaces
-            the variations that are supported by real evidence — with the source quoted, a recoverable value estimate
+            VariationiQ reads that project record with AI, cross-references it against the contract, and surfaces
+            the variations that are supported by real evidence â€” with the source quoted, a recoverable value estimate
             in AUD, and a flag when a time-bar deadline is at risk. Every finding is reviewed and confirmed by a
             person before it&apos;s treated as real; the tool finds candidates, it doesn&apos;t make claims on its own.
           </p>
           <p>
-            We&apos;re scoped to Australian commercial construction — general contractors, builders, and electrical,
-            plumbing, HVAC and fire protection subcontractors — because the time-bar and security-of-payment regimes
+            We&apos;re scoped to Australian commercial construction â€” general contractors, builders, and electrical,
+            plumbing, HVAC and fire protection subcontractors â€” because the time-bar and security-of-payment regimes
             here are specific enough that a generic tool wouldn&apos;t get the detail right.
           </p>
         </div>

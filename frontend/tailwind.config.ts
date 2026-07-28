@@ -1,9 +1,9 @@
-import type { Config } from "tailwindcss";
+﻿import type { Config } from "tailwindcss";
 
 // Two token sets share this config:
-//  • dark Linear tokens (canvas/surface/ink/primary) — root layout body / global-error
+//  â€¢ dark Linear tokens (canvas/surface/ink/primary) â€” root layout body / global-error
 //    fallback only (fixed, no toggle; each page sets its own bg via ip-* tokens)
-//  • "ip" = Ironclad Precision — the enterprise application + Login/Sign Up.
+//  â€¢ "ip" = Ironclad Precision â€” the enterprise application + Login/Sign Up.
 //    ip-* colors resolve from CSS custom properties (see globals.css :root / .dark)
 //    so the same utility classes (bg-ip-card, text-ip-ink, etc.) render light or
 //    dark depending on the `dark` class on <html>, toggled by lib/use-theme.ts.
@@ -32,25 +32,25 @@ const config: Config = {
           ink: "rgb(var(--ip-ink) / <alpha-value>)",
           "ink-2": "rgb(var(--ip-ink-2) / <alpha-value>)",
           "ink-3": "rgb(var(--ip-ink-3) / <alpha-value>)",
-          navy: "rgb(var(--ip-navy) / <alpha-value>)",               // adaptive accent: text/icons/translucent chips — lightens in dark
+          navy: "rgb(var(--ip-navy) / <alpha-value>)",               // adaptive accent: text/icons/translucent chips â€” lightens in dark
           "navy-2": "rgb(var(--ip-navy-2) / <alpha-value>)",
           "navy-3": "rgb(var(--ip-navy-3) / <alpha-value>)",
-          "navy-fill": "rgb(var(--ip-navy-fill) / <alpha-value>)",     // solid fill for white-text buttons/badges — stays dark-navy in both themes
+          "navy-fill": "rgb(var(--ip-navy-fill) / <alpha-value>)",     // solid fill for white-text buttons/badges â€” stays dark-navy in both themes
           "navy-fill-2": "rgb(var(--ip-navy-fill-2) / <alpha-value>)",
-          orange: "rgb(var(--ip-orange) / <alpha-value>)",            // construction orange — NON-TEXT accents only (indicators, borders, tints, focus rings)
+          orange: "rgb(var(--ip-orange) / <alpha-value>)",            // construction orange â€” NON-TEXT accents only (indicators, borders, tints, focus rings)
           "orange-2": "rgb(var(--ip-orange-2) / <alpha-value>)",       // orange text (adapts per theme for legibility)
-          "orange-fill": "rgb(var(--ip-orange-fill) / <alpha-value>)", // solid fill for white-text buttons — stays #9e4300 in both themes
+          "orange-fill": "rgb(var(--ip-orange-fill) / <alpha-value>)", // solid fill for white-text buttons â€” stays #9e4300 in both themes
           recovery: "rgb(var(--ip-recovery) / <alpha-value>)",        // recovered margin (green text)
           "recovery-2": "rgb(var(--ip-recovery-2) / <alpha-value>)",
           risk: "rgb(var(--ip-risk) / <alpha-value>)",                // time-bar / error
           "risk-bg": "rgb(var(--ip-risk-bg) / <alpha-value>)",
-          "recovery-bg": "rgb(var(--ip-recovery-bg) / <alpha-value>)", // tint behind recovery text — completes the pair risk already had
-          warn: "rgb(var(--ip-warn) / <alpha-value>)",                 // middle severity, TEXT-SAFE (unlike orange) — 6.45:1 on card
+          "recovery-bg": "rgb(var(--ip-recovery-bg) / <alpha-value>)", // tint behind recovery text â€” completes the pair risk already had
+          warn: "rgb(var(--ip-warn) / <alpha-value>)",                 // middle severity, TEXT-SAFE (unlike orange) â€” 6.45:1 on card
           "warn-bg": "rgb(var(--ip-warn-bg) / <alpha-value>)",
         },
 
-        // ---- "vq" = VariationIQ design reference (/dashboard-v2 only) ----
-        // Resolves from custom properties scoped to `.vq-root`, NOT :root — see
+        // ---- "vq" = VariationiQ design reference (/dashboard-v2 only) ----
+        // Resolves from custom properties scoped to `.vq-root`, NOT :root â€” see
         // components/v2/vq.css. A new namespace, so no existing utility changes.
         // amber is a NON-TEXT accent (indicator bars, chart fill, dark focus
         // ring): white on #F5A623 is ~2.0:1. Amber text uses `med` (#8A5D06).
@@ -83,7 +83,7 @@ const config: Config = {
       },
       letterSpacing: { tighter: "-0.02em", tightest: "-0.04em", display: "-0.025em" },
       boxShadow: {
-        // Layered, low-opacity depth (Stripe/Linear register) — a hairline
+        // Layered, low-opacity depth (Stripe/Linear register) â€” a hairline
         // ambient layer + a soft directional layer reads more premium than a
         // single flat drop shadow.
         "ip-card": "0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.03)",

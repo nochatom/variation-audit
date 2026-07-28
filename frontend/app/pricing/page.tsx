@@ -165,7 +165,7 @@ export default function PricingPage() {
               <p className="mt-6 max-w-2xl text-[15px] leading-relaxed text-ip-ink-2">
                 Variations get missed because the proof of them sits across contracts, RFIs, emails,
                 site instructions and meeting minutes â€” not because the entitlement isn&apos;t real.
-                VariationIQ reads that record so your commercial team can claim what was already
+                VariationiQ reads that record so your commercial team can claim what was already
                 earned, before a time-bar notice period closes the window.
               </p>
               <p className="mt-6 max-w-2xl text-[15px] font-semibold leading-relaxed text-ip-ink">

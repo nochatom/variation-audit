@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -27,7 +27,7 @@ export default function SettingsPage() {
     <div>
       <PageHeader
         title="Settings"
-        description="Your account, this device, and how VariationIQ looks for you."
+        description="Your account, this device, and how VariationiQ looks for you."
       />
 
       {/* ---- Protagonist: security. Everything else on this page is a
@@ -36,11 +36,11 @@ export default function SettingsPage() {
 
       <h2 className="ip-label mb-3 mt-8">Account</h2>
       <Card className="divide-y divide-ip-line">
-        <Row k="Email" v={me?.email ?? "—"} />
+        <Row k="Email" v={me?.email ?? "â€”"} />
         <FullNameRow />
         <Row
           k="User ID"
-          v={<span className="font-mono text-[12px] text-ip-ink-3">{me?.user_id.slice(0, 8) ?? "—"}</span>}
+          v={<span className="font-mono text-[12px] text-ip-ink-3">{me?.user_id.slice(0, 8) ?? "â€”"}</span>}
         />
       </Card>
 
@@ -118,7 +118,7 @@ export default function SettingsPage() {
 }
 
 /** Password + device sessions. `logoutAll` has existed in the API client since
- *  refresh tokens shipped and had no UI — this is the surface for it. */
+ *  refresh tokens shipped and had no UI â€” this is the surface for it. */
 function Security({ email, onLogout }: { email: string | null; onLogout: () => Promise<void> }) {
   const [resetSent, setResetSent] = useState(false);
   const [confirmAll, setConfirmAll] = useState(false);
@@ -144,7 +144,7 @@ function Security({ email, onLogout }: { email: string | null; onLogout: () => P
     setError(null);
     try {
       await api.logoutAll();
-      // Every refresh token is now revoked, including this device's — so the
+      // Every refresh token is now revoked, including this device's â€” so the
       // only coherent next state is a local sign-out.
       await onLogout();
     } catch (e: any) {
@@ -178,11 +178,11 @@ function Security({ email, onLogout }: { email: string | null; onLogout: () => P
           <div className="mt-0.5 text-[12px] text-ip-ink-2">
             {resetSent
               ? `Reset link sent to ${email}. It expires shortly.`
-              : "We'll email you a reset link — your password is never shown or sent."}
+              : "We'll email you a reset link â€” your password is never shown or sent."}
           </div>
         </div>
         <button onClick={sendReset} disabled={busy !== null || !email} className="btn-ghost shrink-0">
-          {busy === "reset" ? "Sending…" : resetSent ? <><Check className="h-3.5 w-3.5" aria-hidden />Sent</> : "Change password"}
+          {busy === "reset" ? "Sendingâ€¦" : resetSent ? <><Check className="h-3.5 w-3.5" aria-hidden />Sent</> : "Change password"}
         </button>
       </div>
 
@@ -201,7 +201,7 @@ function Security({ email, onLogout }: { email: string | null; onLogout: () => P
               disabled={busy !== null}
               className="rounded-md bg-ip-risk/10 px-2.5 py-1.5 text-xs font-semibold text-ip-risk transition-colors hover:bg-ip-risk/20 disabled:opacity-50"
             >
-              {busy === "all" ? "Signing out…" : "Confirm"}
+              {busy === "all" ? "Signing outâ€¦" : "Confirm"}
             </button>
             <button onClick={() => setConfirmAll(false)} disabled={busy !== null} className="btn-ghost px-2.5 py-1.5 text-xs">
               Cancel
@@ -278,13 +278,13 @@ function Usage({ companyId }: { companyId: string | null }) {
       </div>
       <Card className="divide-y divide-ip-line">
         {rows.map((r) => {
-          // A null limit is unlimited, not zero — treating it as a ratio would
+          // A null limit is unlimited, not zero â€” treating it as a ratio would
           // report "maxed out" on the most generous plan.
           const near = r.limit != null && r.used / r.limit >= 0.8;
           return (
             <div key={r.label} className="flex flex-wrap items-center gap-4 px-4 py-3">
               <span className="min-w-[160px] flex-1 text-[13px] text-ip-ink-2">{r.label}</span>
-              {/* "Near limit" is spelled out, not signalled by colour alone —
+              {/* "Near limit" is spelled out, not signalled by colour alone â€”
                   the count is the meter, so a bar would just re-encode it. */}
               {near && <span className="shrink-0 text-[12px] font-semibold text-ip-orange-2">Near limit</span>}
               <span
@@ -334,7 +334,7 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
   );
 }
 
-/** Editable "Full name" row — persists via PATCH /auth/me and refreshes the
+/** Editable "Full name" row â€” persists via PATCH /auth/me and refreshes the
  * cached user through the context's reload(). */
 function FullNameRow() {
   const { me, reload } = useApp();
@@ -379,7 +379,7 @@ function FullNameRow() {
           aria-label="Full name"
         />
         <button onClick={save} disabled={!dirty || saving} className="btn-navy h-8 shrink-0 px-3 text-[13px]">
-          {saving ? "Saving…" : "Save"}
+          {saving ? "Savingâ€¦" : "Save"}
         </button>
       </div>
       {status === "saved" && !dirty && (

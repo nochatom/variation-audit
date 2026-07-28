@@ -1,13 +1,13 @@
-/**
- * VariationIQ design-reference shell (vq).
+﻿/**
+ * VariationiQ design-reference shell (vq).
  *
  * The permanent frame: 240px sidebar, 72px top bar, #F6F7F9 content area on a
  * 12-column / 24px-gutter grid with 32px padding. Only the children change
  * between the platform's screens.
  *
  * This is a REFERENCE shell, deliberately separate from components/app/chrome.tsx
- * (the shipping frame). It renders static spec content — no data fetching, no
- * AppProvider — which is why /dashboard-v2 sits outside the app/app/ route group
+ * (the shipping frame). It renders static spec content â€” no data fetching, no
+ * AppProvider â€” which is why /dashboard-v2 sits outside the app/app/ route group
  * and its AppChrome layout.
  *
  * The brand mark and wordmark come from the canonical components/ui/*; see

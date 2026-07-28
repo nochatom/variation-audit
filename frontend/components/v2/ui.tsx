@@ -1,5 +1,5 @@
-/**
- * VariationIQ design-reference primitives (vq).
+﻿/**
+ * VariationiQ design-reference primitives (vq).
  *
  * Component styles for the /dashboard-v2 reference screen. These are the
  * permanent building blocks of the spec: cards, metric tiles, status pills,
@@ -21,7 +21,7 @@ export function Card({
 }: {
   children: ReactNode;
   className?: string;
-  /** Drop the 24px padding — for cards whose own header/table own their insets. */
+  /** Drop the 24px padding â€” for cards whose own header/table own their insets. */
   flush?: boolean;
 }) {
   return (
@@ -54,7 +54,7 @@ export function MetricCard({
   value: string;
   /** The subdued change line beneath the value. */
   children: ReactNode;
-  /** 3px amber left bar — carried by the single most important metric only. */
+  /** 3px amber left bar â€” carried by the single most important metric only. */
   accent?: boolean;
 }) {
   return (
@@ -73,7 +73,7 @@ export function MetricCard({
 
 export type Confidence = "high" | "med" | "low";
 
-/** Confidence banding: high >= 85%, medium 70–84%, low below 70%. */
+/** Confidence banding: high >= 85%, medium 70â€“84%, low below 70%. */
 export function confidenceBand(pct: number): Confidence {
   if (pct >= 85) return "high";
   if (pct >= 70) return "med";
@@ -87,7 +87,7 @@ const PILL: Record<Confidence, string> = {
 };
 
 /**
- * Tinted chip, 6px radius. Colour is never the only carrier of meaning — the
+ * Tinted chip, 6px radius. Colour is never the only carrier of meaning â€” the
  * percentage is always rendered, so the band survives greyscale and colour
  * blindness (WCAG 1.4.1).
  */
@@ -142,7 +142,7 @@ export function FilterChips({
 
 /* ------------------------------------------------------------- buttons --- */
 
-/** 40px tall, 8px radius. `primary` is the only filled variant — one per region. */
+/** 40px tall, 8px radius. `primary` is the only filled variant â€” one per region. */
 export function Button({
   children,
   variant = "primary",
@@ -165,7 +165,7 @@ export function Button({
   );
 }
 
-/** Plain navy text button — the tertiary tier. */
+/** Plain navy text button â€” the tertiary tier. */
 export function TextLink({
   children,
   className = "",
@@ -195,7 +195,7 @@ export function BarChart({ rows }: { rows: { name: string; label: string; value:
             <span className="text-[13px] text-vq-ink">{r.name}</span>
             <span className="vq-num text-[13px] font-medium text-vq-ink">{r.label}</span>
           </div>
-          {/* Bars are decorative reinforcement — the figure above is the datum,
+          {/* Bars are decorative reinforcement â€” the figure above is the datum,
               so the track needs no separate accessible name. */}
           <div aria-hidden className="h-2 overflow-hidden rounded-sm bg-vq-bg">
             <span

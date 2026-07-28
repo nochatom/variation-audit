@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -21,7 +21,7 @@ export default function ForgotPasswordPage() {
     setError(null);
     setBusy(true);
     try {
-      // Backend always responds 204 whether or not the email exists — the
+      // Backend always responds 204 whether or not the email exists â€” the
       // UI must not reveal that distinction either, so this branch never
       // varies on the actual lookup result.
       await api.forgotPassword(email.trim());
@@ -48,10 +48,10 @@ export default function ForgotPasswordPage() {
         )}
       </button>
       <div className="w-full max-w-sm">
-        <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationIQ home">
+        <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationiQ home">
           <LogoMark size={32} />
           <div>
-            <h1 aria-label="VariationIQ" className="flex"><Wordmark height={18} className="text-ip-ink" /></h1>
+            <h1 aria-label="VariationiQ" className="flex"><Wordmark height={18} className="text-ip-ink" /></h1>
             <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>
           </div>
         </Link>
@@ -88,7 +88,7 @@ export default function ForgotPasswordPage() {
                 </div>
                 {error && <ErrorNote message={error} />}
                 <button disabled={busy} className="btn-navy w-full">
-                  {busy ? "Sending…" : "Send reset link"}
+                  {busy ? "Sendingâ€¦" : "Send reset link"}
                 </button>
               </form>
               <p className="mt-4 text-center text-[13px] text-ip-ink-2">

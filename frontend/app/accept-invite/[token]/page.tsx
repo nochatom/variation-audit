@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -115,17 +115,17 @@ export default function AcceptInvitePage() {
         )}
       </button>
       <div className="w-full max-w-sm">
-        <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationIQ home">
+        <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationiQ home">
           <LogoMark size={32} />
           <div>
-            <h1 aria-label="VariationIQ" className="flex"><Wordmark height={18} className="text-ip-ink" /></h1>
+            <h1 aria-label="VariationiQ" className="flex"><Wordmark height={18} className="text-ip-ink" /></h1>
             <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>
           </div>
         </Link>
 
         <div className="ip-card-lg p-6">
           {stage.kind === "loading" && (
-            <p className="py-8 text-center text-sm text-ip-ink-3">Checking invitation…</p>
+            <p className="py-8 text-center text-sm text-ip-ink-3">Checking invitationâ€¦</p>
           )}
 
           {stage.kind === "invalid" && (
@@ -142,7 +142,7 @@ export default function AcceptInvitePage() {
                 Join {stage.preview.org_name}
               </h2>
               <p className="mb-5 text-[13px] text-ip-ink-2">
-                You already have a VariationIQ account for <span className="font-semibold text-ip-ink">{stage.preview.email}</span>.
+                You already have a VariationiQ account for <span className="font-semibold text-ip-ink">{stage.preview.email}</span>.
                 Log in to accept this invitation.
               </p>
               <Link href={`/login?redirect=${encodeURIComponent(`/accept-invite/${token}`)}`} className="btn-navy inline-block w-full text-center">
@@ -174,7 +174,7 @@ export default function AcceptInvitePage() {
               </p>
               {error && <ErrorNote message={error} />}
               <button onClick={accept} disabled={busy} className="btn-navy w-full">
-                {busy ? "Joining…" : `Accept invitation`}
+                {busy ? "Joiningâ€¦" : `Accept invitation`}
               </button>
             </>
           )}
@@ -198,7 +198,7 @@ export default function AcceptInvitePage() {
                   <input
                     className="ip-input"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     minLength={8}
@@ -209,14 +209,14 @@ export default function AcceptInvitePage() {
                 </div>
                 {error && <ErrorNote message={error} />}
                 <button disabled={busy} className="btn-navy w-full">
-                  {busy ? "Creating account…" : "Create account & join"}
+                  {busy ? "Creating accountâ€¦" : "Create account & join"}
                 </button>
               </form>
             </>
           )}
 
           {stage.kind === "done" && (
-            <p className="py-8 text-center text-sm text-ip-ink-3">Redirecting…</p>
+            <p className="py-8 text-center text-sm text-ip-ink-3">Redirectingâ€¦</p>
           )}
         </div>
       </div>
