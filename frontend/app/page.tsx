@@ -2,7 +2,7 @@
 import { CtaBanner, Features, Hero, HowItWorks, Nav, SiteFooter } from "@/components/home/sections";
 
 export const metadata: Metadata = {
-  title: "VariationiQ â€” Recover every unclaimed variation",
+  title: "VariationiQ — Recover every unclaimed variation",
   description:
     "AI revenue recovery for Australian construction. VariationiQ scans contracts, RFIs, emails, site instructions and meeting minutes to find unclaimed variations, estimate recoverable value in AUD, and flag time-bar risk.",
 };

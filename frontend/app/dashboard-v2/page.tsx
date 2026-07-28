@@ -1,5 +1,5 @@
 ﻿/**
- * VariationiQ â€” Dashboard, design reference.
+ * VariationiQ — Dashboard, design reference.
  *
  * The master screen for the 10-screen platform: the shell, grid, type scale and
  * component styles established here are reused unchanged elsewhere, and only
@@ -25,10 +25,10 @@ import {
 } from "@/components/v2/ui";
 
 export const metadata: Metadata = {
-  title: "Dashboard â€” VariationiQ",
+  title: "Dashboard — VariationiQ",
 };
 
-/** AUD, no cents â€” these are claim estimates, not invoiced amounts. */
+/** AUD, no cents — these are claim estimates, not invoiced amounts. */
 const aud = (n: number) => `$${n.toLocaleString("en-AU")}`;
 
 const FINDINGS = [
@@ -42,7 +42,7 @@ const FINDINGS = [
     date: "12 Jul",
   },
   {
-    finding: "Client-directed slab thickening â€” SI-142",
+    finding: "Client-directed slab thickening — SI-142",
     project: "Riverside Apartments Stage 2",
     type: "Site Instruction",
     value: 96_200,
@@ -87,9 +87,9 @@ const VALUE_BY_TYPE = [
 ];
 
 const ACTIVITY = [
-  { text: "Analysis completed", meta: "Riverside Apartments Stage 2 Â· 2h ago", d: "M20.5 12a8.5 8.5 0 11-8.5-8.5A8.5 8.5 0 0120.5 12zM8.5 12.2l2.4 2.4 4.6-4.8" },
-  { text: "14 documents uploaded", meta: "Collins St Fitout Â· 5h ago", d: "M12 16.5V4.5M7.5 9L12 4.5 16.5 9M4.5 15v3.5a1 1 0 001 1h13a1 1 0 001-1V15" },
-  { text: "Report generated", meta: "Northgate Logistics Hub Â· Yesterday", d: "M7 3.5h6.5L18 8v12.5a1 1 0 01-1 1H7a1 1 0 01-1-1v-16a1 1 0 011-1zM13 3.5V8h5M9 13.5h6M9 17h4" },
+  { text: "Analysis completed", meta: "Riverside Apartments Stage 2 · 2h ago", d: "M20.5 12a8.5 8.5 0 11-8.5-8.5A8.5 8.5 0 0120.5 12zM8.5 12.2l2.4 2.4 4.6-4.8" },
+  { text: "14 documents uploaded", meta: "Collins St Fitout · 5h ago", d: "M12 16.5V4.5M7.5 9L12 4.5 16.5 9M4.5 15v3.5a1 1 0 001 1h13a1 1 0 001-1V15" },
+  { text: "Report generated", meta: "Northgate Logistics Hub · Yesterday", d: "M7 3.5h6.5L18 8v12.5a1 1 0 01-1 1H7a1 1 0 01-1-1v-16a1 1 0 011-1zM13 3.5V8h5M9 13.5h6M9 17h4" },
   { text: "Sarah Chen joined the organisation", meta: "2 days ago", d: "M13.5 8a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM4 19.5c0-3.3 2.7-5.5 6-5.5 1.2 0 2.3.3 3.2.8M17 14v5.5M14.2 16.7h5.6" },
 ];
 

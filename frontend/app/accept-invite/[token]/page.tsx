@@ -125,7 +125,7 @@ export default function AcceptInvitePage() {
 
         <div className="ip-card-lg p-6">
           {stage.kind === "loading" && (
-            <p className="py-8 text-center text-sm text-ip-ink-3">Checking invitationâ€¦</p>
+            <p className="py-8 text-center text-sm text-ip-ink-3">Checking invitation…</p>
           )}
 
           {stage.kind === "invalid" && (
@@ -174,7 +174,7 @@ export default function AcceptInvitePage() {
               </p>
               {error && <ErrorNote message={error} />}
               <button onClick={accept} disabled={busy} className="btn-navy w-full">
-                {busy ? "Joiningâ€¦" : `Accept invitation`}
+                {busy ? "Joining…" : `Accept invitation`}
               </button>
             </>
           )}
@@ -198,7 +198,7 @@ export default function AcceptInvitePage() {
                   <input
                     className="ip-input"
                     type="password"
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     minLength={8}
@@ -209,14 +209,14 @@ export default function AcceptInvitePage() {
                 </div>
                 {error && <ErrorNote message={error} />}
                 <button disabled={busy} className="btn-navy w-full">
-                  {busy ? "Creating accountâ€¦" : "Create account & join"}
+                  {busy ? "Creating account…" : "Create account & join"}
                 </button>
               </form>
             </>
           )}
 
           {stage.kind === "done" && (
-            <p className="py-8 text-center text-sm text-ip-ink-3">Redirectingâ€¦</p>
+            <p className="py-8 text-center text-sm text-ip-ink-3">Redirecting…</p>
           )}
         </div>
       </div>

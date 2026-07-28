@@ -3,7 +3,7 @@
    ----------------------------------------------------------------------------
    Scoped deliberately: every token is defined on `.vq-root`, never on `:root`,
    so importing this file cannot alter a single existing page. The shipping app
-   keeps its own `ip-*` system untouched â€” the two coexist.
+   keeps its own `ip-*` system untouched — the two coexist.
 
    Font is declared here rather than through next/font in app/layout.tsx, so
    this route needs no change to any shared file. Same self-hosting rationale
@@ -13,10 +13,10 @@
    Dark values are derived, not inverted, and every foreground/background pair
    below was checked against WCAG 2.1 AA before being written down. Two of the
    spec's own values did not survive that check and were corrected:
-     â€¢ secondary text #6B7785 -> #677381. #6B7785 measures 4.26:1 on the
+     • secondary text #6B7785 -> #677381. #6B7785 measures 4.26:1 on the
        #F6F7F9 row-hover tint (needs 4.5). This is the smallest darkening that
        clears both the tint (4.51:1) and the white card (4.83:1).
-     â€¢ warning amber #B47A0A reads 3.67:1 as text on white and is therefore
+     • warning amber #B47A0A reads 3.67:1 as text on white and is therefore
        NON-TEXT ONLY here. Amber text uses --vq-med (#8A5D06, 5.75:1).
    The accent amber #F5A623 is likewise non-text only: white on it is ~2.0:1.
    This mirrors the split already documented for --ip-orange in globals.css.
@@ -87,13 +87,13 @@
 
 /* The findings table carries 7 data columns plus a row action, and measures
    1235px of natural content (Finding alone wants 386px). An 8-of-12 span gives
-   747px, so it cannot hold this table: capping every column â€” truncating both
-   text columns and reducing the action to an icon â€” still only reaches 838px.
+   747px, so it cannot hold this table: capping every column — truncating both
+   text columns and reducing the action to an icon — still only reaches 838px.
    The table therefore spans all 12 columns (1136px) and the right-hand cards sit
    beneath it. At 1136px the browser closes the remaining 8% by compressing the
    two text columns, which is why only those two carry an ellipsis.
 
-   overflow-x here is the narrow-viewport safety net, not the primary strategy â€”
+   overflow-x here is the narrow-viewport safety net, not the primary strategy —
    at the 1440px reference width nothing scrolls. */
 .vq-tablewrap {
   overflow-x: auto;
@@ -111,7 +111,7 @@
   text-overflow: ellipsis;
 }
 /* Sized to each column's measured natural content, so at the 1440px reference
-   width neither actually ellipses â€” the truncation rule stays as the graceful
+   width neither actually ellipses — the truncation rule stays as the graceful
    degradation for narrower windows rather than the everyday state. */
 .vq-col-finding {
   width: 37%;
@@ -162,7 +162,7 @@
 }
 
 /* Row actions stay quiet until the row is engaged, but never drop below the
-   contrast floor â€” 0.75 opacity on --vq-navy still clears AA on both surfaces. */
+   contrast floor — 0.75 opacity on --vq-navy still clears AA on both surfaces. */
 .vq-row-action {
   opacity: 0.75;
 }

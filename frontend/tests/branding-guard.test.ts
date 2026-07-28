@@ -6,7 +6,7 @@
  * placeholder silently re-implemented in 10 different files instead of
  * using components/ui/Logo.tsx, a missing favicon, and a stale page title.
  * These tests read source files directly and fail loudly if that pattern
- * reappears â€” they do not change any UI behavior.
+ * reappears — they do not change any UI behavior.
  */
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
@@ -93,11 +93,11 @@ describe("branding regression guard", () => {
   it("brand-mark SVG path data appears only inside Logo.tsx, nowhere else", () => {
     // A second file hand-copying the raw path data (rather than importing
     // LogoMark) would defeat the whole point of having one canonical
-    // component â€” this catches that even if it doesn't match the "V"
+    // component — this catches that even if it doesn't match the "V"
     // placeholder pattern above.
     // These must track whatever glyph LogoMark actually draws. They were left
     // pointing at the retired "V" + sparkle artwork after the mark changed to
-    // the Bodoni Q, so the check passed without guarding anything â€” and had to
+    // the Bodoni Q, so the check passed without guarding anything — and had to
     // be updated again when the mark became the Breakline. If you change the
     // artwork, change these in the same commit or this test guards nothing.
     //
@@ -106,7 +106,7 @@ describe("branding regression guard", () => {
     // is drawn only by the primary cut inside LogoMark, which makes it the one
     // fragment that uniquely identifies a copied mark.
     const BRAND_PATH_FRAGMENTS = [
-      "M13 20 V40", // left staff tick â€” primary cut, mark-only
+      "M13 20 V40", // left staff tick — primary cut, mark-only
     ];
     const offenders: string[] = [];
     for (const file of nonLogoFiles) {
@@ -146,16 +146,16 @@ describe("branding regression guard", () => {
   it("app/icon.svg draws the same brand mark as LogoMark", () => {
     // The original guard only proved the favicon was *a* file starting with
     // <svg>. That let the retired Arial "V" placeholder survive in the
-    // browser tab long after it had been purged from every component â€” the
+    // browser tab long after it had been purged from every component — the
     // app showed a Bodoni Q and the tab showed a V. Assert the artwork
     // matches, not merely that a file exists.
     const icon = fs.readFileSync(ICON_SVG, "utf-8");
     const logo = fs.readFileSync(LOGO_COMPONENT, "utf-8");
-    // A favicon renders at 16-32px, so it draws the small cut â€” the same path
+    // A favicon renders at 16-32px, so it draws the small cut — the same path
     // LogoMark uses below 24px. That shared string is what ties the two
     // together; if either is re-drawn without the other, this fails.
     const smallCut = "M12 30 H59 V70 H88";
-    expect(logo, "LogoMark no longer draws the expected Breakline small cut â€” update both").toContain(smallCut);
+    expect(logo, "LogoMark no longer draws the expected Breakline small cut — update both").toContain(smallCut);
     expect(icon, "favicon artwork has drifted from the canonical LogoMark").toContain(smallCut);
     // And the favicon must not have quietly reverted to the retired Bodoni Q.
     expect(icon).not.toContain("M1225 -373V-424");

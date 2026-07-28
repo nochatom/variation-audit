@@ -3,7 +3,7 @@ import { Nav, SiteFooter } from "@/components/home/sections";
 import { InfoNote } from "@/components/ui";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy â€” VariationiQ",
+  title: "Privacy Policy — VariationiQ",
   description: "How VariationiQ collects, stores, and processes data.",
 };
 
@@ -17,7 +17,7 @@ export default function PrivacyPage() {
         <p className="mt-2 text-[13px] text-ip-ink-3">Last updated: {new Date().getFullYear()}</p>
 
         <div className="mt-6 rounded-md border border-ip-orange/30 bg-ip-orange/12 px-4 py-3 text-[13px] leading-relaxed text-ip-ink-2">
-          <strong className="text-ip-ink">Draft â€” pending legal review.</strong> This page describes our current
+          <strong className="text-ip-ink">Draft — pending legal review.</strong> This page describes our current
           data practices in plain terms but has not yet been reviewed by a lawyer. Don&apos;t treat it as a finalized
           legal document until this notice is removed.
         </div>
@@ -26,7 +26,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-ip-ink">What we collect</h2>
             <p className="mt-2">
-              Account details (name, email, organization), and the project documents you upload for analysis â€”
+              Account details (name, email, organization), and the project documents you upload for analysis —
               contracts, RFIs, emails, site instructions, meeting minutes, and similar records. We also keep an
               audit log of actions taken on your account (who reviewed or confirmed a variation, and when) for
               traceability.
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-ip-ink">Where it&apos;s stored</h2>
             <p className="mt-2">
-              Data is stored in Australian-region infrastructure. Access is scoped per organization â€” members of
+              Data is stored in Australian-region infrastructure. Access is scoped per organization — members of
               one company account cannot see another company&apos;s projects or documents.
             </p>
           </section>
@@ -65,14 +65,14 @@ export default function PrivacyPage() {
               from active systems; residual copies in backups are purged on our normal backup rotation cycle
               rather than instantly. Audit log entries (who reviewed or confirmed a variation, and when) may be
               retained for a longer period where needed for security, dispute-resolution, or accounting purposes,
-              consistent with typical recordkeeping practice for commercial software â€” the specific retention
+              consistent with typical recordkeeping practice for commercial software — the specific retention
               period is still being finalized and will be confirmed here once set.
             </p>
             <p className="mt-2">
               We&apos;re not aware of any Australian legal requirement that specifically mandates a minimum
               retention period for the kind of data VariationiQ holds, but if your organization&apos;s own
               contractual or regulatory obligations (e.g. under a head contract) require longer retention of
-              project records, that is your responsibility to manage separately â€” we don&apos;t delete data
+              project records, that is your responsibility to manage separately — we don&apos;t delete data
               against your organization&apos;s wishes while your account remains active.
             </p>
           </section>
@@ -95,7 +95,7 @@ export default function PrivacyPage() {
 
             <h3 className="ip-label mt-5">2. Data isolation &amp; access control</h3>
             <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li>Organizational data is isolated at the database query level â€” access is scoped so a user can
+              <li>Organizational data is isolated at the database query level — access is scoped so a user can
                 retrieve only data belonging to their own organization.</li>
               <li>Role-based access control (RBAC) governs permissions within an organization: admins may manage
                 members, roles, and organization-wide settings; members operate under restricted,
@@ -123,7 +123,7 @@ export default function PrivacyPage() {
               VariationiQ does not currently hold formal third-party security certifications such as SOC 2 or
               ISO/IEC 27001, and no such claims are made. Our data handling practices are designed to operate
               consistently with the Australian Privacy Principles (APPs) under the <em>Privacy Act 1988</em>{" "}
-              (Cth) â€” including purpose limitation, data security, and access/correction rights â€” without
+              (Cth) — including purpose limitation, data security, and access/correction rights — without
               representing formal certified compliance. Controls are proportionate to the current scale and
               sensitivity of data processed and are reviewed as the platform matures. This section will be
               updated if formal certifications are obtained.
@@ -136,18 +136,18 @@ export default function PrivacyPage() {
               functions described below.
             </p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li><strong className="text-ip-ink">Anthropic</strong> â€” uploaded project documents are transmitted
+              <li><strong className="text-ip-ink">Anthropic</strong> — uploaded project documents are transmitted
                 to Anthropic&apos;s API to perform variation detection, value estimation, and risk assessment.
                 Data is processed for inference purposes only; Anthropic is not permitted to use customer data to
                 train its models.</li>
-              <li><strong className="text-ip-ink">Sentry</strong> â€” used for application error monitoring and
+              <li><strong className="text-ip-ink">Sentry</strong> — used for application error monitoring and
                 debugging. May capture limited technical context (e.g. page URL, error stack trace); does not
                 perform full session recording.</li>
-              <li><strong className="text-ip-ink">Amazon Web Services (AWS)</strong> â€” uploaded documents are
+              <li><strong className="text-ip-ink">Amazon Web Services (AWS)</strong> — uploaded documents are
                 stored in Amazon S3, in the Sydney (ap-southeast-2) region.</li>
-              <li><strong className="text-ip-ink">PostgreSQL</strong> â€” primary database for account,
+              <li><strong className="text-ip-ink">PostgreSQL</strong> — primary database for account,
                 organization, and variation metadata.</li>
-              <li><strong className="text-ip-ink">Email delivery</strong> â€” transactional email (invitations,
+              <li><strong className="text-ip-ink">Email delivery</strong> — transactional email (invitations,
                 password resets) is sent via SMTP. A named provider has not yet been finalized; this section will
                 be updated once one is selected.</li>
             </ul>
@@ -160,7 +160,7 @@ export default function PrivacyPage() {
               &quot;Remember me&quot; is selected, or in{" "}
               <code className="rounded bg-ip-card-2 px-1 py-0.5 text-[13px]">sessionStorage</code> otherwise
               (cleared when the browser session ends). Tokens are transmitted with each request solely to
-              authenticate the user â€” not used for tracking, profiling, or analytics.
+              authenticate the user — not used for tracking, profiling, or analytics.
             </p>
 
             <h3 className="ip-label mt-5">8. Data residency &amp; international transfers</h3>
@@ -180,8 +180,8 @@ export default function PrivacyPage() {
               <InfoNote>
                 <strong className="text-ip-ink">Note for enterprise users: </strong>
                 VariationiQ supports operational analysis of construction project documents. It does not
-                constitute legal, contractual, or financial advice, and outputs â€” including AI-generated
-                variation candidates â€” should be independently reviewed by qualified personnel before being
+                constitute legal, contractual, or financial advice, and outputs — including AI-generated
+                variation candidates — should be independently reviewed by qualified personnel before being
                 relied upon.
               </InfoNote>
             </div>

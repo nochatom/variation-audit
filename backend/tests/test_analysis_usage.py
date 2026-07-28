@@ -4,7 +4,7 @@ Root cause: get_usage()/enforce_analysis_limit() used to count rows in
 analysis_jobs, whose project_id FK is ON DELETE CASCADE. Permanently
 deleting a project (routers/projects.py:delete_project) deleted that
 project's analysis_jobs rows too, silently resetting the org's counted
-monthly usage â€” a free org could archive+delete and recreate a project
+monthly usage — a free org could archive+delete and recreate a project
 (the only way to free up Free's 1-project cap) to reset its 5/month analysis
 quota indefinitely.
 
@@ -31,7 +31,7 @@ def _sub(cid, plan=PlanTier.free, status=SubscriptionStatus.active):
 
 class _RecordingSession(FakeSession):
     """Same canned-result behavior as FakeSession, but also remembers the
-    compiled SQL text of every statement passed to execute() â€” lets a test
+    compiled SQL text of every statement passed to execute() — lets a test
     assert *which table* a query targeted, and whether it asked for a row
     lock, without needing a real database."""
 
@@ -66,7 +66,7 @@ def test_enqueue_analysis_records_a_usage_event():
 
 def test_enqueue_analysis_idempotent_replay_does_not_double_charge():
     """A replayed request_id returns the existing job (no new AnalysisJob
-    row) â€” it must also not write a second usage event, or a client retry
+    row) — it must also not write a second usage event, or a client retry
     would cost the org two units of quota for one accepted run."""
     from datetime import datetime, timezone
 
@@ -121,7 +121,7 @@ def test_get_usage_analysis_runs_queries_the_usage_ledger_not_analysis_jobs():
 
 def test_project_deletion_cascade_cannot_touch_the_usage_ledger():
     """Documents the actual fix, structurally: analysis_usage_events'
-    project_id/job_id FKs are ON DELETE SET NULL, never CASCADE â€” unlike
+    project_id/job_id FKs are ON DELETE SET NULL, never CASCADE — unlike
     analysis_jobs.project_id (CASCADE), deleting a Project can only null out
     the reference on a usage-event row, never delete the row itself, so the
     monthly count it contributes to can never go down."""

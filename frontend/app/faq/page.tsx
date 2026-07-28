@@ -4,7 +4,7 @@ import { FaqList } from "@/components/faq/FaqList";
 import { FAQ } from "@/lib/faq";
 
 export const metadata: Metadata = {
-  title: "FAQ â€” VariationiQ",
+  title: "FAQ — VariationiQ",
   description:
     "How VariationiQ handles your project record, what it can and can't claim, and how plans work.",
 };
@@ -29,7 +29,7 @@ export default function FaqPage() {
 
         <section>
           <div className="mx-auto max-w-[880px] px-6 py-16 sm:px-12">
-            {/* Grouped and filterable here â€” sixteen questions get scanned, not
+            {/* Grouped and filterable here — sixteen questions get scanned, not
                 read. The pricing page renders the same source unfiltered. */}
             <FaqList items={FAQ} grouped filterable />
 

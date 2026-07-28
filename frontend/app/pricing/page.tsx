@@ -17,7 +17,7 @@ type Plan = {
   ctaHref: string;
   highlighted?: boolean;
   features: string[];
-  /** Announced but not yet shipped â€” rendered separately from `features` so a
+  /** Announced but not yet shipped — rendered separately from `features` so a
    *  roadmap item can never be mistaken for something you can buy today. */
   roadmap?: string[];
 };
@@ -75,7 +75,7 @@ const PLANS: Plan[] = [
       "Priority support",
     ],
     // Not features. SSO and advanced analytics aren't built, so they sat in
-    // the bullet list beside things that work, with the same check mark â€”
+    // the bullet list beside things that work, with the same check mark —
     // selling something that doesn't exist. Kept visible but plainly marked,
     // because a buyer evaluating Enterprise is entitled to know the roadmap
     // without being told it has already shipped.
@@ -100,7 +100,7 @@ export default function PricingPage() {
               Recover revenue you already earned.
             </h1>
             {/* Dropped "Most plans pay for themselves the first time we surface
-                one you would have missed" â€” an unmeasurable claim, and the
+                one you would have missed" — an unmeasurable claim, and the
                 fifth place on this page the same argument was being made. */}
             <p className="mx-auto mt-4 max-w-xl text-[16px] leading-relaxed text-ip-ink-2">
               Start free on one project. Upgrade when the record shows it&apos;s worth it.
@@ -124,7 +124,7 @@ export default function PricingPage() {
                 }`}
                 onClick={() => setInterval("annual")}
               >
-                Annual <span className={interval === "annual" ? "text-white/80" : "text-ip-recovery"}>Â· 2 months free</span>
+                Annual <span className={interval === "annual" ? "text-white/80" : "text-ip-recovery"}>· 2 months free</span>
               </button>
             </div>
           </div>
@@ -144,10 +144,10 @@ export default function PricingPage() {
         {/* Why it pays.
 
             The previous version of this section presented "Typical missed
-            variation: AUD 3,000â€“20,000+" and "Break-even: often in month one"
+            variation: AUD 3,000–20,000+" and "Break-even: often in month one"
             as stats, in the same grid as the real subscription price. Those
-            figures aren't measured â€” there's no design-partner data behind
-            them â€” and formatting an estimate like a finding lends it authority
+            figures aren't measured — there's no design-partner data behind
+            them — and formatting an estimate like a finding lends it authority
             it hasn't earned. On a page selling financial rigour that is a
             liability, not a conversion lever.
 
@@ -164,13 +164,13 @@ export default function PricingPage() {
               </h2>
               <p className="mt-6 max-w-2xl text-[15px] leading-relaxed text-ip-ink-2">
                 Variations get missed because the proof of them sits across contracts, RFIs, emails,
-                site instructions and meeting minutes â€” not because the entitlement isn&apos;t real.
+                site instructions and meeting minutes — not because the entitlement isn&apos;t real.
                 VariationiQ reads that record so your commercial team can claim what was already
                 earned, before a time-bar notice period closes the window.
               </p>
               <p className="mt-6 max-w-2xl text-[15px] font-semibold leading-relaxed text-ip-ink">
                 Pro is AUD 149 a month. You know what one unclaimed variation is worth on your jobs
-                better than we do â€” run it on a finished project and see what the record says.
+                better than we do — run it on a finished project and see what the record says.
               </p>
             </div>
           </div>
@@ -194,7 +194,7 @@ export default function PricingPage() {
               <Link href="/faq" className="font-semibold text-ip-ink underline underline-offset-4">
                 See all questions
               </Link>{" "}
-              â€” including how we handle your contracts and what the analysis can and can&apos;t claim.
+              — including how we handle your contracts and what the analysis can and can&apos;t claim.
             </p>
           </div>
         </section>
@@ -207,7 +207,7 @@ export default function PricingPage() {
                 Stop leaving variations unclaimed.
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-ip-ink-2">
-                Start free on one project â€” see what it's already owed before you pay for anything.
+                Start free on one project — see what it's already owed before you pay for anything.
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <Link href="/login" className="btn-navy px-6 py-3 text-[15px]">
@@ -237,7 +237,7 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
     >
       {plan.highlighted && (
         // Prominent solid-navy pill (bg-ip-navy-fill is the design system's
-        // designated fill for white-text badges â€” stays dark navy in both
+        // designated fill for white-text badges — stays dark navy in both
         // themes) so it reads immediately against the card. Straddles the
         // card border; ring-4 in the page background carves a clean notch
         // where it crosses, shadow-ip-pop lifts it off the card.
@@ -267,7 +267,7 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
           </>
         )}
         {plan.tier === "pro" && interval === "annual" && (
-          <p className="mt-1 text-[12px] text-ip-recovery">â‰ˆ AUD 124/mo â€” 2 months free vs. monthly</p>
+          <p className="mt-1 text-[12px] text-ip-recovery">≈ AUD 124/mo — 2 months free vs. monthly</p>
         )}
       </div>
 
@@ -281,8 +281,8 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
           roadmap item can be read as something included today. */}
       {plan.roadmap && plan.roadmap.length > 0 && (
         <div className="mt-5 border-t border-ip-line pt-4">
-          <p className="ip-label mb-2">On the roadmap â€” not available yet</p>
-          <p className="text-[13px] text-ip-ink-3">{plan.roadmap.join(" Â· ")}</p>
+          <p className="ip-label mb-2">On the roadmap — not available yet</p>
+          <p className="text-[13px] text-ip-ink-3">{plan.roadmap.join(" · ")}</p>
         </div>
       )}
 
@@ -298,7 +298,7 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: "monthly" | "annua
   );
 }
 
-/* One feature line. Every entry here is something the plan includes today â€”
+/* One feature line. Every entry here is something the plan includes today —
    roadmap items render separately in PlanCard, so this no longer needs a
    second "coming later" state. */
 function FeatureRow({ feature, highlighted }: { feature: string; highlighted?: boolean }) {

@@ -21,7 +21,7 @@ export default function ForgotPasswordPage() {
     setError(null);
     setBusy(true);
     try {
-      // Backend always responds 204 whether or not the email exists â€” the
+      // Backend always responds 204 whether or not the email exists — the
       // UI must not reveal that distinction either, so this branch never
       // varies on the actual lookup result.
       await api.forgotPassword(email.trim());
@@ -88,7 +88,7 @@ export default function ForgotPasswordPage() {
                 </div>
                 {error && <ErrorNote message={error} />}
                 <button disabled={busy} className="btn-navy w-full">
-                  {busy ? "Sendingâ€¦" : "Send reset link"}
+                  {busy ? "Sending…" : "Send reset link"}
                 </button>
               </form>
               <p className="mt-4 text-center text-[13px] text-ip-ink-2">

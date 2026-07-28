@@ -32,7 +32,7 @@ export default function ResetPasswordPage() {
     setBusy(true);
     try {
       // Resetting revokes every existing session server-side, so there's no
-      // auto-login here â€” the user logs back in fresh, everywhere.
+      // auto-login here — the user logs back in fresh, everywhere.
       await api.resetPassword(token, password);
       setDone(true);
     } catch (err) {
@@ -87,7 +87,7 @@ export default function ResetPasswordPage() {
                       id="password"
                       className="ip-input pl-9 pr-9"
                       type={showPassword ? "text" : "password"}
-                      placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                      placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       minLength={8}
@@ -112,7 +112,7 @@ export default function ResetPasswordPage() {
                     id="confirm"
                     className="ip-input"
                     type={showPassword ? "text" : "password"}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder="••••••••"
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
                     minLength={8}
@@ -122,7 +122,7 @@ export default function ResetPasswordPage() {
                 </div>
                 {error && <ErrorNote message={error} />}
                 <button disabled={busy} className="btn-navy w-full">
-                  {busy ? "Updatingâ€¦" : "Update password"}
+                  {busy ? "Updating…" : "Update password"}
                 </button>
               </form>
             </>

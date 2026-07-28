@@ -6,8 +6,8 @@
  * between the platform's screens.
  *
  * This is a REFERENCE shell, deliberately separate from components/app/chrome.tsx
- * (the shipping frame). It renders static spec content â€” no data fetching, no
- * AppProvider â€” which is why /dashboard-v2 sits outside the app/app/ route group
+ * (the shipping frame). It renders static spec content — no data fetching, no
+ * AppProvider — which is why /dashboard-v2 sits outside the app/app/ route group
  * and its AppChrome layout.
  *
  * The brand mark and wordmark come from the canonical components/ui/*; see

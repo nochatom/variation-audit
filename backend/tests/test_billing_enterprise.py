@@ -53,7 +53,7 @@ class _RaceSession(FakeSession):
     """Simulates a concurrent duplicate webhook delivery winning the race:
     the dedup lookup says "not seen yet" for both requests, but the second
     request's reservation hits the stripe_events unique-key violation when
-    flushed (the reservation is flushed â€” taking the row lock â€” before the
+    flushed (the reservation is flushed — taking the row lock — before the
     event is actually applied; see handle_webhook_event's docstring)."""
 
     def __init__(self, *, results=None):
@@ -92,14 +92,14 @@ def test_webhook_duplicate_event_already_recorded_is_ignored():
     session = FakeSession(get_obj=existing_event)  # StripeEvent lookup: already processed
     event = {"id": "evt_1", "type": "invoice.paid", "data": {"object": {"id": "in_1"}}}
     billing_service.handle_webhook_event(session, event)
-    # No further processing at all â€” no queries, no new rows.
+    # No further processing at all — no queries, no new rows.
     assert session.added == []
     assert session.commits == 0
 
 
 def test_webhook_concurrent_duplicate_caught_by_integrity_error():
     """Two requests both pass the "not seen yet" check at the same time;
-    only one may actually record the event â€” the loser's commit fails with
+    only one may actually record the event — the loser's commit fails with
     IntegrityError and must back off cleanly rather than double-apply."""
     session = _RaceSession(results=[FakeResult(scalar=None), FakeResult(scalar=None)])
     event = {"id": "evt_1", "type": "invoice.paid", "data": {"object": {"id": "in_1", "subscription": "sub_abc"}}}
@@ -110,7 +110,7 @@ def test_webhook_concurrent_duplicate_caught_by_integrity_error():
 
 def test_webhook_missing_event_id_still_processes_but_skips_dedup():
     """Defensive: an event with no id (shouldn't happen with real Stripe, but
-    malformed input must not crash) still gets applied â€” just without the
+    malformed input must not crash) still gets applied — just without the
     idempotency guard, matching the pre-.24 behaviour for such input."""
     cid = uuid.uuid4()
     sub = _sub(cid)
@@ -165,7 +165,7 @@ def test_enforce_storage_limit_over_limit_raises():
     session = FakeSession(results=[
         FakeResult(scalar=_sub(cid, plan=PlanTier.free)),
         # storage_bytes_used() is ONE combined execute (doc blobs + project
-        # contract/scope text) â†’ one scalar, nearly at the 500MB cap.
+        # contract/scope text) → one scalar, nearly at the 500MB cap.
         FakeResult(scalar=free_limit_bytes - 100),
     ])
     with pytest.raises(billing_service.PlanLimitExceeded) as ei:
@@ -174,7 +174,7 @@ def test_enforce_storage_limit_over_limit_raises():
 
 
 def test_storage_bytes_used_is_single_authoritative_calc():
-    """storage_bytes_used is the one source of truth used by enforcement â€”
+    """storage_bytes_used is the one source of truth used by enforcement —
     it resolves to a single aggregated scalar (documents + project text),
     computed live so it needs no separate usage counter to keep in sync."""
     cid = uuid.uuid4()
