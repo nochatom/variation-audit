@@ -134,6 +134,30 @@ def test_verify_supabase_token_missing_email_verified_defaults_false(monkeypatch
     get_settings.cache_clear()
 
 
+def test_verify_supabase_token_email_verified_in_user_metadata(monkeypatch, rsa_keypair):
+    """A token with email_verified nested inside user_metadata (and absent at
+    the top level) must be successfully verified as True."""
+    private_key, public_key = rsa_keypair
+    monkeypatch.setenv("VA_SUPABASE_URL", "https://project.supabase.co")
+    from app.config import get_settings
+    get_settings.cache_clear()
+    monkeypatch.setattr(supabase_jwt, "_jwks_client", lambda url: _FakeJwksClient(public_key))
+
+    payload = {
+        "sub": "user-sub-123",
+        "email": "person@example.com",
+        "aud": "authenticated",
+        "iss": _TEST_ISSUER,
+        "user_metadata": {"email_verified": True}
+    }
+    token = jwt.encode(payload, private_key, algorithm="RS256")
+    claims = verify_supabase_token(token)
+    assert claims.sub == "user-sub-123"
+    assert claims.email == "person@example.com"
+    assert claims.email_verified is True
+    get_settings.cache_clear()
+
+
 def test_verify_supabase_token_not_configured_without_url(monkeypatch):
     # Explicitly override to empty (not just delenv) — a real deployment's
     # backend/.env may itself set VA_SUPABASE_URL, and pydantic-settings
