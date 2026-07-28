@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useCallback, useState } from "react";
 import Link from "next/link";
@@ -13,7 +13,7 @@ import { LogoMark } from "@/components/ui/Logo";
 import { Wordmark } from "@/components/ui/Wordmark";
 
 // Only ever follow a same-site relative path (never a scheme or "//host"
-// prefix) — the redirect param is attacker-controllable query input, so an
+// prefix) â€” the redirect param is attacker-controllable query input, so an
 // open redirect must be structurally impossible here, not just unlikely.
 function safeRedirect(raw: string | null): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/app/dashboard";
@@ -50,11 +50,11 @@ function LoginForm() {
   const completeAuth = useCallback(
     async (tok: TokenResponse, rememberChoice: boolean) => {
       storeTokens(tok, rememberChoice);
-      // tok.organizations comes straight off the login/signup response — no
+      // tok.organizations comes straight off the login/signup response â€” no
       // separate GET /auth/me round trip needed just to learn this (that
       // fetch was pure duplication: AppProvider, mounted right after this
       // redirect, independently fetches /auth/me itself and already falls
-      // back to organizations[0] with no companyId set — see lib/app-context.tsx).
+      // back to organizations[0] with no companyId set â€” see lib/app-context.tsx).
       if (tok.organizations[0]) setCompanyId(tok.organizations[0].id);
       router.replace(safeRedirect(searchParams.get("redirect")));
     },
@@ -93,7 +93,7 @@ function LoginForm() {
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
           // Google silently re-approves (no visible screen) once a session +
-          // prior consent exist for this client — standard OAuth behavior,
+          // prior consent exist for this client â€” standard OAuth behavior,
           // not a bug. Forcing the account chooser here is a deliberate UX
           // choice so the user always sees/confirms which account they're
           // using, rather than the default silent-reauth fast path.
@@ -104,7 +104,7 @@ function LoginForm() {
       // Browser navigates to Google now; nothing left to do here.
     } catch (err) {
       // Supabase's own client errors (popup blocked, redirect misconfigured,
-      // etc.) aren't ApiError instances — mapAuthError's fallback for those
+      // etc.) aren't ApiError instances â€” mapAuthError's fallback for those
       // is generic, so give a scoped-to-Google message instead of leaking
       // the raw client error text.
       setError(err instanceof ApiError ? mapAuthError(err, "google") : "Google sign-in isn't available right now. Please try again.");
@@ -127,10 +127,10 @@ function LoginForm() {
         )}
       </button>
       <div className="w-full max-w-sm">
-        <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationIQ home">
+        <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="Datum Break home">
           <LogoMark size={32} />
           <div>
-            <h1 aria-label="VariationIQ" className="flex"><Wordmark height={18} className="text-ip-ink" /></h1>
+            <h1 aria-label="Datum Break" className="flex"><Wordmark height={18} className="text-ip-ink" /></h1>
             <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>
           </div>
         </Link>
@@ -189,7 +189,7 @@ function LoginForm() {
                   id="password"
                   className="ip-input pl-9 pr-9"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   minLength={mode === "signup" ? 8 : undefined}
@@ -229,7 +229,7 @@ function LoginForm() {
             {error && <ErrorNote message={error} />}
 
             <button disabled={busy} className="btn-navy w-full">
-              {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
+              {busy ? "Please waitâ€¦" : mode === "login" ? "Sign in" : "Create account"}
             </button>
           </form>
 

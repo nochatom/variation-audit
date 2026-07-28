@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { ReactNode, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -23,7 +23,7 @@ type NavItem = {
 };
 
 /** Groups make the product's actual sequence legible: set a project up, feed
- *  it documents, run detection — then work the queue that detection produces.
+ *  it documents, run detection â€” then work the queue that detection produces.
  *  Admin is a different job on a different cadence, so it sits apart at the
  *  bottom rather than interleaved with daily work. */
 type NavGroup = { label: string | null; items: NavItem[]; admin?: boolean };
@@ -59,7 +59,7 @@ const NAV: NavGroup[] = [
       { label: "Reports", href: "/app/reports", icon: I("M3 3v18h18M7 14l3-3 3 3 5-6") },
     ],
   },
-  // Notifications is intentionally NOT a sidebar item — the topbar bell icon
+  // Notifications is intentionally NOT a sidebar item â€” the topbar bell icon
   // is the single entry point and opens the notifications popover. The page
   // itself stays reachable via the popover's "View all notifications" link
   // (and its topbar title is preserved in NESTED_TITLES below).
@@ -78,7 +78,7 @@ const NAV: NavGroup[] = [
 ];
 
 // Nested settings routes (not their own NAV entry) get a more specific
-// topbar title than the generic "Settings" match below — otherwise the
+// topbar title than the generic "Settings" match below â€” otherwise the
 // topbar disagrees with the page's own <h1> (e.g. "Settings" shown while
 // viewing "Billing & subscription").
 const NESTED_TITLES: { prefix: string; title: string }[] = [
@@ -88,7 +88,7 @@ const NESTED_TITLES: { prefix: string; title: string }[] = [
   { prefix: "/app/notifications", title: "Notifications" },
 ];
 
-/** Every nav item, ignoring grouping — grouping is a presentation concern, so
+/** Every nav item, ignoring grouping â€” grouping is a presentation concern, so
  *  title lookup and any other route matching should not have to know about it. */
 const NAV_ITEMS: NavItem[] = NAV.flatMap((g) => g.items);
 
@@ -112,7 +112,7 @@ export function AppChrome({ children }: { children: ReactNode }) {
   );
 }
 
-// Must match .animate-drawer-out's duration in globals.css (200ms) — the
+// Must match .animate-drawer-out's duration in globals.css (200ms) â€” the
 // drawer stays mounted this long after close so the slide-out can finish.
 const DRAWER_EXIT_MS = 200;
 
@@ -125,7 +125,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [closing, setClosing] = useState(false);
   // The two numbers the product exists to surface: work waiting on a decision,
   // and work about to expire. Both come from one call the dashboard already
-  // makes, and both fail silently — a sidebar must never break on a bad fetch.
+  // makes, and both fail silently â€” a sidebar must never break on a bad fetch.
   const [pending, setPending] = useState<number | null>(null);
   const [atRisk, setAtRisk] = useState(0);
 
@@ -166,7 +166,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
       <Link
         href="/app/dashboard"
         className="flex h-14 items-center gap-2.5 border-b border-ip-line px-5 cursor-pointer transition hover:opacity-80"
-        aria-label="VariationIQ home"
+        aria-label="Datum Break home"
       >
         <LogoMark size={28} />
         <Wordmark height={17} className="text-ip-ink" />
@@ -222,7 +222,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
                         className={`rounded-pill px-1.5 py-px text-[11px] font-bold tabular-nums ${
                           // Not hue alone (WCAG 1.4.1): the urgent pill is a pale
                           // tint with dark text, the normal one a solid dark fill
-                          // with white text — they invert in greyscale, so the
+                          // with white text â€” they invert in greyscale, so the
                           // states stay distinguishable without colour vision.
                           urgent ? "bg-ip-orange/12 text-ip-orange-2" : "bg-ip-navy-fill text-white"
                         }`}
@@ -244,10 +244,10 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
       </nav>
 
       {/* Card chrome removed: a border, a fill and an "ORGANIZATION" label to
-          render one string. The name is what matters — it stays, quietly. */}
+          render one string. The name is what matters â€” it stays, quietly. */}
       <div className="border-t border-ip-line px-4 py-3">
         <div className="truncate text-[12px] font-medium text-ip-ink-3" title={org?.name ?? undefined}>
-          {org?.name ?? "—"}
+          {org?.name ?? "â€”"}
         </div>
       </div>
     </div>
@@ -340,8 +340,8 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
 
 /* Notification bell + popover.
  *
- * Opening the popover is NOT navigation — it's an overlay over the current
- * page — so the active sidebar item is unaffected. The "Notifications" nav
+ * Opening the popover is NOT navigation â€” it's an overlay over the current
+ * page â€” so the active sidebar item is unaffected. The "Notifications" nav
  * item highlights only when the user actually navigates to /app/notifications
  * (via "View all" or the sidebar), never merely by opening this popup. */
 function NotificationBell() {
@@ -357,7 +357,7 @@ function NotificationBell() {
   useEffect(() => {
     refreshCount();
     // Stay in sync with read actions elsewhere (e.g. the notifications page),
-    // which broadcast this event — no route change fires there.
+    // which broadcast this event â€” no route change fires there.
     window.addEventListener("notifications:changed", refreshCount);
     return () => window.removeEventListener("notifications:changed", refreshCount);
   }, [pathname, refreshCount]);
@@ -428,7 +428,7 @@ function NotificationBell() {
             </div>
             <div className="max-h-80 overflow-y-auto">
               {items === null ? (
-                <div className="px-3.5 py-6 text-center text-[13px] text-ip-ink-3">Loading…</div>
+                <div className="px-3.5 py-6 text-center text-[13px] text-ip-ink-3">Loadingâ€¦</div>
               ) : items.length === 0 ? (
                 <div className="px-3.5 py-6 text-center text-[13px] text-ip-ink-3">You&apos;re all caught up.</div>
               ) : (
@@ -443,7 +443,7 @@ function NotificationBell() {
                           aria-label={`${n.read ? "" : "Unread: "}${d.title}`}
                           className={`flex items-start gap-2.5 px-3.5 py-2.5 transition-colors hover:bg-ip-card-2 ${n.read ? "" : "bg-ip-navy/[0.045]"}`}
                         >
-                          {/* Unread: solid orange dot. Read: hollow ring — a
+                          {/* Unread: solid orange dot. Read: hollow ring â€” a
                               clear, quiet distinction between the two states. */}
                           <span
                             className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read ? "ring-1 ring-inset ring-ip-line-strong" : "bg-ip-orange"}`}
@@ -475,7 +475,7 @@ function NotificationBell() {
   );
 }
 
-// Compact per-type description for the popover — mirrors the notifications
+// Compact per-type description for the popover â€” mirrors the notifications
 // page, and never renders a raw payload UUID.
 function describeNotif(n: NotificationItem): { title: string; detail: string; href: string } {
   const p = (n.payload ?? {}) as Record<string, unknown>;

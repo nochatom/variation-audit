@@ -118,14 +118,20 @@ describe("branding regression guard", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("every page that links to VariationIQ home imports LogoMark from the canonical path", () => {
+  it("every page that links to the brand home imports LogoMark from the canonical path", () => {
     // Positive check, not just a negative one: everywhere a
-    // aria-label="VariationIQ home" link exists, it must actually import
+    // aria-label="Datum Break home" link exists, it must actually import
     // and use the canonical component, not just avoid the old placeholder.
+    //
+    // This label is load-bearing for the test. When the lockup was renamed
+    // from VariationIQ to Datum Break, leaving the old string here would have
+    // matched nothing and passed vacuously — guarding zero files while looking
+    // green. If the accessible name changes again, change it here too.
+    const HOME_LINK_LABEL = 'aria-label="Datum Break home"';
     const offenders: string[] = [];
     for (const file of nonLogoFiles) {
       const source = fs.readFileSync(file, "utf-8");
-      if (source.includes('aria-label="VariationIQ home"')) {
+      if (source.includes(HOME_LINK_LABEL)) {
         const importsLogoMark = /from\s+["']@\/components\/ui\/Logo["']/.test(source);
         const usesLogoMark = /<LogoMark\b/.test(source);
         if (!importsLogoMark || !usesLogoMark) {
