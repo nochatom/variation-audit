@@ -62,11 +62,11 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <dl className="grid grid-cols-3 border-t border-ip-line lg:grid-cols-1 lg:border-l lg:border-t-0">
+            <div className="grid grid-cols-3 border-t border-ip-line lg:grid-cols-1 lg:border-l lg:border-t-0">
               <Metric label="Pending review" value={String(t!.pending)} href="/app/variations" />
               <Metric label="Confirmed" value={String(t!.confirmed)} />
               <Metric label="Projects" value={String(t!.projects)} href="/app/projects" />
-            </dl>
+            </div>
           </section>
 
           {/* ---- Conditional escalation: when nothing is time-barred this strip
@@ -152,10 +152,10 @@ export default function DashboardPage() {
 function Metric({ label, value, href }: { label: string; value: string; href?: string }) {
   const body = (
     <>
-      <dt className="ip-label">{label}</dt>
-      <dd className="mt-1.5 text-[22px] font-bold leading-none tabular-nums tracking-display text-ip-ink">
+      <div className="ip-label">{label}</div>
+      <div className="mt-1.5 text-[22px] font-bold leading-none tabular-nums tracking-display text-ip-ink">
         {value}
-      </dd>
+      </div>
     </>
   );
   const base = "px-5 py-4 border-ip-line [&:not(:first-child)]:border-l lg:[&:not(:first-child)]:border-l-0 lg:[&:not(:first-child)]:border-t";
