@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Frontend branding regression guard.
  *
  * Static source-inspection tests (no rendering, no DOM) that catch the

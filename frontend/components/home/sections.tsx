@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { Gavel, Inbox, Link2, ScanSearch } from "lucide-react";
 import { Chip, ConfidenceBar, StatCard, TimeBarFlag, aud } from "@/components/ui";
 import { MobileMenu } from "@/components/home/mobile-menu";

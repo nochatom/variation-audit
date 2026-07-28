@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { Nav, SiteFooter } from "@/components/home/sections";
 import { FaqList } from "@/components/faq/FaqList";
 import { FAQ } from "@/lib/faq";

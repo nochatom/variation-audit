@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VariationiQ design-reference shell (vq).
  *
  * The permanent frame: 240px sidebar, 72px top bar, #F6F7F9 content area on a

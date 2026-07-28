@@ -1,4 +1,4 @@
-﻿"""Regression coverage for the free-tier analysis-usage bypass.
+"""Regression coverage for the free-tier analysis-usage bypass.
 
 Root cause: get_usage()/enforce_analysis_limit() used to count rows in
 analysis_jobs, whose project_id FK is ON DELETE CASCADE. Permanently

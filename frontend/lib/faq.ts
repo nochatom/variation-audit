@@ -1,4 +1,4 @@
-﻿/** The single FAQ source. Consumed by /faq (the full page) and by the pricing
+/** The single FAQ source. Consumed by /faq (the full page) and by the pricing
  * page, which renders the `pricing` subset — so an answer can never drift
  * between the two places a buyer might read it. */
 export type FaqGroup = "data" | "claims" | "how" | "billing";

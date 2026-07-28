@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VariationiQ — Dashboard, design reference.
  *
  * The master screen for the 10-screen platform: the shell, grid, type scale and

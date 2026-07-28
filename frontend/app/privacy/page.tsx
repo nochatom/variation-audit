@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { Nav, SiteFooter } from "@/components/home/sections";
 import { InfoNote } from "@/components/ui";
 

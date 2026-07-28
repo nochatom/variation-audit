@@ -1,4 +1,4 @@
-﻿import { test, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 /**
  * Smoke tests — public pages render, key content is present, and navigation

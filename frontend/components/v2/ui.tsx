@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VariationiQ design-reference primitives (vq).
  *
  * Component styles for the /dashboard-v2 reference screen. These are the

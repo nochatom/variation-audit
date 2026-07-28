@@ -1,4 +1,4 @@
-﻿"""Enterprise billing (.24): webhook idempotency, plan-limit enforcement,
+"""Enterprise billing (.24): webhook idempotency, plan-limit enforcement,
 grace period, seat-based billing, feature flags, billing audit trail, RBAC.
 """
 import uuid

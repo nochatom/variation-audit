@@ -1,4 +1,4 @@
-﻿import type { Config } from "tailwindcss";
+import type { Config } from "tailwindcss";
 
 // Two token sets share this config:
 //  • dark Linear tokens (canvas/surface/ink/primary) — root layout body / global-error
