@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { Gavel, Inbox, Link2, ScanSearch } from "lucide-react";
 import { Chip, ConfidenceBar, StatCard, TimeBarFlag, aud } from "@/components/ui";
 import { MobileMenu } from "@/components/home/mobile-menu";
@@ -6,11 +6,11 @@ import { LogoMark } from "@/components/ui/Logo";
 import { Wordmark } from "@/components/ui/Wordmark";
 
 /* ---------------- nav ----------------
-   Root-relative (/#id), not bare #id â€” this nav renders on every marketing
+   Root-relative (/#id), not bare #id — this nav renders on every marketing
    page, and a bare hash silently no-ops anywhere the target section doesn't
    exist (e.g. /pricing).
 
-   "Product" used to point at /#preview, the sample panel inside the hero â€”
+   "Product" used to point at /#preview, the sample panel inside the hero —
    i.e. it scrolled you to the top of the page you were already on. It now
    names what it actually reaches. */
 const NAV_LINKS = [
@@ -26,13 +26,13 @@ export function Nav() {
         <Link
           href="/"
           className="-ml-2 flex min-h-[44px] items-center gap-2.5 rounded-md px-2"
-          aria-label="Datum Break home"
+          aria-label="VariationIQ home"
         >
           <LogoMark size={28} />
           <Wordmark height={17} className="text-ip-ink" />
         </Link>
 
-        {/* Links sit at 44px tall (they were 20px) â€” the hit area grows, the
+        {/* Links sit at 44px tall (they were 20px) — the hit area grows, the
             type does not. */}
         <nav className="hidden items-center gap-2 text-sm text-ip-ink-2 md:flex">
           {NAV_LINKS.map((l) => (
@@ -48,7 +48,7 @@ export function Nav() {
 
         <div className="flex items-center gap-1 sm:gap-2">
           {/* Sign in stays a quiet text link and Get started keeps the fill:
-              one action leads. They also now resolve to different tabs â€”
+              one action leads. They also now resolve to different tabs —
               previously both hit /login and both opened the login form. */}
           <Link
             href="/login"
@@ -57,7 +57,7 @@ export function Nav() {
             Sign in
           </Link>
           {/* Stays visible at every width. Hiding it behind the mobile menu
-              traded the header's one job for a hamburger â€” wayfinding belongs
+              traded the header's one job for a hamburger — wayfinding belongs
               in the menu, the primary action does not. */}
           <Link href="/login?mode=signup" className="btn-navy min-h-[44px] px-4 text-sm">
             Get started
@@ -99,7 +99,7 @@ export function Hero() {
           </p>
 
           {/* Secondary CTA says what it actually does. It is an in-page anchor
-              to the sample panel (#preview) â€” labelling it "Book a Demo" made a
+              to the sample panel (#preview) — labelling it "Book a Demo" made a
               promise the button never kept, and on desktop its target is already
               on screen. It earns its place on mobile, where the proof sits below
               the fold. */}
@@ -119,7 +119,7 @@ export function Hero() {
         </div>
 
         {/* DELETED: WorkflowChain. HowItWorks() below is the same pipeline
-            (Ingest â†’ Detect â†’ Recover) told properly â€” the hero was explaining
+            (Ingest → Detect → Recover) told properly — the hero was explaining
             mechanics before the visitor had accepted the premise. */}
         <div className="animate-fade-up" style={{ animationDelay: "150ms" }}>
           <ScreenshotPreview />
@@ -152,7 +152,7 @@ function ScreenshotPreview() {
               money recovered. */}
           <div className="mb-4">
             <div className="text-[11px] text-ip-ink-3">Projects / Sydney Metro</div>
-            <div className="text-sm font-semibold text-ip-ink">Package 4 â€” Electrical</div>
+            <div className="text-sm font-semibold text-ip-ink">Package 4 — Electrical</div>
           </div>
 
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
@@ -164,14 +164,14 @@ function ScreenshotPreview() {
           <div className="mt-2.5 overflow-hidden rounded-lg border border-ip-line">
             <div className="flex items-center justify-between border-b border-ip-line bg-ip-card-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-ip-ink-3">
               <span>Detected variations</span>
-              <span>Value Â· Confidence</span>
+              <span>Value · Confidence</span>
             </div>
             <PreviewRow title="Additional GPOs beyond contract scope" score={0.86} value={aud(4200)} timeBar />
             <PreviewRow title="Client-directed lobby finish upgrade" score={0.81} value={aud(18000)} timeBar />
-            <PreviewRow title="Latent ground conditions â€” extra excavation" score={0.64} value={aud(12500)} />
+            <PreviewRow title="Latent ground conditions — extra excavation" score={0.64} value={aud(12500)} />
           </div>
 
-          <p className="mt-3 text-center text-[11px] text-ip-ink-3">Illustrative sample data â€” not live</p>
+          <p className="mt-3 text-center text-[11px] text-ip-ink-3">Illustrative sample data — not live</p>
         </div>
       </div>
     </div>
@@ -210,7 +210,7 @@ function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) 
    Deliberately NOT three equal cards. Ingest is table stakes (every tool
    accepts uploads) and Recover is output formatting; detection against the
    contract baseline is the only step a competitor can't trivially copy. So
-   Detect gets the width, the word budget and â€” most importantly â€” the only
+   Detect gets the width, the word budget and — most importantly — the only
    thing on this section that isn't a claim: a worked example. The supporting
    steps shrink to a single line each. */
 export function HowItWorks() {
@@ -219,15 +219,15 @@ export function HowItWorks() {
       <div className="mx-auto max-w-[1440px] px-6 py-24 sm:px-12 lg:px-16">
         <SectionHeading eyebrow="How it works" title="From project records to recoverable revenue." />
 
-        {/* Source order is 01 â†’ 02 â†’ 03 so the stacked mobile layout reads in
+        {/* Source order is 01 → 02 → 03 so the stacked mobile layout reads in
             sequence; the two-column desktop arrangement is produced by explicit
             placement, not by source order. Nesting the asides in their own
-            column made mobile read 01 â†’ 03 â†’ 02. */}
+            column made mobile read 01 → 03 → 02. */}
         <div className="mt-12 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_1.85fr] lg:items-start">
           <StepAside
             n="01"
             title="Ingest"
-            body="RFIs, site instructions, meeting minutes and comms â€” by upload or CSV, normalised into one timeline."
+            body="RFIs, site instructions, meeting minutes and comms — by upload or CSV, normalised into one timeline."
             className="lg:col-start-1 lg:row-start-1"
           />
 
@@ -257,7 +257,7 @@ export function HowItWorks() {
 }
 
 /** Supporting step: no card fill, no bordered numeral box. The number is just a
- *  number â€” the reading order already communicates sequence, so the box that
+ *  number — the reading order already communicates sequence, so the box that
  *  used to hold it was decoration. */
 function StepAside({ n, title, body, className = "" }: { n: string; title: string; body: string; className?: string }) {
   return (
@@ -274,11 +274,11 @@ function StepAside({ n, title, body, className = "" }: { n: string; title: strin
   );
 }
 
-/** The worked example â€” the one thing in this section that isn't a claim.
+/** The worked example — the one thing in this section that isn't a claim.
  *  Shows the actual transformation: an ordinary line in a site instruction on
  *  the left, the variation it produces on the right. Built from the same
  *  primitives the product renders (ConfidenceBar, Chip, aud) rather than
- *  drawn, and labelled as illustrative â€” the hero makes the same promise and
+ *  drawn, and labelled as illustrative — the hero makes the same promise and
  *  breaking it here would cost more than the section is worth. */
 function DetectionExample() {
   return (
@@ -286,9 +286,9 @@ function DetectionExample() {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
         {/* evidence in */}
         <div className="rounded-lg border border-ip-line bg-ip-card-2 p-4">
-          <p className="ip-label mb-2">Site instruction Â· 14 Mar</p>
+          <p className="ip-label mb-2">Site instruction · 14 Mar</p>
           <p className="text-[13px] leading-relaxed text-ip-ink-2">
-            &ldquo;Confirming site walk today â€” client wants{" "}
+            &ldquo;Confirming site walk today — client wants{" "}
             <mark className="rounded bg-ip-orange/20 px-0.5 text-ip-ink">four extra GPOs in the plant room</mark>{" "}
             before ceilings close. Proceed and we&rsquo;ll sort the paperwork later.&rdquo;
           </p>
@@ -324,7 +324,7 @@ function DetectionExample() {
       </div>
 
       <p className="mt-3 text-[11px] text-ip-ink-3">
-        Illustrative example â€” not live data. &ldquo;Sort the paperwork later&rdquo; is where the money goes missing.
+        Illustrative example — not live data. &ldquo;Sort the paperwork later&rdquo; is where the money goes missing.
       </p>
     </div>
   );
@@ -339,7 +339,7 @@ function DetectionExample() {
    late. It gets the width; the rest support it. */
 export function Features() {
   const supporting = [
-    { title: "Multi-source ingestion", body: "RFIs, site instructions, meeting minutes and project comms â€” parsed and normalised, not just stored.", icon: Inbox },
+    { title: "Multi-source ingestion", body: "RFIs, site instructions, meeting minutes and project comms — parsed and normalised, not just stored.", icon: Inbox },
     { title: "AI variation detection", body: "Finds out-of-scope and unclaimed work across the entire project record, clustered with its rationale.", icon: ScanSearch },
     { title: "Evidence-linked audit trail", body: "Every finding traces back to its source document, with an immutable record of each review decision.", icon: Link2 },
   ];
@@ -351,7 +351,7 @@ export function Features() {
 
         {/* Protagonist. Two columns rather than one long line: a single text
             block stopped around 60% of the card, leaving the border drawing a
-            box around empty space â€” which reads as unfinished rather than as
+            box around empty space — which reads as unfinished rather than as
             restraint. Heading left, argument right, both using the width. */}
         <div className="ip-card-lg mt-12 p-7 sm:p-9">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14">
@@ -367,7 +367,7 @@ export function Features() {
 
             <div>
               {/* Absorbs the one sentence worth keeping from the deleted
-                  "Product capabilities" section â€” the state/territory nuance. */}
+                  "Product capabilities" section — the state/territory nuance. */}
               <p className="text-[15px] leading-relaxed text-ip-ink-2">
                 Recoverable estimates in AUD, with Security of Payment notice deadlines flagged before
                 they lapse. Notice periods and time-bar logic account for state and territory SoP regimes.
@@ -379,7 +379,7 @@ export function Features() {
           </div>
         </div>
 
-        {/* supporting â€” no hover lift: these aren't clickable, and a card that
+        {/* supporting — no hover lift: these aren't clickable, and a card that
             rises under the cursor promises an interaction that never arrives. */}
         <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           {supporting.map((c) => (
@@ -438,7 +438,7 @@ export function CtaBanner() {
    Two columns, not four. "Company" and "Legal" held one and two links; a 12px
    uppercase header plus its spacing is more chrome than a single line of
    content deserves, so they're merged into one column that earns its label.
-   Contact moved into the brand block â€” an email address is identity, not
+   Contact moved into the brand block — an email address is identity, not
    navigation, and as a standalone column it was the fifth child in a
    four-track grid, wrapping to its own row with the full width of the footer
    empty beside it.
@@ -448,7 +448,7 @@ export function CtaBanner() {
    link earlier, and a footer that contradicts the header is worse than one
    link short. */
 /* One flat row rather than two labelled columns. "Product" and "Company" each
-   spent a heading row organising three items â€” more chrome than content at this
+   spent a heading row organising three items — more chrome than content at this
    link count. FAQ is included because it is otherwise reachable only from the
    bottom of /pricing. */
 const FOOTER_LINKS: { title: string; href: string }[] = [
@@ -470,13 +470,13 @@ export function SiteFooter() {
             <Link
               href="/"
               className="-ml-2 flex min-h-[44px] w-fit items-center gap-2.5 rounded-md px-2"
-              aria-label="Datum Break home"
+              aria-label="VariationIQ home"
             >
               <LogoMark size={28} />
               <Wordmark height={17} className="text-ip-ink" />
             </Link>
             <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-ip-ink-3">
-              AI revenue recovery for Australian construction â€” surfacing unclaimed variations from your project
+              AI revenue recovery for Australian construction — surfacing unclaimed variations from your project
               records before the time bar closes.
             </p>
             <a
@@ -504,16 +504,16 @@ export function SiteFooter() {
 
         {/* Trust band. This footer sits on every page, and the question a
             commercial manager has before uploading head-contract correspondence
-            is where it goes and who sees it â€” not which marketing page to read
+            is where it goes and who sees it — not which marketing page to read
             next. Residency is stated because the API already reports it
-            (GET /health â†’ region). Nothing here asserts anything unverified:
+            (GET /health → region). Nothing here asserts anything unverified:
             the retention-on-downgrade answer is still in FAQ_DRAFTS and stays
             out until it is confirmed. */}
         <dl className="mt-10 grid gap-x-10 gap-y-5 border-t border-ip-line pt-6 sm:grid-cols-2">
           <div>
             <dt className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-ip-ink-3">Your data</dt>
             <dd className="mt-1 text-[13px] leading-relaxed text-ip-ink-2">
-              Stored in Australia â€” <span className="font-mono text-[11.5px]">ap-southeast-2</span> (Sydney).
+              Stored in Australia — <span className="font-mono text-[11.5px]">ap-southeast-2</span> (Sydney).
               Each analysis is isolated to your workspace, and your documents are never used to
               train AI models.
             </dd>
@@ -538,7 +538,7 @@ export function SiteFooter() {
         </p>
 
         <div className="mt-6 border-t border-ip-line pt-5">
-          <p className="text-[12px] text-ip-ink-3">Â© {new Date().getFullYear()} VariationIQ</p>
+          <p className="text-[12px] text-ip-ink-3">© {new Date().getFullYear()} VariationIQ</p>
         </div>
       </div>
     </footer>

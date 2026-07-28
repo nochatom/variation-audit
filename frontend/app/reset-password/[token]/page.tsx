@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -32,7 +32,7 @@ export default function ResetPasswordPage() {
     setBusy(true);
     try {
       // Resetting revokes every existing session server-side, so there's no
-      // auto-login here â€” the user logs back in fresh, everywhere.
+      // auto-login here — the user logs back in fresh, everywhere.
       await api.resetPassword(token, password);
       setDone(true);
     } catch (err) {
@@ -57,10 +57,10 @@ export default function ResetPasswordPage() {
         )}
       </button>
       <div className="w-full max-w-sm">
-        <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="Datum Break home">
+        <Link href="/" className="mb-7 flex items-center gap-2.5" aria-label="VariationIQ home">
           <LogoMark size={32} />
           <div>
-            <h1 aria-label="Datum Break" className="flex"><Wordmark height={18} className="text-ip-ink" /></h1>
+            <h1 aria-label="VariationIQ" className="flex"><Wordmark height={18} className="text-ip-ink" /></h1>
             <p className="text-[12px] text-ip-ink-3">AU construction variation recovery</p>
           </div>
         </Link>
@@ -87,7 +87,7 @@ export default function ResetPasswordPage() {
                       id="password"
                       className="ip-input pl-9 pr-9"
                       type={showPassword ? "text" : "password"}
-                      placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                      placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       minLength={8}
@@ -112,7 +112,7 @@ export default function ResetPasswordPage() {
                     id="confirm"
                     className="ip-input"
                     type={showPassword ? "text" : "password"}
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder="••••••••"
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
                     minLength={8}
@@ -122,7 +122,7 @@ export default function ResetPasswordPage() {
                 </div>
                 {error && <ErrorNote message={error} />}
                 <button disabled={busy} className="btn-navy w-full">
-                  {busy ? "Updatingâ€¦" : "Update password"}
+                  {busy ? "Updating…" : "Update password"}
                 </button>
               </form>
             </>
