@@ -53,7 +53,7 @@ test.describe("critical journey", () => {
       mimeType: "text/plain",
       buffer: Buffer.from("Agreed scope baseline: electrical rough-in and fit-off."),
     });
-    await expect(authedPage.getByText(/Contract baseline updated/i)).toBeVisible();
+    await expect(authedPage.getByText(/Scope baseline in place/i)).toBeVisible();
   });
 
   test("open the billing plan modal", async ({ authedPage }) => {

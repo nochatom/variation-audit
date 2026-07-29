@@ -72,6 +72,7 @@ test.describe("analysis (live SSE)", () => {
     await expect(page.getByText("Documents read").locator("xpath=following-sibling::div")).toHaveText("3/3");
 
     // Live log rendered one line per event, derived from real fields.
+    await page.getByText("Technical detail").first().click();
     await expect(page.getByText("Live log")).toBeVisible();
     await expect(page.getByText("Variation Detection completed (5 found)")).toBeVisible();
   });

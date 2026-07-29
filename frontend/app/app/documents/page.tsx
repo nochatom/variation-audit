@@ -177,7 +177,7 @@ function Baseline({
   const handle = (f: File) =>
     api.uploadContract(projectId, f).then(() => "Baseline updated");
 
-  if (hasContract && !receipt?.ok) {
+  if (hasContract && (!receipt || receipt.ok)) {
     // Settled state: confirmed in one line. A large panel for a solved
     // problem is exactly the kind of weight this page can't afford.
     return (
