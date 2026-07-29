@@ -11,7 +11,74 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, Document, Evidence
+from app.models import (
+    AuditLog,
+    Document,
+    Evidence,
+    Invitation,
+    Office,
+    Organization,
+    Project,
+    User,
+    Variation,
+)
+
+# Which model and attribute names each audited entity_type. An audit row stores
+# only a UUID, so without this the trail can say "a3f2b891 did something to
+# 8f31a204" and nothing more — which defeats the point of an audit trail.
+# `membership` is deliberately User: orgs.py writes the TARGET user's id as the
+# entity_id, not a membership row id.
+_ENTITY_LABEL: dict[str, tuple[type, tuple[str, ...]]] = {
+    "project": (Project, ("name",)),
+    "variation": (Variation, ("title",)),
+    "membership": (User, ("full_name", "email")),
+    "invitation": (Invitation, ("email",)),
+    "office": (Office, ("name",)),
+    "organization": (Organization, ("name",)),
+    "subscription": (Organization, ("name",)),
+}
+
+
+def _first_attr(obj, names: tuple[str, ...]) -> str | None:
+    for n in names:
+        v = getattr(obj, n, None)
+        if v:
+            return str(v)
+    return None
+
+
+def resolve_labels(session: Session, rows: list[AuditLog]) -> tuple[dict, dict]:
+    """Human-readable names for the actors and entities in `rows`.
+
+    Returns ({actor_user_id: name}, {(entity_type, entity_id): label}).
+
+    Batched per model — one query for the actors and one per entity_type present,
+    rather than two lookups per row. A 100-row page therefore costs at most a
+    handful of queries regardless of how many distinct entities it touches.
+    """
+    # .scalars().all() rather than iterating .scalars(): that is the pattern used
+    # throughout this module, and the test fakes implement .all() only.
+    actor_ids = {r.actor_user_id for r in rows if r.actor_user_id}
+    actors: dict = {}
+    if actor_ids:
+        for u in session.execute(select(User).where(User.id.in_(actor_ids))).scalars().all():
+            actors[u.id] = _first_attr(u, ("full_name", "email")) or str(u.id)
+
+    labels: dict = {}
+    by_type: dict[str, set] = {}
+    for r in rows:
+        if r.entity_type in _ENTITY_LABEL:
+            by_type.setdefault(r.entity_type, set()).add(r.entity_id)
+
+    for etype, ids in by_type.items():
+        model, attrs = _ENTITY_LABEL[etype]
+        found = session.execute(select(model).where(model.id.in_(ids))).scalars().all()
+        for obj in found:
+            label = _first_attr(obj, attrs)
+            if label:
+                labels[(etype, obj.id)] = label
+
+    return actors, labels
 
 
 def list_audit(session: Session, company_id: uuid.UUID, *,

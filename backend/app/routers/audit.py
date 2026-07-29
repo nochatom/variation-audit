@@ -18,6 +18,12 @@ router = APIRouter(tags=["audit"])
 class AuditOut(BaseModel):
     id: str
     actor_user_id: str | None = None
+    # Resolved server-side so the client can render a sentence rather than two
+    # UUID prefixes. Both are best-effort: an entity deleted since the event was
+    # written has no label, and a system-generated event has no actor. The raw
+    # ids stay in the payload either way, so nothing is lost.
+    actor_name: str | None = None
+    entity_label: str | None = None
     entity_type: str
     entity_id: str
     action: str
@@ -40,13 +46,22 @@ class EvidenceContextOut(BaseModel):
     source_document: SourceDocumentOut | None = None
 
 
-def _audit_out(a) -> AuditOut:
+def _audit_out(a, actors: dict | None = None, labels: dict | None = None) -> AuditOut:
     return AuditOut(
         id=str(a.id), actor_user_id=str(a.actor_user_id) if a.actor_user_id else None,
+        actor_name=(actors or {}).get(a.actor_user_id),
+        entity_label=(labels or {}).get((a.entity_type, a.entity_id)),
         entity_type=a.entity_type, entity_id=str(a.entity_id), action=a.action,
         before=a.before, after=a.after,
         created_at=a.created_at.isoformat() if a.created_at else "",
     )
+
+
+def _audit_page(session, rows) -> list[AuditOut]:
+    """Resolve every actor and entity name for the page in a handful of queries,
+    then map. Doing it per-row would be two extra lookups per entry."""
+    actors, labels = audit_service.resolve_labels(session, rows)
+    return [_audit_out(a, actors, labels) for a in rows]
 
 
 def _load_variation(session, user, variation_id) -> Variation:
@@ -71,7 +86,7 @@ def org_audit(company_id: uuid.UUID, entity_type: str | None = None,
     except billing_service.FeatureNotAvailable as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
     rows = audit_service.list_audit(session, company_id, entity_type=entity_type, limit=limit)
-    return [_audit_out(a) for a in rows]
+    return _audit_page(session, rows)
 
 
 # -- per-variation audit history (any member) -----------------------------
@@ -81,7 +96,7 @@ def variation_audit(variation_id: uuid.UUID, user: User = Depends(get_current_us
     v = _load_variation(session, user, variation_id)
     rows = audit_service.list_audit(session, v.company_id, entity_type="variation",
                                     entity_id=variation_id)
-    return [_audit_out(a) for a in rows]
+    return _audit_page(session, rows)
 
 
 # -- evidence viewer with source-document context (any member) ------------

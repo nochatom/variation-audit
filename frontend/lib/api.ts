@@ -553,6 +553,13 @@ export type InvitationPreview = { email: string; org_name: string; role: string;
 export type AuditEntry = {
   id: string;
   actor_user_id: string | null;
+  /** Resolved server-side. Null for system-generated events, or when the actor
+   *  no longer exists — fall back to the id, never render a bare UUID as if it
+   *  were a name. */
+  actor_name: string | null;
+  /** Resolved server-side from entity_type + entity_id. Null when the entity has
+   *  since been deleted, which is expected in an append-only log. */
+  entity_label: string | null;
   entity_type: string;
   entity_id: string;
   action: string;
