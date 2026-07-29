@@ -5,7 +5,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app.auth.deps import get_current_user, get_db, require_admin
+from app.auth.deps import get_current_user, get_db, require_admin, require_any_org_admin
 from app.main import app
 from app.models import AuditLog, Membership, MembershipRole, User
 from app.services import orgs as org_service
@@ -32,6 +32,20 @@ def test_require_admin_rejects_member():
     m = _membership(user.id, cid, MembershipRole.member)
     with pytest.raises(HTTPException) as ei:
         require_admin(FakeSession(results=[FakeResult(scalar=m)]), user, cid)
+    assert ei.value.status_code == 403
+
+
+# -- require_any_org_admin guard -------------------------------------------
+def test_require_any_org_admin_allows_admin():
+    user = _user()
+    m = _membership(user.id, uuid.uuid4(), MembershipRole.admin)
+    assert require_any_org_admin(user, FakeSession(results=[FakeResult(scalar=m)])) is user
+
+
+def test_require_any_org_admin_rejects_non_admin():
+    user = _user()
+    with pytest.raises(HTTPException) as ei:
+        require_any_org_admin(user, FakeSession(results=[FakeResult(scalar=None)]))
     assert ei.value.status_code == 403
 
 

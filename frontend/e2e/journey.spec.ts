@@ -47,19 +47,19 @@ test.describe("critical journey", () => {
   test("upload a contract on the Documents page", async ({ authedPage }) => {
     await authedPage.goto("/app/documents");
     // The contract UploadCard's hidden file input (accept=".pdf,.txt").
-    const contractCard = authedPage.getByText("Contract / scope baseline").locator("xpath=ancestor::*[.//input[@type='file']][1]");
+    const contractCard = authedPage.getByText(/No scope baseline yet|Scope baseline/i).locator("xpath=ancestor::*[.//input[@type='file']][1]");
     await contractCard.locator('input[type="file"]').setInputFiles({
       name: "contract.txt",
       mimeType: "text/plain",
       buffer: Buffer.from("Agreed scope baseline: electrical rough-in and fit-off."),
     });
-    await expect(authedPage.getByText(/Contract baseline updated/i)).toBeVisible();
+    await expect(authedPage.getByText(/Scope baseline in place/i)).toBeVisible();
   });
 
   test("open the billing plan modal", async ({ authedPage }) => {
     await authedPage.goto("/app/settings/billing");
     // Free plan → button reads "Upgrade plan"; opens the UpgradeModal.
-    await authedPage.getByRole("button", { name: /Upgrade plan|Change plan/i }).click();
+    await authedPage.getByRole("button", { name: /Upgrade plan|Change plan/i }).first().click();
     const dialog = authedPage.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText(/Change plan/i);

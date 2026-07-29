@@ -78,10 +78,14 @@ def require_any_org_admin(
     doesn't fit. This codebase has no separate "platform admin" role;
     requiring org-admin-of-any-org is the closest fit to "the existing admin
     authorization mechanism" without inventing a new one."""
+    # Security/Hardening: Add .limit(1) before scalar_one_or_none() because
+    # if a user is an admin of multiple organizations, the query will return
+    # multiple results and raise SQLAlchemy's MultipleResultsFound exception,
+    # causing a 500 Internal Server Error (Denial of Service/Access) for that admin.
     is_admin = session.execute(
         select(Membership).where(
             Membership.user_id == user.id, Membership.role == MembershipRole.admin,
-        )
+        ).limit(1)
     ).scalar_one_or_none()
     if is_admin is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin role required")

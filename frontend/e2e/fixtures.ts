@@ -97,7 +97,7 @@ export async function mockApi(page: Page) {
   // with raw JSON). Trailing "*" tolerates query strings.
   await page.route(`${B}/auth/me`, (r) => r.fulfill(json(ME)));
   await page.route(`${B}/auth/login`, (r) =>
-    r.fulfill(json({ access_token: "test-access", refresh_token: "test-refresh", user_id: USER_ID, email: ME.email })),
+    r.fulfill(json({ access_token: "test-access", refresh_token: "test-refresh", user_id: USER_ID, email: ME.email, organizations: ME.organizations })),
   );
   await page.route(`${B}/auth/refresh`, (r) =>
     r.fulfill(json({ access_token: "test-access", refresh_token: "test-refresh" })),

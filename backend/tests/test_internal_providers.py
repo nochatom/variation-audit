@@ -117,6 +117,43 @@ def test_admin_accepted(admin_client):
     assert resp.status_code == 200
 
 
+def test_admin_with_multiple_orgs_accepted():
+    """A user who is an admin in multiple organizations must be accepted
+    by `require_any_org_admin` without crashing (previously, lack of limit(1)
+    raised MultipleResultsFound)."""
+    with session_factory() as session:
+        org1 = Organization(id=uuid.uuid4(), name="Diagnostics Test Org 1")
+        org2 = Organization(id=uuid.uuid4(), name="Diagnostics Test Org 2")
+        user = User(id=uuid.uuid4(), email=f"multi-admin-{uuid.uuid4().hex[:8]}@test.com",
+                    password_hash="x", is_active=True)
+        session.add_all([org1, org2, user])
+        session.flush()
+        session.add(Membership(id=uuid.uuid4(), user_id=user.id, company_id=org1.id,
+                               role=MembershipRole.admin))
+        session.add(Membership(id=uuid.uuid4(), user_id=user.id, company_id=org2.id,
+                               role=MembershipRole.admin))
+        session.commit()
+        user_id = user.id
+
+    def _db():
+        with session_factory() as session:
+            yield session
+
+    def _user():
+        with session_factory() as session:
+            return session.get(User, user_id)
+
+    app.dependency_overrides[get_db] = _db
+    app.dependency_overrides[get_current_user] = _user
+
+    try:
+        client = TestClient(app)
+        resp = client.get("/internal/providers")
+        assert resp.status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
 @pytest.mark.parametrize("path", [
     "/internal/providers", "/internal/providers/models",
     "/internal/providers/health", "/internal/providers/circuits",
