@@ -24,7 +24,7 @@ test.describe("reports", () => {
     });
 
     await page.goto("/app/reports");
-    await page.getByRole("button", { name: "Download PDF", exact: true }).first().click();
+    await page.getByRole("button", { name: /Download.*report/i }).first().click();
 
     // The actionable backend message is shown; the old generic string is not.
     await expect(page.getByText(/exports.*feature isn't available on your current plan/i)).toBeVisible();
