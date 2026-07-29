@@ -482,15 +482,23 @@ function fromStatus(d: ProjectDashboard): VM {
 /* ---------------- failure / stall banners ---------------- */
 function StallBanner({ busy, onRetry, onViewLogs }: { busy: boolean; onRetry: () => void; onViewLogs: () => void }) {
   return (
-    <div role="alert" className="mt-5 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+    // Warn severity, not error: a quiet stage on a long contract is normal, and
+    // the run has not failed. Uses --ip-warn (6.45:1) rather than raw
+    // amber-500, which measured 2.15:1 as text and failed AA outright — the
+    // project's own token comment reserves orange for non-text use for exactly
+    // this reason.
+    <div role="status" className="mt-5 rounded-lg border border-ip-line border-l-[3px] border-l-ip-warn bg-ip-card p-4">
       <div className="flex items-start gap-3">
-        <svg viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+        <svg viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0 text-ip-warn" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 8v5M12 16.5v.5" /><circle cx="12" cy="12" r="9" />
         </svg>
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-bold text-ip-ink">Analysis appears stalled.</p>
+          <p className="text-[14px] font-bold text-ip-ink">
+            No update for over {STALL_MS / 1000} seconds.
+          </p>
           <p className="mt-0.5 text-[12.5px] leading-relaxed text-ip-ink-2">
-            No progress event has been received for over {STALL_MS / 1000} seconds. The worker may have stopped or lost connection.
+            The run has not failed — a long contract can sit on one stage for a while. Retrying
+            starts again from the beginning and discards the work completed so far.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button onClick={onRetry} disabled={busy} className="btn-orange text-xs">
@@ -685,35 +693,72 @@ function RunPanel({
         <StallBanner busy={busy} onRetry={onRun} onViewLogs={viewLogs} />
       ) : null}
 
-      {/* progress bar + percentage */}
-      <div className="mt-6">
-        <div className="mb-1.5 flex items-baseline justify-between">
-          <span className="text-[13px] font-medium text-ip-ink-2">{vm.label}</span>
-          <span className="text-[13px] font-bold tabular-nums text-ip-ink">{vm.pct}%</span>
+      {/* The current stage is the hero, not the percentage. "47%" answers how
+          far; "Reading RFIs — document 14 of 31" answers what is happening,
+          which is what someone watches a running job to learn. The percentage
+          stays, set large and right-aligned, but it is read second. */}
+      <div className="mt-6 grid grid-cols-[1fr_auto] items-start gap-5">
+        <div className="min-w-0">
+          <h3 className="truncate text-[24px] font-bold leading-[1.15] tracking-tight text-ip-ink">
+            {vm.label}
+          </h3>
+          <p className="mt-1.5 truncate text-[13.5px] text-ip-ink-2">
+            {live?.current_document
+              ? <>Document <span className="font-semibold text-ip-ink tabular-nums">{vm.docsProcessed}</span> — {live.current_document}</>
+              : vm.currentStatus}
+          </p>
         </div>
+        <div className="text-right">
+          <div className="text-[40px] font-bold leading-none tracking-display tabular-nums text-ip-ink">{vm.pct}%</div>
+          <div className="mt-1.5 text-[12px] text-ip-ink-3">
+            {vm.remainingMs != null ? `about ${fmtDur(vm.remainingMs)} left` : fmtDur(vm.elapsedMs) + " elapsed"}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4">
         <ProgressBar pct={vm.pct} state={vm.state} />
       </div>
 
-      {/* four-step pipeline */}
-      <ol className="mt-6 space-y-1">
+      {/* Four phases as a rail rather than four stacked blocks. Only one is
+          ever active, so the rail keeps all four visible for orientation while
+          spending emphasis on the live one. */}
+      <ol className="mt-5 grid grid-cols-2 overflow-hidden rounded-lg border border-ip-line sm:grid-cols-4">
         {STEPS.map((label, i) => (
-          <Step key={label} n={i + 1} label={label} state={vm.steps[i]} last={i === STEPS.length - 1} />
+          <PhaseCell key={label} label={label} state={vm.steps[i]} last={i === STEPS.length - 1} />
         ))}
       </ol>
 
-      {/* metrics grid — every value below is a real backend figure while live */}
-      <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-ip-line bg-ip-line sm:grid-cols-3">
+      {/* Four counts, not six metrics. Elapsed and remaining moved up beside
+          the percentage, where the question they answer is being asked. */}
+      <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-ip-line bg-ip-line sm:grid-cols-4">
+        <Metric label="Documents read" value={vm.docsProcessed} mono />
+        <Metric label="Variations found" value={vm.variations} mono />
+        <Metric label="Evidence links" value={vm.evidence} mono />
         <Metric label="Elapsed" value={fmtDur(vm.elapsedMs)} mono />
-        <Metric label="Est. remaining" value={fmtDur(vm.remainingMs)} mono />
-        <Metric label="Current status" value={vm.currentStatus} />
-        <Metric label="Documents processed" value={vm.docsProcessed} mono />
-        <Metric label="Variations detected" value={vm.variations} mono />
-        <Metric label="Evidence collected" value={vm.evidence} mono />
       </div>
 
-      {log.length > 0 && <LogWindow entries={log} live={streamActive && connected} scrollRef={logRef} />}
-
-      <TechnicalDetails vm={vm} />
+      {/* Diagnostics are real and worth keeping, but they are not the answer to
+          "what is happening". One disclosure, closed by default, so the run
+          stays the page while they remain one click away. */}
+      {(log.length > 0 || vm.stageStates.length > 0) && (
+        <details className="mt-5 overflow-hidden rounded-lg border border-ip-line">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-[13px] font-semibold text-ip-ink [&::-webkit-details-marker]:hidden">
+            <span>
+              Technical detail
+              <span className="ml-2 font-normal text-ip-ink-3">
+                {vm.completedStages} of {vm.stageStates.length} stages
+                {log.length > 0 ? ` · ${log.length} log line${log.length === 1 ? "" : "s"}` : ""}
+              </span>
+            </span>
+            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ip-ink-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </summary>
+          <TechnicalDetails vm={vm} />
+          {log.length > 0 && <LogWindow entries={log} live={streamActive && connected} scrollRef={logRef} />}
+        </details>
+      )}
     </Card>
   );
 }
@@ -747,34 +792,41 @@ function ProgressBar({ pct, state }: { pct: number; state: RunState }) {
   );
 }
 
-function Step({ n, label, state, last }: { n: number; label: string; state: StepState; last: boolean }) {
+/** One of the four phases, as a cell in a horizontal rail.
+ *
+ * Replaces the vertical numbered Step list. The numbering carried no
+ * information the order did not already give, and four stacked rows spent
+ * height on three phases that are, by definition, not what is happening. */
+function PhaseCell({ label, state, last }: { label: string; state: StepState; last: boolean }) {
+  const tone =
+    state === "done" ? "text-ip-recovery"
+    : state === "active" ? "text-ip-ink"
+    : state === "error" ? "text-ip-risk"
+    : "text-ip-ink-3";
+  const note =
+    state === "done" ? "done"
+    : state === "active" ? "in progress"
+    : state === "error" ? "failed"
+    : "not started";
   return (
-    <li className="relative flex items-center gap-3 py-1.5">
-      {!last && (
-        <span
-          className={`absolute left-[11px] top-8 h-[calc(100%-16px)] w-px ${state === "done" ? "bg-ip-recovery/40" : "bg-ip-line"}`}
-          aria-hidden
-        />
-      )}
-      <span className="relative grid h-6 w-6 shrink-0 place-items-center rounded-full">
-        {state === "done" ? (
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-ip-recovery/12 text-ip-recovery">
+    <li className={`px-3 py-2.5 ${last ? "" : "sm:border-r"} border-ip-line`}>
+      <div className={`flex items-center gap-1.5 text-[12.5px] font-semibold ${tone}`}>
+        <span className="grid h-3.5 w-3.5 shrink-0 place-items-center" aria-hidden>
+          {state === "done" ? (
             <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
-          </span>
-        ) : state === "active" ? (
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-ip-navy/10 text-ip-navy"><Spin /></span>
-        ) : state === "error" ? (
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-ip-risk/12 text-ip-risk">
+          ) : state === "active" ? (
+            <Spin />
+          ) : state === "error" ? (
             <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
-          </span>
-        ) : (
-          <span className="h-2 w-2 rounded-full bg-ip-line-strong" />
-        )}
-      </span>
-      <span className={`text-[14px] ${state === "pending" ? "font-medium text-ip-ink-3" : state === "error" ? "font-semibold text-ip-risk" : "font-semibold text-ip-ink"}`}>
-        {n}. {label}
-      </span>
-      {state === "active" && <span className="ip-label ml-auto text-ip-navy">running</span>}
+          ) : (
+            <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /></svg>
+          )}
+        </span>
+        <span className="truncate">{label}</span>
+      </div>
+      {/* State in words as well as colour and icon — colour alone is never the
+          only carrier of meaning here. */}
+      <div className="mt-0.5 pl-5 text-[11.5px] text-ip-ink-3">{note}</div>
     </li>
   );
 }
@@ -797,7 +849,8 @@ function Metric({ label, value, mono, hint }: { label: string; value: string; mo
  * scrolling up to read history pauses the auto-scroll until they return. */
 const LOG_KIND_CLS: Record<string, string> = {
   completed: "text-ip-recovery",
-  running: "text-amber-500",
+  // --ip-warn, not amber-500: measured 2.15:1 on a card and failed AA outright.
+  running: "text-ip-warn",
   failed: "text-ip-risk",
   meta: "text-ip-ink-3",
 };
@@ -890,7 +943,10 @@ function TechnicalDetails({ vm }: { vm: VM }) {
 
 const STAGE_UI: Record<StageState, { dotCls: string; textCls: string; label: string; labelCls: string }> = {
   completed: { dotCls: "bg-ip-recovery", textCls: "text-ip-ink", label: "completed", labelCls: "text-ip-recovery" },
-  running:   { dotCls: "bg-amber-400", textCls: "text-ip-ink", label: "running", labelCls: "text-amber-600" },
+  // Dot is a non-text indicator, so --ip-orange is the correct token for it.
+  // The label is text, so it takes --ip-warn: amber-600 measured 3.19:1 and
+  // fails AA for body text.
+  running:   { dotCls: "bg-ip-orange", textCls: "text-ip-ink", label: "running", labelCls: "text-ip-warn" },
   failed:    { dotCls: "bg-ip-risk", textCls: "text-ip-risk", label: "failed", labelCls: "text-ip-risk" },
   pending:   { dotCls: "bg-ip-line-strong", textCls: "text-ip-ink-3", label: "pending", labelCls: "text-ip-ink-3" },
 };
@@ -905,10 +961,14 @@ function TechRow({ name, state }: { name: string; state: StageState }) {
         ) : state === "failed" ? (
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-ip-risk" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
         ) : state === "running" ? (
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-70" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
-          </span>
+          // A spinner, not a pinging dot. animate-ping pulses continuously for
+          // information that never changes, and it runs on every stage row at
+          // once; a spinner reads as "working" without competing for attention,
+          // and motion-safe: honours prefers-reduced-motion.
+          <span
+            className="h-2.5 w-2.5 rounded-full border-2 border-ip-line-strong border-t-ip-orange motion-safe:animate-spin"
+            aria-hidden
+          />
         ) : (
           <span className={`h-2 w-2 rounded-full ${ui.dotCls}`} />
         )}
