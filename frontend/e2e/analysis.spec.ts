@@ -100,7 +100,7 @@ test.describe("analysis (live SSE)", () => {
     // Honest queued state: the current label reflects the real backend status…
     await expect(page.getByText("Queued — waiting for an available worker")).toBeVisible();
     await expect(page.getByText("Queued", { exact: true }).first()).toBeVisible(); // status badge
-    await expect(page.getByText("0%")).toBeVisible(); // no fabricated percentage
+    await expect(page.getByText("0%", { exact: true })).toBeVisible(); // no fabricated percentage
     // …and the OLD fabricated in-flight states must NOT appear for a queued job.
     await expect(page.getByText("Starting…")).toHaveCount(0);
     await expect(page.getByText("Waiting for first progress event…")).toHaveCount(0);
