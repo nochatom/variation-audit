@@ -57,6 +57,25 @@ def review_queue(session: Session, company_id: uuid.UUID, *,
     return list(session.execute(stmt.limit(_MAX_LIST_ROWS)).scalars().all())
 
 
+def amounts_for(session: Session,
+                variation_ids: list[uuid.UUID]) -> dict[uuid.UUID, float | None]:
+    """Likely value per variation, in one query.
+
+    The queue lists variations but the money lives in `value_estimates`, so a
+    summary built from the Variation row alone reports amount=None for every
+    row — which is what made the review queue total $0 while the detail page
+    showed real figures. Batched deliberately: the queue is capped at
+    _MAX_LIST_ROWS, and a per-row lookup would be that many round trips.
+    """
+    if not variation_ids:
+        return {}
+    rows = session.execute(
+        select(ValueEstimate.variation_id, ValueEstimate.amount)
+        .where(ValueEstimate.variation_id.in_(variation_ids))
+    ).all()
+    return {vid: float(amount) if amount is not None else None for vid, amount in rows}
+
+
 def get_variation(session: Session, company_id: uuid.UUID,
                   variation_id: uuid.UUID) -> Variation | None:
     return session.execute(
