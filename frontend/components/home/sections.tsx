@@ -162,7 +162,7 @@ function ScreenshotPreview() {
           </div>
 
           <div className="mt-2.5 overflow-hidden rounded-lg border border-ip-line">
-            <div className="flex items-center justify-between border-b border-ip-line bg-ip-card-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-ip-ink-3">
+            <div className="flex items-center justify-between border-b border-ip-line bg-ip-card-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-ip-ink-2">
               <span>Detected variations</span>
               <span>Value · Confidence</span>
             </div>
