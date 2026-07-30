@@ -59,7 +59,7 @@ test.describe("critical journey", () => {
   test("open the billing plan modal", async ({ authedPage }) => {
     await authedPage.goto("/app/settings/billing");
     // Free plan → button reads "Upgrade plan"; opens the UpgradeModal.
-    await authedPage.getByRole("button", { name: /Upgrade plan|Change plan/i }).click();
+    await authedPage.getByRole("button", { name: /Upgrade plan|Change plan/i }).first().click();
     const dialog = authedPage.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText(/Change plan/i);
