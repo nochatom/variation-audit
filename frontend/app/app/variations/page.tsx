@@ -6,7 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { ArrowDown, Check, Undo2, X } from "lucide-react";
 import { api, VariationSummary } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
-import { PageHeader, Card, Chip, ConfidenceBar, TimeBarFlag, ErrorNote, Spinner, EmptyState, aud } from "@/components/ui";
+import { Chip, ConfidenceBar, TimeBarFlag, ErrorNote, Spinner, EmptyState, aud } from "@/components/ui";
+import { Claim, ClaimNote, STATUS_LABEL, Section, TimeBarNotice } from "@/components/app/recover";
 
 const TABS = ["pending", "confirmed", "rejected"] as const;
 type Tab = (typeof TABS)[number];
@@ -108,44 +109,49 @@ function VariationsInner() {
   const total = visible.reduce((s, r) => s + (r.amount ?? 0), 0);
   const atRisk = visible.filter((r) => r.time_bar_risk).length;
   const filtered = (rows?.length ?? 0) - visible.length;
-
-  // Green is the recovered-money token — it must not label rejected value.
-  const totalTone =
-    tab === "confirmed" ? "text-ip-recovery" : tab === "rejected" ? "text-ip-ink-3" : "text-ip-ink";
+  // A total that silently omits unvalued findings overstates how complete it
+  // is, so the claim says how many it left out.
+  const unvalued = visible.filter((r) => r.amount == null).length;
 
   return (
     <div>
-      <PageHeader
-        title="AI findings"
-        description="Every variation the engine detected, ranked by what it's worth and how long you have to claim it."
-      />
-      {error && <ErrorNote message={error} />}
-
-      {/* ---- Protagonist: the value under review in this filter. One figure,
-           sized so nothing else competes, honest about which tab it sums. ---- */}
-      <div className="ip-card-lg mb-4 flex flex-wrap items-end justify-between gap-4 p-6">
-        <div>
-          <h2 className="ip-label">
-            {tab === "pending" ? "Awaiting a decision" : tab === "confirmed" ? "Approved value" : "Rejected value"}
-          </h2>
-          <div className={`mt-3 text-[40px] font-bold leading-none tabular-nums tracking-display sm:text-[52px] ${totalTone}`}>
-            {aud(total)}
-          </div>
-          <p className="mt-2 text-[13px] text-ip-ink-2">
-            {visible.length} {visible.length === 1 ? "finding" : "findings"}
-            {filtered > 0 && ` · ${filtered} hidden by filters`}
-          </p>
+      <header className="mb-8 border-b border-ip-line pb-8">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span className="ip-label">Review queue</span>
+          <span className="text-ip-line-strong" aria-hidden>·</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ip-ink-2">
+            {STATUS_LABEL[tab === "confirmed" ? "confirmed" : tab === "rejected" ? "rejected" : "pending"]}
+          </span>
         </div>
 
+        {/* The position, stated in the same register as a single finding's
+            claim. The old treatment was a $52px figure in a card — the
+            template answer, and it read as settled money when a pending
+            queue is a set of propositions. */}
+        <div className="mt-4">
+          <QueueClaim tab={tab} total={total} count={visible.length} unvalued={unvalued} />
+        </div>
+
+        <p className="mt-3 text-[13px] text-ip-ink-3">
+          {visible.length} {visible.length === 1 ? "finding" : "findings"}
+          {filtered > 0 && ` · ${filtered} hidden by filters`}
+        </p>
+
         {atRisk > 0 && tab === "pending" && (
-          <div className="rounded-md border border-ip-risk/30 bg-ip-risk-bg px-3.5 py-2.5">
-            <div className="text-[13px] font-bold text-ip-risk">
-              {atRisk} {atRisk === 1 ? "finding is" : "findings are"} time-barred
-            </div>
-            <div className="mt-0.5 text-[12px] text-ip-ink-2">Sorted to the top of the queue.</div>
+          <div className="mt-6">
+            <TimeBarNotice>
+              <span className="font-semibold">
+                {atRisk} {atRisk === 1 ? "finding is" : "findings are"} past a notice window.
+              </span>{" "}
+              <span className="text-ip-ink-2">
+                Sorted to the top — value you cannot claim isn&rsquo;t value.
+              </span>
+            </TimeBarNotice>
           </div>
         )}
-      </div>
+      </header>
+
+      {error && <ErrorNote message={error} />}
 
       {/* ---- Triage controls. Confidence band was fetched and discarded before;
            it is the axis a reviewer actually filters on. ---- */}
@@ -238,13 +244,83 @@ function VariationsInner() {
       )}
 
       {visible.length > 0 && (
-        <Card className="divide-y divide-ip-line">
-          {visible.map((v) => (
-            <FindingRow key={v.id} row={v} tab={tab} busy={busyId === v.id} onAct={act} />
-          ))}
-        </Card>
+        <Section
+          title="Findings"
+          /* Honest about the actual order. The primary key is the time bar, not
+             the sort toggle — a label reading "highest value first" while
+             $58,000 sits below $4,500 just looks broken. */
+          meta={
+            atRisk > 0 && tab === "pending"
+              ? `past a notice window first, then ${sort === "value" ? "highest value" : "highest confidence"}`
+              : sort === "value"
+                ? "highest value first"
+                : "highest confidence first"
+          }
+        >
+          <ul className="divide-y divide-ip-line border-y border-ip-line">
+            {visible.map((v) => (
+              <FindingRow key={v.id} row={v} tab={tab} busy={busyId === v.id} onAct={act} />
+            ))}
+          </ul>
+        </Section>
       )}
     </div>
+  );
+}
+
+/**
+ * The position under review, stated. Same register as a single finding's claim
+ * on the detail page, so the queue and the thing it opens speak with one voice.
+ * Green is the recovered-money token and must not label rejected value.
+ */
+function QueueClaim({
+  tab,
+  total,
+  count,
+  unvalued,
+}: {
+  tab: Tab;
+  total: number;
+  count: number;
+  unvalued: number;
+}) {
+  if (count === 0) {
+    return (
+      <Claim as="h1">
+        Nothing is <span className="text-ip-ink-3">{tab}</span> right now.
+      </Claim>
+    );
+  }
+
+  const figure = (tone: string) => <span className={`tabular-nums ${tone}`}>{aud(total)}</span>;
+  const note = unvalued > 0 && (
+    <ClaimNote>
+      {unvalued} of these {unvalued === 1 ? "has" : "have"} no estimate yet and {unvalued === 1 ? "is" : "are"} not
+      included in that figure.
+    </ClaimNote>
+  );
+
+  if (tab === "confirmed") {
+    return (
+      <Claim as="h1">
+        {figure("text-ip-recovery")} of variations are approved and ready to claim.
+        {note}
+      </Claim>
+    );
+  }
+  if (tab === "rejected") {
+    return (
+      <Claim as="h1">
+        {figure("text-ip-ink-3")} of detected value was rejected on review.
+        {note}
+      </Claim>
+    );
+  }
+  return (
+    <Claim as="h1">
+      {figure("text-ip-ink")} of detected work is waiting on a decision.
+      {note}
+    </Claim>
   );
 }
 
@@ -264,11 +340,11 @@ function FindingRow({
   onAct: (row: Row, to: Tab) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-4 px-4 py-4 transition-colors hover:bg-ip-card-2">
+    <li className="flex flex-wrap items-center gap-4 px-1 py-4 transition-colors hover:bg-ip-card-2">
       <div className="min-w-[220px] flex-1">
         <Link
           href={`/app/variations/${row.id}`}
-          className="text-[15px] font-semibold leading-snug text-ip-ink hover:text-ip-navy"
+          className="rounded-sm text-[15px] font-semibold leading-snug text-ip-ink hover:text-ip-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ip-navy/40 focus-visible:ring-offset-2 focus-visible:ring-offset-ip-bg"
         >
           {row.title}
         </Link>
@@ -288,10 +364,18 @@ function FindingRow({
       </div>
 
       <div className="shrink-0 text-right">
-        <div className="text-[20px] font-bold leading-none tabular-nums tracking-display text-ip-ink">
-          {aud(row.amount)}
-        </div>
-        <div className="mt-1 text-[11px] text-ip-ink-3">recoverable</div>
+        {row.amount == null ? (
+          /* An unvalued finding is not a $0 finding. Saying so keeps the row
+             honest instead of parking a dash where money should be. */
+          <div className="text-[13px] font-medium text-ip-ink-3">No estimate yet</div>
+        ) : (
+          <>
+            <div className="text-[20px] font-bold leading-none tabular-nums tracking-display text-ip-ink">
+              {aud(row.amount)}
+            </div>
+            <div className="mt-1 text-[11px] text-ip-ink-3">recoverable</div>
+          </>
+        )}
       </div>
 
       <div className="flex shrink-0 gap-2">
@@ -328,6 +412,6 @@ function FindingRow({
           </button>
         )}
       </div>
-    </div>
+    </li>
   );
 }

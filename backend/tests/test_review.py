@@ -147,3 +147,65 @@ def test_add_comment_endpoint():
                                        json={"body": "Claim it."})
     assert resp.status_code == 201
     assert resp.json()["body"] == "Claim it."
+
+
+# -- queue value ------------------------------------------------------------
+# The money lives in value_estimates, not on the Variation row, so a summary
+# built from the variation alone reported amount=None for every queue row —
+# which made the review queue total $0 while the detail page showed real
+# figures for the same variations.
+def test_amounts_for_maps_variation_to_likely_value():
+    a, b = uuid.uuid4(), uuid.uuid4()
+    session = FakeSession(results=[FakeResult(rows=[(a, Decimal("38000.00")),
+                                                   (b, Decimal("1250.50"))])])
+    assert review_service.amounts_for(session, [a, b]) == {a: 38000.0, b: 1250.5}
+
+
+def test_amounts_for_preserves_null_amount():
+    """A row can exist with no amount — that must stay None, not become 0.0,
+    so the UI can say "no value yet" instead of "worth nothing"."""
+    vid = uuid.uuid4()
+    session = FakeSession(results=[FakeResult(rows=[(vid, None)])])
+    assert review_service.amounts_for(session, [vid]) == {vid: None}
+
+
+def test_amounts_for_empty_input_runs_no_query():
+    session = FakeSession()
+    assert review_service.amounts_for(session, []) == {}
+
+
+def test_review_queue_endpoint_carries_value():
+    user = _user()
+    cid = uuid.uuid4()
+    membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid)
+    v = _variation(company_id=cid)
+    project = Project(id=v.project_id, company_id=cid, name="Tower A",
+                      status=ProjectStatus.in_progress)
+    # ensure_member -> membership ; queue -> [v] ; amounts_for -> one (id, amount) row
+    session = FakeSession(
+        results=[FakeResult(scalar=membership),
+                 FakeResult(scalars=[v]),
+                 FakeResult(rows=[(v.id, Decimal("38000.00"))])],
+        get_obj=project,
+    )
+    resp = _client(session, user).get(f"/projects/{v.project_id}/review-queue")
+    assert resp.status_code == 200
+    assert resp.json()[0]["amount"] == 38000.0
+
+
+def test_review_queue_endpoint_amount_none_when_unvalued():
+    """A variation with no estimate must report null, not 0 — the queue's
+    total would otherwise read as a real figure built from absent data."""
+    user = _user()
+    cid = uuid.uuid4()
+    membership = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid)
+    v = _variation(company_id=cid)
+    project = Project(id=v.project_id, company_id=cid, name="Tower A",
+                      status=ProjectStatus.in_progress)
+    session = FakeSession(
+        results=[FakeResult(scalar=membership), FakeResult(scalars=[v]), FakeResult(rows=[])],
+        get_obj=project,
+    )
+    resp = _client(session, user).get(f"/projects/{v.project_id}/review-queue")
+    assert resp.status_code == 200
+    assert resp.json()[0]["amount"] is None

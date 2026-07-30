@@ -108,7 +108,11 @@ def review_queue(project_id: uuid.UUID, company_id: uuid.UUID | None = None,
     ensure_member(session, user, project.company_id)
     rows = review_service.review_queue(session, project.company_id, project_id=project_id,
                                        status=review_status)
-    return [_summary(v) for v in rows]
+    # The queue is ranked and totalled by value in the UI, so it has to carry
+    # the value — one batched lookup rather than a join, to keep review_queue's
+    # ordering and row shape untouched.
+    amounts = review_service.amounts_for(session, [v.id for v in rows])
+    return [_summary(v, amount=amounts.get(v.id)) for v in rows]
 
 
 @router.get("/variations/{variation_id}", response_model=VariationDetail)
