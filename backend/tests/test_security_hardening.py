@@ -274,3 +274,44 @@ def test_jwt_secret_strength_validation(monkeypatch):
     assert settings.jwt_secret == "this-is-a-strong-jwt-secret-key-32-chars-long"
 
     get_settings.cache_clear()
+
+
+# --------------------------------------------------------------------------
+# Multi-org Admin require_any_org_admin tests
+# --------------------------------------------------------------------------
+def test_require_any_org_admin_with_multiple_admin_memberships():
+    """Verify that require_any_org_admin allows users who are admins of
+    multiple organizations to authenticate without throwing MultipleResultsFound."""
+    from app.auth.deps import require_any_org_admin
+
+    user = User(id=uuid.uuid4(), email="admin@multi.com", password_hash="x", is_active=True)
+    cid1 = uuid.uuid4()
+    cid2 = uuid.uuid4()
+    admin_m1 = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid1, role=MembershipRole.admin)
+    admin_m2 = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid2, role=MembershipRole.admin)
+
+    session = FakeSession(results=[FakeResult(scalars=[admin_m1, admin_m2])])
+
+    res = require_any_org_admin(user=user, session=session)
+    assert res == user
+
+
+def test_require_any_org_admin_endpoint_with_multiple_admin_memberships():
+    """Verify through TestClient that multi-org admins can successfully access
+    endpoints protected by require_any_org_admin (like /internal/storage/health)."""
+    user = User(id=uuid.uuid4(), email="admin@multi.com", password_hash="x", is_active=True)
+    cid1 = uuid.uuid4()
+    cid2 = uuid.uuid4()
+    admin_m1 = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid1, role=MembershipRole.admin)
+    admin_m2 = Membership(id=uuid.uuid4(), user_id=user.id, company_id=cid2, role=MembershipRole.admin)
+
+    session = FakeSession(results=[FakeResult(scalars=[admin_m1, admin_m2])])
+    app.dependency_overrides[get_db] = lambda: session
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        client = TestClient(app)
+        resp = client.get("/internal/storage/health")
+        # Should not crash with 500, but succeed (e.g., 200)
+        assert resp.status_code == 200
+    finally:
+        app.dependency_overrides.clear()

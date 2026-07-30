@@ -81,8 +81,8 @@ def require_any_org_admin(
     is_admin = session.execute(
         select(Membership).where(
             Membership.user_id == user.id, Membership.role == MembershipRole.admin,
-        )
-    ).scalar_one_or_none()
+        ).limit(1)
+    ).scalars().first()
     if is_admin is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin role required")
     return user

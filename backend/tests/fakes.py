@@ -14,6 +14,9 @@ class FakeScalars:
     def all(self):
         return list(self._items)
 
+    def first(self):
+        return self._items[0] if self._items else None
+
 
 class FakeResult:
     """Mimics the bits of a SQLAlchemy Result the code uses."""
