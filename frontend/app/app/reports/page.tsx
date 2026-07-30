@@ -6,13 +6,17 @@ import { Download, FileText, Lock } from "lucide-react";
 import { api, OrgDashboard } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
 import { useFeatures } from "@/lib/billing/hooks";
-import { PageHeader, Card, ErrorNote, Spinner, EmptyState, aud } from "@/components/ui";
+import { ErrorNote, Spinner, EmptyState, aud } from "@/components/ui";
+import { Claim, Section } from "@/components/app/recover";
 
 type Scope = "confirmed" | "pending";
 
-const SCOPES: { id: Scope; label: string; note: string }[] = [
-  { id: "confirmed", label: "Approved only", note: "The claimable position — approved variations only." },
-  { id: "pending", label: "Draft (pending)", note: "Under review, not yet approved. For internal use." },
+// `word` is what the interface calls this state, not what the API stores it as.
+// The button says "Approve", so every downstream label has to say "approved" —
+// "confirmed" is the column name leaking into the product's vocabulary.
+const SCOPES: { id: Scope; label: string; note: string; word: string }[] = [
+  { id: "confirmed", label: "Approved only", note: "The claimable position — approved variations only.", word: "approved" },
+  { id: "pending", label: "Draft (pending)", note: "Under review, not yet approved. For internal use.", word: "pending" },
 ];
 
 export default function ReportsPage() {
@@ -42,7 +46,10 @@ export default function ReportsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${projectName.replace(/[^\w\-]+/g, "-").toLowerCase()}-${scope}-report.pdf`;
+      // The downloaded file is user-facing too, so it carries the interface's
+      // word for the scope rather than the API's.
+      const word = SCOPES.find((s) => s.id === scope)!.word;
+      a.download = `${projectName.replace(/[^\w\-]+/g, "-").toLowerCase()}-${word}-report.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -63,10 +70,20 @@ export default function ReportsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Reports"
-        description="Generate a review-ready recovery report for any project."
-      />
+      <header className="mb-8 border-b border-ip-line pb-8">
+        <span className="ip-label">Reports</span>
+        <h1 className="mt-1.5 max-w-2xl text-[21px] font-semibold leading-[1.25] tracking-display text-ip-ink">
+          Export the recovery position for a project
+        </h1>
+        {totalReportable > 0 && !exportsLocked && (
+          <div className="mt-4">
+            <Claim>
+              <span className="tabular-nums text-ip-recovery">{aud(totalReportable)}</span> of
+              approved variations is ready to report on.
+            </Claim>
+          </div>
+        )}
+      </header>
 
       {error && <ErrorNote message={error} />}
 
@@ -110,8 +127,7 @@ export default function ReportsPage() {
               {/* Report scope — the endpoint has always accepted review_status;
                   the UI simply never offered it. A draft over pending findings
                   is how a QS sanity-checks a claim before it goes out. */}
-              <div className="mb-5">
-                <h2 className="ip-label mb-2">Report scope</h2>
+              <Section title="Report scope" className="mb-8">
                 <div className="flex w-fit gap-1 rounded-md border border-ip-line bg-ip-card p-1" role="group" aria-label="Report scope">
                   {SCOPES.map((s) => (
                     <button
@@ -129,16 +145,18 @@ export default function ReportsPage() {
                 <p className="mt-2 text-[13px] text-ip-ink-2">
                   {SCOPES.find((s) => s.id === scope)!.note}
                 </p>
-              </div>
+              </Section>
 
-              <Card className="divide-y divide-ip-line">
+              <Section title="Projects" meta={`${projects.length} in this organisation`}>
+              <ul className="divide-y divide-ip-line border-y border-ip-line">
                 {projects.map((p) => {
                   const count = scope === "confirmed" ? p.counts.confirmed : p.counts.pending;
                   const empty = count === 0;
+                  const word = SCOPES.find((s) => s.id === scope)!.word;
                   return (
-                    <div
+                    <li
                       key={p.id}
-                      className="flex flex-wrap items-center gap-4 px-4 py-4 transition-colors hover:bg-ip-card-2"
+                      className="flex flex-wrap items-center gap-4 px-1 py-4 transition-colors hover:bg-ip-card-2"
                     >
                       <FileText
                         className={`h-4 w-4 shrink-0 ${empty ? "text-ip-ink-3" : "text-ip-navy"}`}
@@ -154,8 +172,8 @@ export default function ReportsPage() {
                         </Link>
                         <div className="mt-0.5 text-[12px] text-ip-ink-3">
                           {empty
-                            ? `Nothing ${scope} to report`
-                            : `${count} ${scope} ${count === 1 ? "variation" : "variations"}`}
+                            ? `Nothing ${word} to report`
+                            : `${count} ${word} ${count === 1 ? "variation" : "variations"}`}
                         </div>
                       </div>
 
@@ -177,17 +195,18 @@ export default function ReportsPage() {
                       <button
                         onClick={() => download(p.id, p.name)}
                         disabled={busy === p.id || empty}
-                        aria-label={`Download ${scope} report for ${p.name}`}
-                        title={empty ? `No ${scope} variations to include` : undefined}
+                        aria-label={`Download ${word} report for ${p.name}`}
+                        title={empty ? `No ${word} variations to include` : undefined}
                         className="btn-ghost shrink-0"
                       >
                         <Download className="h-3.5 w-3.5" aria-hidden />
                         {busy === p.id ? "Generating…" : "PDF"}
                       </button>
-                    </div>
+                    </li>
                   );
                 })}
-              </Card>
+              </ul>
+              </Section>
             </>
           )}
         </>

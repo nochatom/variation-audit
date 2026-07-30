@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { api, EvidenceContext, VariationSummary } from "@/lib/api";
 import { useApp } from "@/lib/app-context";
-import { PageHeader, Card, Chip, ErrorNote, Spinner, EmptyState, aud, fmtDate } from "@/components/ui";
+import { Chip, ErrorNote, Spinner, EmptyState, TimeBarFlag, aud } from "@/components/ui";
+import { EvidenceSpine, STATUS_LABEL, Section, spineMeta } from "@/components/app/recover";
 
 type Item = VariationSummary & { projectName: string };
 
@@ -44,63 +46,120 @@ export default function EvidenceLibraryPage() {
 
   return (
     <div>
-      <PageHeader title="Evidence Library" description="Trace any variation back to the source documents it was detected from." />
+      <header className="mb-8 border-b border-ip-line pb-8">
+        <span className="ip-label">Evidence library</span>
+        <h1 className="mt-1.5 max-w-2xl text-[21px] font-semibold leading-[1.25] tracking-display text-ip-ink">
+          Trace any variation back to the correspondence it was detected from
+        </h1>
+        <p className="mt-3 max-w-[68ch] text-[14px] leading-relaxed text-ip-ink-2">
+          Every finding is only as good as its paper trail. Pick a variation to read its sources in
+          the order they were written.
+        </p>
+      </header>
+
       {error && <ErrorNote message={error} />}
       {!items && !error && <Spinner />}
 
-      {items && items.length === 0 && <EmptyState title="No variations to trace" body="Run analysis to detect variations, then explore their evidence here." />}
+      {items && items.length === 0 && (
+        <EmptyState
+          title="No variations to trace"
+          body="Run analysis to detect variations, then read their evidence here."
+        />
+      )}
 
       {items && items.length > 0 && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
-          {/* list */}
-          <Card className="h-fit overflow-hidden">
-            <div className="border-b border-ip-line px-4 py-3"><h2 className="text-sm font-bold text-ip-ink">Variations ({items.length})</h2></div>
-            <ul className="max-h-[60vh] divide-y divide-ip-line overflow-y-auto">
-              {items.map((v) => (
-                <li key={v.id}>
-                  <button onClick={() => setSelected(v.id)} className={`block w-full px-4 py-3 text-left transition-colors ${selected === v.id ? "bg-ip-card-2" : "hover:bg-ip-card-2"}`}>
-                    <div className="truncate text-[13px] font-semibold text-ip-ink">{v.title}</div>
-                    <div className="mt-0.5 flex items-center justify-between text-[12px] text-ip-ink-3">
-                      <span className="truncate">{v.projectName}</span>
-                      <span className="font-semibold tabular-nums text-ip-recovery">{aud(v.amount)}</span>
-                    </div>
-                  </button>
-                </li>
-              ))}
+        <div className="grid grid-cols-1 gap-x-10 gap-y-10 lg:grid-cols-[280px_minmax(0,1fr)]">
+          {/* ---- Picker. A rail of names, not a panel of cards: choosing which
+               variation to read is navigation, and navigation shouldn't
+               out-weigh the evidence it leads to. ---- */}
+          <nav className="order-first lg:order-none lg:sticky lg:top-[76px] lg:self-start" aria-label="Variations">
+            <h2 className="ip-label mb-3 border-b border-ip-line pb-2">
+              Variations ({items.length})
+            </h2>
+            <ul className="max-h-[62vh] overflow-y-auto">
+              {items.map((v) => {
+                const active = selected === v.id;
+                return (
+                  <li key={v.id}>
+                    <button
+                      onClick={() => setSelected(v.id)}
+                      aria-current={active ? "true" : undefined}
+                      className={`group block w-full border-l-2 py-2.5 pl-3 pr-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ip-navy/40 ${
+                        active
+                          ? "border-l-ip-navy bg-ip-card-2"
+                          : "border-l-transparent hover:border-l-ip-line-strong hover:bg-ip-card-2"
+                      }`}
+                    >
+                      <span
+                        className={`block text-[13px] font-semibold leading-snug ${
+                          active ? "text-ip-ink" : "text-ip-ink-2 group-hover:text-ip-ink"
+                        }`}
+                      >
+                        {v.title}
+                      </span>
+                      <span className="mt-1 flex items-center justify-between gap-2 text-[11px] text-ip-ink-3">
+                        <span className="truncate">{v.projectName}</span>
+                        {v.amount != null && (
+                          <span className="shrink-0 font-semibold tabular-nums">{aud(v.amount)}</span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
-          </Card>
+          </nav>
 
-          {/* evidence pane */}
-          <Card className="overflow-hidden">
-            <div className="flex items-center justify-between border-b border-ip-line px-5 py-3">
-              <div>
-                <h2 className="text-sm font-bold text-ip-ink">{current?.title ?? "Evidence"}</h2>
-                {current && <div className="text-[12px] text-ip-ink-3">{current.projectName}</div>}
+          {/* ---- The evidence itself, on the same spine the variation detail
+               page uses — one component, so a reviewer reads the same proof
+               the same way whichever door they came in through. ---- */}
+          <div className="min-w-0">
+            {current && (
+              <div className="mb-8">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span className="ip-label">{current.projectName}</span>
+                  <span className="text-ip-line-strong" aria-hidden>·</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ip-ink-2">
+                    {STATUS_LABEL[current.review_status] ?? current.review_status}
+                  </span>
+                  {current.time_bar_risk && (
+                    <span className="text-[12px]"><TimeBarFlag risk /></span>
+                  )}
+                </div>
+                <h2 className="mt-1.5 max-w-3xl text-[19px] font-semibold leading-[1.3] tracking-display text-ip-ink">
+                  {current.title}
+                </h2>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  {current.amount != null && (
+                    <Chip tone="recovery">{aud(current.amount)} recoverable</Chip>
+                  )}
+                  <Link
+                    href={`/app/variations/${current.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-sm text-[13px] font-semibold text-ip-navy hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ip-navy/40 focus-visible:ring-offset-2 focus-visible:ring-offset-ip-bg"
+                  >
+                    Open variation to decide
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                  </Link>
+                </div>
               </div>
-              {current && <Link href={`/app/variations/${current.id}`} className="text-[13px] text-ip-ink-3 hover:text-ip-ink">Open variation →</Link>}
-            </div>
+            )}
 
             {!evidence ? (
               <Spinner />
-            ) : evidence.length === 0 ? (
-              <div className="px-5 py-12 text-center text-[13px] text-ip-ink-3">No linked evidence for this variation.</div>
             ) : (
-              <ul className="divide-y divide-ip-line">
-                {evidence.map((e, i) => (
-                  <li key={i} className="px-5 py-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Chip tone="navy">{e.type}</Chip>
-                      {e.reference && <span className="text-[12px] font-semibold text-ip-ink">{e.reference}</span>}
-                      {e.source_document && (
-                        <span className="text-[12px] text-ip-ink-3">· {e.source_document.source_type}{e.source_document.source ? ` · ${e.source_document.source}` : ""}{e.source_document.doc_timestamp ? ` · ${fmtDate(e.source_document.doc_timestamp)}` : ""}</span>
-                      )}
-                    </div>
-                    {e.quote && <blockquote className="mt-2 border-l-2 border-ip-line-strong pl-3 text-[13px] italic leading-relaxed text-ip-ink-2">“{e.quote}”</blockquote>}
-                  </li>
-                ))}
-              </ul>
+              <Section title="Evidence" meta={evidence.length > 0 ? spineMeta(evidence) : undefined}>
+                <EvidenceSpine
+                  items={evidence}
+                  empty={
+                    <p className="max-w-[68ch] text-[14px] leading-relaxed text-ip-ink-3">
+                      No sources are linked to this variation, so there is nothing to trace. Upload
+                      the correspondence it should have come from and run the analysis again.
+                    </p>
+                  }
+                />
+              </Section>
             )}
-          </Card>
+          </div>
         </div>
       )}
     </div>
