@@ -10,7 +10,7 @@ import uuid
 from collections import Counter, defaultdict
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -100,9 +100,10 @@ def project_dashboard(session: Session, company_id: uuid.UUID, project: Project)
         select(AnalysisJob).where(AnalysisJob.project_id == project.id)
         .order_by(AnalysisJob.created_at.desc()).limit(1)
     ).scalar_one_or_none()
-    doc_count = len(list(session.execute(
-        select(Document).where(Document.project_id == project.id)
-    ).scalars().all()))
+    # Optimizing database performance: Use SQL COUNT instead of loading all rows into memory
+    doc_count = int(session.execute(
+        select(func.count(Document.id)).where(Document.project_id == project.id)
+    ).scalar_one() or 0)
 
     recoverable = sum((ve.amount for ve in confirmed_values if ve.amount is not None), Decimal("0"))
 
