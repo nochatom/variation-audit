@@ -55,11 +55,7 @@ export default function ReportsPage() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      setError(
-        e?.status === 403
-          ? "PDF export isn't included in your current plan. Upgrade to generate reports."
-          : e.message,
-      );
+      setError(e.message);
     } finally {
       setBusy(null);
     }

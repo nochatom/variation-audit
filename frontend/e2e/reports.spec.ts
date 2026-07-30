@@ -15,7 +15,16 @@ const REAL_MSG = "the 'exports' feature isn't available on your current plan —
 
 test.describe("reports", () => {
   test("surfaces the real backend error on a failed PDF download", async ({ authedPage: page }) => {
-    await page.route(`**/localhost:8000/projects/*/report.pdf*`, (route) => {
+    // Mock exports: true so the "Download PDF" button is rendered on the page
+    await page.route(`**localhost:8000/**/billing/features`, (route) => {
+      if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS, body: "" });
+      return route.fulfill({
+        status: 200, contentType: "application/json", headers: CORS,
+        body: JSON.stringify({ audit_log: false, exports: true, sso: false, priority_support: false, advanced_analytics: false }),
+      });
+    });
+
+    await page.route(`**localhost:8000/projects/*/report.pdf*`, (route) => {
       if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS, body: "" });
       return route.fulfill({
         status: 403, contentType: "application/json", headers: CORS,
@@ -24,7 +33,7 @@ test.describe("reports", () => {
     });
 
     await page.goto("/app/reports");
-    await page.getByRole("button", { name: "Download PDF", exact: true }).first().click();
+    await page.getByRole("button", { name: /^Download/i }).first().click();
 
     // The actionable backend message is shown; the old generic string is not.
     await expect(page.getByText(/exports.*feature isn't available on your current plan/i)).toBeVisible();

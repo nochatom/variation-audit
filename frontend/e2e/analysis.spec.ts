@@ -67,11 +67,12 @@ test.describe("analysis (live SSE)", () => {
     await expect(page.getByText("Completed", { exact: true }).first()).toBeVisible();
 
     // Real stats straight off the events (label → sibling value).
-    await expect(page.getByText("Variations detected").locator("xpath=following-sibling::div")).toHaveText("5");
-    await expect(page.getByText("Evidence collected").locator("xpath=following-sibling::div")).toHaveText("13");
-    await expect(page.getByText("Documents processed").locator("xpath=following-sibling::div")).toHaveText("3/3");
+    await expect(page.getByText("Variations found").locator("xpath=following-sibling::div")).toHaveText("5");
+    await expect(page.getByText("Evidence links").locator("xpath=following-sibling::div")).toHaveText("13");
+    await expect(page.getByText("Documents read").locator("xpath=following-sibling::div")).toHaveText("3/3");
 
     // Live log rendered one line per event, derived from real fields.
+    await page.locator("summary").first().click();
     await expect(page.getByText("Live log")).toBeVisible();
     await expect(page.getByText("Variation Detection completed (5 found)")).toBeVisible();
   });
@@ -100,7 +101,7 @@ test.describe("analysis (live SSE)", () => {
     // Honest queued state: the current label reflects the real backend status…
     await expect(page.getByText("Queued — waiting for an available worker")).toBeVisible();
     await expect(page.getByText("Queued", { exact: true }).first()).toBeVisible(); // status badge
-    await expect(page.getByText("0%")).toBeVisible(); // no fabricated percentage
+    await expect(page.getByText("0%", { exact: true })).toBeVisible(); // no fabricated percentage
     // …and the OLD fabricated in-flight states must NOT appear for a queued job.
     await expect(page.getByText("Starting…")).toHaveCount(0);
     await expect(page.getByText("Waiting for first progress event…")).toHaveCount(0);
@@ -191,6 +192,7 @@ test.describe("analysis (live SSE)", () => {
     await expect(page.getByText("Starting…")).toHaveCount(0);
 
     // Subsequent stages did NOT fabricate completion — Evidence Linking is still pending.
+    await page.locator("summary").first().click();
     await page.getByRole("button", { name: /Show technical details/ }).click();
     const evidenceRow = page.getByText("Evidence Linking").locator("xpath=ancestor::li[1]");
     await expect(evidenceRow).toContainText("pending");
