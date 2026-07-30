@@ -78,11 +78,15 @@ def require_any_org_admin(
     doesn't fit. This codebase has no separate "platform admin" role;
     requiring org-admin-of-any-org is the closest fit to "the existing admin
     authorization mechanism" without inventing a new one."""
+    # We use `.scalars().first()` rather than `.scalar_one_or_none()` because a
+    # user can be an admin of multiple organizations. In such cases,
+    # `.scalar_one_or_none()` would raise `MultipleResultsFound`, crashing with a
+    # 500 error instead of correctly authorizing the platform diagnostics request.
     is_admin = session.execute(
         select(Membership).where(
             Membership.user_id == user.id, Membership.role == MembershipRole.admin,
         )
-    ).scalar_one_or_none()
+    ).scalars().first()
     if is_admin is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin role required")
     return user
