@@ -78,10 +78,14 @@ def require_any_org_admin(
     doesn't fit. This codebase has no separate "platform admin" role;
     requiring org-admin-of-any-org is the closest fit to "the existing admin
     authorization mechanism" without inventing a new one."""
+    # Defensive limit: a user can legitimately be an admin in multiple orgs.
+    # Without .limit(1), .scalar_one_or_none() raises MultipleResultsFound
+    # and throws a 500 server error, resulting in a denial-of-service for
+    # valid multi-org administrators.
     is_admin = session.execute(
         select(Membership).where(
             Membership.user_id == user.id, Membership.role == MembershipRole.admin,
-        )
+        ).limit(1)
     ).scalar_one_or_none()
     if is_admin is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin role required")

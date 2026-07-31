@@ -112,8 +112,46 @@ def test_non_admin_member_rejected(member_client):
     assert resp.status_code == 403
 
 
+@pytest.fixture
+def multi_org_admin_client():
+    """A user who is an admin in more than one organization."""
+    with session_factory() as session:
+        org1 = Organization(id=uuid.uuid4(), name="Diagnostics Test Org 1")
+        org2 = Organization(id=uuid.uuid4(), name="Diagnostics Test Org 2")
+        user = User(id=uuid.uuid4(), email=f"admin-{uuid.uuid4().hex[:8]}@test.com",
+                    password_hash="x", is_active=True)
+        session.add_all([org1, org2, user])
+        session.flush()
+        session.add(Membership(id=uuid.uuid4(), user_id=user.id, company_id=org1.id,
+                               role=MembershipRole.admin))
+        session.add(Membership(id=uuid.uuid4(), user_id=user.id, company_id=org2.id,
+                               role=MembershipRole.admin))
+        session.commit()
+        user_id = user.id
+
+    def _db():
+        with session_factory() as session:
+            yield session
+
+    def _user():
+        with session_factory() as session:
+            return session.get(User, user_id)
+
+    app.dependency_overrides[get_db] = _db
+    app.dependency_overrides[get_current_user] = _user
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
 def test_admin_accepted(admin_client):
     resp = admin_client.get("/internal/providers")
+    assert resp.status_code == 200
+
+
+def test_admin_of_multiple_orgs_accepted(multi_org_admin_client):
+    """A user who is an admin of multiple organizations must be accepted
+    and not crash the server with a MultipleResultsFound 500 error."""
+    resp = multi_org_admin_client.get("/internal/providers")
     assert resp.status_code == 200
 
 
