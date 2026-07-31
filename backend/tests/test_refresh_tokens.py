@@ -50,8 +50,12 @@ def test_rotate_valid_token_revokes_old_and_returns_new():
     assert user_id == row.user_id
     assert row.revoked_at is not None
     assert row.replaced_by_id is not None
-    # 1 commit from issue() inside rotate(), 1 more from rotate() itself
-    assert session.commits == 2
+    # Exactly one commit: the new row's insert and the old row's revocation
+    # land in the same transaction, so a crash between the two can never
+    # leave both tokens simultaneously valid.
+    assert session.commits == 1
+    assert len(session.added_of(RefreshToken)) == 1
+    assert row.replaced_by_id == session.added_of(RefreshToken)[0].id
 
 
 def test_rotate_malformed_token_raises():

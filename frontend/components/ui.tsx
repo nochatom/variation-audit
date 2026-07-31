@@ -83,8 +83,6 @@ export function Chip({ children, tone = "neutral" }: { children: ReactNode; tone
     </span>
   );
 }
-// alias kept for convenience
-export const Badge = Chip;
 
 export function statusTone(status: string): string {
   if (status === "confirmed" || status === "completed" || status === "succeeded") return "recovery";

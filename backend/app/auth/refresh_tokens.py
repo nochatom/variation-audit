@@ -60,8 +60,12 @@ def _decode(raw: str) -> tuple[uuid.UUID, str] | None:
         return None
 
 
-def issue(session: Session, user_id: uuid.UUID) -> str:
-    """Create a new refresh token row and return the raw token to hand the client."""
+def _new_token_row(user_id: uuid.UUID) -> tuple[RefreshToken, str]:
+    """Build a new refresh token row (uncommitted) and its raw encoded form.
+
+    Shared by issue() (which adds+commits it alone) and rotate() (which adds
+    it alongside the old row's revocation so both commit in one transaction).
+    """
     secret = secrets.token_urlsafe(32)
     row = RefreshToken(
         id=uuid.uuid4(),
@@ -69,9 +73,15 @@ def issue(session: Session, user_id: uuid.UUID) -> str:
         token_hash=_hash(secret),
         expires_at=_now() + timedelta(days=get_settings().refresh_token_expire_days),
     )
+    return row, _encode(row.id, secret)
+
+
+def issue(session: Session, user_id: uuid.UUID) -> str:
+    """Create a new refresh token row and return the raw token to hand the client."""
+    row, raw = _new_token_row(user_id)
     session.add(row)
     session.commit()
-    return _encode(row.id, secret)
+    return raw
 
 
 def rotate(session: Session, raw_token: str) -> tuple[str, uuid.UUID]:
@@ -107,10 +117,26 @@ def rotate(session: Session, raw_token: str) -> tuple[str, uuid.UUID]:
     if row.expires_at < _now():
         raise RefreshTokenError("refresh token expired")
 
-    new_raw = issue(session, row.user_id)
-    new_id, _ = _decode(new_raw)  # type: ignore[misc]
+    # The new row is added here (not via issue(), which would commit it on
+    # its own) so it lands in the SAME transaction as the old row's
+    # revocation below — a crash between the two can no longer leave both
+    # the old and new tokens simultaneously valid.
+    #
+    # flush() (not commit()) before setting replaced_by_id: without an ORM
+    # relationship() linking the two rows, SQLAlchemy's unit-of-work does not
+    # guarantee the new row's INSERT is emitted before the old row's UPDATE
+    # in the same flush — and replaced_by_id is a real FK to
+    # refresh_tokens.id. An UPDATE issued first hits Postgres with a
+    # ForeignKeyViolation, since the referenced row doesn't exist yet. The
+    # explicit flush forces the INSERT to execute (still inside this same
+    # open transaction, nothing committed yet) before the UPDATE is queued,
+    # so the FK target exists when Postgres checks it; the commit() below
+    # still lands both writes atomically.
+    new_row, new_raw = _new_token_row(row.user_id)
+    session.add(new_row)
+    session.flush()
     row.revoked_at = _now()
-    row.replaced_by_id = new_id
+    row.replaced_by_id = new_row.id
     session.commit()
     return new_raw, row.user_id
 
