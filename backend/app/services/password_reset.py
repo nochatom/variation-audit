@@ -9,7 +9,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.auth import refresh_tokens
@@ -99,7 +99,19 @@ def reset_password(session: Session, *, raw_token: str, new_password: str) -> Us
         raise ResetTokenError("account no longer exists")
 
     user.password_hash = hash_password(new_password)
-    row.used_at = _now()
+    now = _now()
+    row.used_at = now
+
+    # Revoke any other unused reset tokens for this user (Defense in Depth:
+    # once a password is successfully reset, all other active reset tokens of that user are invalidated)
+    session.execute(
+        update(PasswordResetToken)
+        .where(PasswordResetToken.user_id == user.id)
+        .where(PasswordResetToken.used_at.is_(None))
+        .where(PasswordResetToken.id != row.id)
+        .values(used_at=now)
+    )
+
     session.commit()
 
     refresh_tokens.revoke_all(session, user.id)

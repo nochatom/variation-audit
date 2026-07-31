@@ -123,6 +123,43 @@ def test_reset_password_success_updates_password_and_revokes_sessions():
     assert verify_password("newpassword123", user.password_hash)
 
 
+def test_reset_password_invalidates_other_tokens():
+    class CaptureExecuteSession(_MultiGetSession):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.executed_statements = []
+
+        def execute(self, stmt, *args, **kwargs):
+            self.executed_statements.append(stmt)
+            return super().execute(stmt, *args, **kwargs)
+
+    user_id = uuid.uuid4()
+    row = _make_token_row(user_id, secret="s3cr3t")
+    user = User(id=user_id, email="user@example.com", password_hash="oldhash", is_active=True)
+
+    session = CaptureExecuteSession(
+        get_by_class={PasswordResetToken: row, User: user},
+        results=[
+            FakeResult(),              # update() execute call result
+            FakeResult(scalars=[]),     # revoke_all's active-token lookup
+        ],
+    )
+    raw = password_reset_service._encode(row.id, "s3cr3t")
+
+    returned_user = password_reset_service.reset_password(session, raw_token=raw, new_password="newpassword123")
+
+    assert returned_user is user
+    assert len(session.executed_statements) >= 1
+    update_stmt = session.executed_statements[0]
+
+    # Verify the SQLAlchemy update statement is targeting PasswordResetToken
+    assert "UPDATE password_reset_tokens" in str(update_stmt)
+    assert "SET used_at=" in str(update_stmt)
+    assert "WHERE password_reset_tokens.user_id = " in str(update_stmt)
+    assert "password_reset_tokens.used_at IS NULL" in str(update_stmt)
+    assert "password_reset_tokens.id != " in str(update_stmt)
+
+
 # -- endpoints ---------------------------------------------------------------
 def _client(session):
     def _db():
