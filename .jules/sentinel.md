@@ -11,3 +11,8 @@ This journal contains only critical, unique security learnings from maintaining 
 **Vulnerability:** Social/OAuth logins (e.g. Google via Supabase Auth) do not place the `email_verified` boolean claim in the JWT top-level payload, but rather nest it inside `user_metadata.email_verified`. If the backend only looks for `email_verified` at the top level, it would mistakenly treat verified OAuth users as unverified, creating a risk where developers might bypass verification checks to restore login functionality.
 **Learning:** Supabase GoTrue maps provider-specific verification status under `user_metadata` inside the JWT claims. To avoid either breaking social login or accidentally failing-open on unverified claims, we must robustly look for `email_verified` in both the top-level payload and nested metadata.
 **Prevention:** Always parse `email_verified` with a fallback chain checking top-level first, then nested `user_metadata`, before failing-closed to `False`.
+
+## 2026-10-25 - [Enforcing Timing Parity in Authentication]
+**Vulnerability:** When looking up a user during login/authenticate, returning None early for non-existent, inactive, or passwordless users skips the expensive synchronous password hash verification step (~90ms for cost-10 bcrypt). This creates a timing side-channel that allows attackers to easily enumerate registered users.
+**Learning:** To eliminate user-enumeration timing leaks, we must always pay the same synchronous password hashing cost regardless of whether a user is active, inactive, or non-existent.
+**Prevention:** Execute a dummy bcrypt verify check using a valid cost-10 dummy hash in all failure/absent user branches to ensure timing parity.
