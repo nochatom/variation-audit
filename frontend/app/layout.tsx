@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PostHogProvider } from "../lib/posthog-provider";
 import "./globals.css";
 
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-ip-bg font-ip text-ip-ink antialiased">
         <PostHogProvider>{children}</PostHogProvider>
+        <SpeedInsights />
       </body>
     </html>
   );

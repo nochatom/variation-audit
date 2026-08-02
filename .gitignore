@@ -47,3 +47,5 @@ frontend/.next-dev.log
 
 # Local document store — uploaded project files written at runtime.
 backend/.docstore/
+.vercel
+.env*
