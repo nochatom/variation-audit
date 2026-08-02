@@ -76,6 +76,41 @@ def test_authenticate_fails_closed_for_passwordless_account():
     assert service.authenticate(session, email="sso@y.co", password="anything") is None
 
 
+def test_authenticate_timing_parity(monkeypatch):
+    """Verify that calling authenticate on non-existent, inactive, or passwordless
+    users performs a dummy password verification with the cost-10 dummy hash
+    to ensure timing parity across all failure branches."""
+    import app.auth.service as auth_service
+
+    called_with = []
+
+    def mock_verify_password(password, hashed):
+        called_with.append((password, hashed))
+        return False
+
+    monkeypatch.setattr(auth_service, "verify_password", mock_verify_password)
+
+    # Scenario 1: Non-existent user
+    session_none = FakeSession(results=[FakeResult(scalar=None)])
+    assert auth_service.authenticate(session_none, email="ghost@y.co", password="foo") is None
+    assert len(called_with) == 1
+    assert called_with[-1] == ("foo", "$2b$10$ExEKaj3Sm7ZjDeOIWbDWROKaSGAP5uyeuokkEdv.42931vdp1jtty")
+
+    # Scenario 2: Inactive user
+    inactive_user = User(id=uuid.uuid4(), email="inactive@y.co", password_hash="hash", is_active=False)
+    session_inactive = FakeSession(results=[FakeResult(scalar=inactive_user)])
+    assert auth_service.authenticate(session_inactive, email="inactive@y.co", password="bar") is None
+    assert len(called_with) == 2
+    assert called_with[-1] == ("bar", "$2b$10$ExEKaj3Sm7ZjDeOIWbDWROKaSGAP5uyeuokkEdv.42931vdp1jtty")
+
+    # Scenario 3: Passwordless user
+    passwordless_user = User(id=uuid.uuid4(), email="sso@y.co", password_hash=None, is_active=True)
+    session_passwordless = FakeSession(results=[FakeResult(scalar=passwordless_user)])
+    assert auth_service.authenticate(session_passwordless, email="sso@y.co", password="baz") is None
+    assert len(called_with) == 3
+    assert called_with[-1] == ("baz", "$2b$10$ExEKaj3Sm7ZjDeOIWbDWROKaSGAP5uyeuokkEdv.42931vdp1jtty")
+
+
 # -- endpoints (TestClient + get_db override) ------------------------------
 def _client_with(session) -> TestClient:
     def _override_db():
