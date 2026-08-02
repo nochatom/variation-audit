@@ -54,15 +54,21 @@ export function UpgradeModal({
 
   return (
     <Modal title="Change plan" onClose={onClose}>
-      <div className="flex items-center justify-center gap-2 rounded-pill bg-ip-card-2 p-1 text-[12px] font-semibold">
+      <div
+        className="flex items-center justify-center gap-2 rounded-pill bg-ip-card-2 p-1 text-[12px] font-semibold"
+        role="group"
+        aria-label="Billing interval"
+      >
         <button
           className={`rounded-pill px-3 py-1 ${interval === "monthly" ? "bg-ip-navy text-white" : "text-ip-ink-2"}`}
+          aria-pressed={interval === "monthly"}
           onClick={() => setInterval("monthly")}
         >
           Monthly
         </button>
         <button
           className={`rounded-pill px-3 py-1 ${interval === "annual" ? "bg-ip-navy text-white" : "text-ip-ink-2"}`}
+          aria-pressed={interval === "annual"}
           onClick={() => setInterval("annual")}
         >
           Annual <span className="text-ip-recovery">· 2 months free</span>
