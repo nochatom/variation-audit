@@ -50,14 +50,19 @@ def signup(session: Session, *, email: str, password: str,
     return user, org, membership
 
 
+# A pre-computed dummy bcrypt hash with cost factor 10 to protect against timing attacks/user enumeration.
+_DUMMY_HASH = "$2b$10$XiKEYZES1S5PZ5dHiB57perb8Om.FfX0z1Vm1KlNS/43tbgMOBXvy"
+
+
 def authenticate(session: Session, *, email: str, password: str) -> User | None:
     user = _user_by_email(session, email)
-    if user is None or not user.is_active:
+
+    # Timing parity: check password against a dummy hash if user is not found,
+    # inactive, or passwordless, ensuring a constant-time bcrypt verification.
+    if user is None or not user.is_active or user.password_hash is None:
+        verify_password(password, _DUMMY_HASH)
         return None
-    # An OAuth-only account (see OAuthIdentity) has no password to check
-    # against — fail closed rather than passing None into verify_password.
-    if user.password_hash is None:
-        return None
+
     if not verify_password(password, user.password_hash):
         return None
     return user
