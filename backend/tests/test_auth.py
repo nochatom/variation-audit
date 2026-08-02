@@ -225,3 +225,39 @@ def test_update_me_rejects_overlong_name():
     resp = client.patch("/auth/me", json={"full_name": "x" * 201})
 
     assert resp.status_code == 422  # exceeds max_length=200
+
+
+def test_authenticate_timing_parity_called(monkeypatch):
+    """Verify that verify_password is still called with the correct dummy hash
+    when a user is not found, is inactive, or is passwordless, ensuring timing
+    attack protection (no user enumeration)."""
+    from app.auth import service as auth_service
+
+    calls = []
+    original_verify = auth_service.verify_password
+
+    def mock_verify(password: str, hashed: str) -> bool:
+        calls.append((password, hashed))
+        return original_verify(password, hashed)
+
+    monkeypatch.setattr(auth_service, "verify_password", mock_verify)
+
+    # 1. User not found (None)
+    session1 = FakeSession(results=[FakeResult(scalar=None)])
+    assert auth_service.authenticate(session1, email="ghost@y.co", password="any_password") is None
+    assert len(calls) == 1
+    assert calls[-1][1] == auth_service._DUMMY_HASH
+
+    # 2. Inactive user
+    inactive_user = User(id=uuid.uuid4(), email="inactive@y.co", password_hash="somehash", is_active=False)
+    session2 = FakeSession(results=[FakeResult(scalar=inactive_user)])
+    assert auth_service.authenticate(session2, email="inactive@y.co", password="any_password") is None
+    assert len(calls) == 2
+    assert calls[-1][1] == auth_service._DUMMY_HASH
+
+    # 3. Passwordless user
+    passwordless_user = User(id=uuid.uuid4(), email="sso@y.co", password_hash=None, is_active=True)
+    session3 = FakeSession(results=[FakeResult(scalar=passwordless_user)])
+    assert auth_service.authenticate(session3, email="sso@y.co", password="any_password") is None
+    assert len(calls) == 3
+    assert calls[-1][1] == auth_service._DUMMY_HASH
