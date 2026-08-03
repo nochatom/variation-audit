@@ -282,6 +282,23 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
   const [menu, setMenu] = useState(false);
   const initials = (me?.email ?? "?").slice(0, 2).toUpperCase();
 
+  // Close the user menu when path changes
+  useEffect(() => {
+    setMenu(false);
+  }, [pathname]);
+
+  // Escape key closes user menu (a11y keyboard support)
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenu(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menu]);
+
+  const userLabel = `User menu for ${me?.full_name || me?.email || "Account"}`;
+
   return (
     <header className="sticky top-0 z-20 border-b border-ip-line bg-ip-card/85 backdrop-blur-xl">
       <div className="flex h-14 items-center justify-between px-5 sm:px-8">
@@ -311,6 +328,10 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
           </span>
           <button
             onClick={() => setMenu((v) => !v)}
+            aria-label={userLabel}
+            title={userLabel}
+            aria-haspopup="menu"
+            aria-expanded={menu}
             className="grid h-8 w-8 place-items-center rounded-full bg-ip-navy-fill text-[11px] font-bold text-white transition-transform active:scale-90"
           >
             {initials}
@@ -318,15 +339,28 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
           {menu && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
-              <div className="animate-scale-in absolute right-0 top-11 z-20 w-56 origin-top-right rounded-lg border border-ip-line bg-ip-card p-1.5 shadow-ip-pop">
-                <div className="border-b border-ip-line px-3 py-2">
+              <div
+                role="menu"
+                aria-label={userLabel}
+                className="animate-scale-in absolute right-0 top-11 z-20 w-56 origin-top-right rounded-lg border border-ip-line bg-ip-card p-1.5 shadow-ip-pop"
+              >
+                <div className="border-b border-ip-line px-3 py-2" role="none">
                   <div className="truncate text-[13px] font-semibold text-ip-ink">{me?.email}</div>
                   <div className="text-[11px] text-ip-ink-3">{org?.name}</div>
                 </div>
-                <Link href="/app/settings" onClick={() => setMenu(false)} className="block rounded-md px-3 py-2 text-[13px] text-ip-ink-2 transition-colors hover:bg-ip-card-2 hover:text-ip-ink">
+                <Link
+                  href="/app/settings"
+                  onClick={() => setMenu(false)}
+                  role="menuitem"
+                  className="block rounded-md px-3 py-2 text-[13px] text-ip-ink-2 transition-colors hover:bg-ip-card-2 hover:text-ip-ink"
+                >
                   Settings
                 </Link>
-                <button onClick={logout} className="block w-full rounded-md px-3 py-2 text-left text-[13px] text-ip-ink-2 transition-colors hover:bg-ip-card-2 hover:text-ip-ink">
+                <button
+                  onClick={logout}
+                  role="menuitem"
+                  className="block w-full rounded-md px-3 py-2 text-left text-[13px] text-ip-ink-2 transition-colors hover:bg-ip-card-2 hover:text-ip-ink"
+                >
                   Log out
                 </button>
               </div>
@@ -396,7 +430,7 @@ function NotificationBell() {
     <div className="relative">
       <button
         onClick={toggle}
-        aria-label="Notifications"
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
         className="relative rounded-md p-1.5 text-ip-ink-2 transition-colors hover:bg-ip-card-2 active:scale-90"
       >

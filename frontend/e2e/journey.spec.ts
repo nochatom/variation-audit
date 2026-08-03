@@ -67,4 +67,33 @@ test.describe("critical journey", () => {
     await authedPage.getByRole("button", { name: "Close", exact: true }).click();
     await expect(dialog).toBeHidden();
   });
+
+  test("interact with accessible user profile menu", async ({ authedPage }) => {
+    await authedPage.goto("/app/dashboard");
+
+    // The user menu trigger should have the correct dynamic aria-label
+    const userBtn = authedPage.getByRole("button", { name: /User menu for/i });
+    await expect(userBtn).toBeVisible();
+    await expect(userBtn).toHaveAttribute("aria-haspopup", "menu");
+    await expect(userBtn).toHaveAttribute("aria-expanded", "false");
+
+    // Click to open user menu
+    await userBtn.click();
+    await expect(userBtn).toHaveAttribute("aria-expanded", "true");
+
+    // Dropdown container should have role="menu"
+    const dropdownMenu = authedPage.getByRole("menu", { name: /User menu for/i });
+    await expect(dropdownMenu).toBeVisible();
+
+    // Menuitems should be visible and accessible
+    const settingsItem = dropdownMenu.getByRole("menuitem", { name: "Settings" });
+    const logoutItem = dropdownMenu.getByRole("menuitem", { name: "Log out" });
+    await expect(settingsItem).toBeVisible();
+    await expect(logoutItem).toBeVisible();
+
+    // Press Escape to close menu (keyboard accessibility support)
+    await authedPage.keyboard.press("Escape");
+    await expect(dropdownMenu).toBeHidden();
+    await expect(userBtn).toHaveAttribute("aria-expanded", "false");
+  });
 });
