@@ -9,7 +9,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.auth import refresh_tokens
@@ -67,6 +67,17 @@ def create_reset_token(session: Session, *, email: str, expire_minutes: int) -> 
         session.commit()   # same commit round trip as the exists path
         return None
 
+    # Invalidate any existing outstanding/pending reset tokens for this user
+    # to enforce that only the newly created password reset link is valid.
+    session.execute(
+        update(PasswordResetToken)
+        .where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        )
+        .values(used_at=_now())
+    )
+
     token = PasswordResetToken(
         id=uuid.uuid4(), user_id=user.id, token_hash=token_hash,
         expires_at=_now() + timedelta(minutes=expire_minutes),
@@ -100,6 +111,19 @@ def reset_password(session: Session, *, raw_token: str, new_password: str) -> Us
 
     user.password_hash = hash_password(new_password)
     row.used_at = _now()
+
+    # Invalidate all other active/outstanding password reset tokens for this user
+    # to prevent any subsequent resets using older/different active links.
+    session.execute(
+        update(PasswordResetToken)
+        .where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.id != row.id,
+            PasswordResetToken.used_at.is_(None),
+        )
+        .values(used_at=row.used_at)
+    )
+
     session.commit()
 
     refresh_tokens.revoke_all(session, user.id)

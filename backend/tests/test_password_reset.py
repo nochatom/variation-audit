@@ -65,6 +65,29 @@ def test_create_reset_token_known_email_returns_raw_token():
     assert session.commits == 1
 
 
+def test_create_reset_token_invalidates_existing_tokens():
+    user = User(id=uuid.uuid4(), email="user@example.com", password_hash="hash", is_active=True)
+
+    class RecordingSession(FakeSession):
+        def __init__(self, results=None):
+            super().__init__(results=results)
+            self.executed_statements = []
+
+        def execute(self, stmt):
+            self.executed_statements.append(stmt)
+            return super().execute(stmt)
+
+    session = RecordingSession(results=[FakeResult(scalar=user)])
+
+    token = password_reset_service.create_reset_token(session, email="user@example.com", expire_minutes=60)
+    assert token is not None
+
+    updates = [s for s in session.executed_statements if hasattr(s, "is_update") and s.is_update]
+    assert len(updates) == 1
+    update_stmt = updates[0]
+    assert update_stmt.table.name == "password_reset_tokens"
+
+
 # -- reset_password ---------------------------------------------------------
 def _make_token_row(user_id, *, secret, used_at=None, expires_delta=timedelta(hours=1)):
     return PasswordResetToken(
@@ -121,6 +144,34 @@ def test_reset_password_success_updates_password_and_revokes_sessions():
     assert row.used_at is not None
     assert user.password_hash != "oldhash"
     assert verify_password("newpassword123", user.password_hash)
+
+
+def test_reset_password_invalidates_other_tokens():
+    user_id = uuid.uuid4()
+    row = _make_token_row(user_id, secret="s3cr3t")
+    user = User(id=user_id, email="user@example.com", password_hash="oldhash", is_active=True)
+
+    class RecordingMultiGetSession(_MultiGetSession):
+        def __init__(self, *, get_by_class, results=None):
+            super().__init__(get_by_class=get_by_class, results=results)
+            self.executed_statements = []
+
+        def execute(self, stmt):
+            self.executed_statements.append(stmt)
+            return super().execute(stmt)
+
+    session = RecordingMultiGetSession(
+        get_by_class={PasswordResetToken: row, User: user},
+        results=[FakeResult(scalars=[])],
+    )
+    raw = password_reset_service._encode(row.id, "s3cr3t")
+
+    password_reset_service.reset_password(session, raw_token=raw, new_password="newpassword123")
+
+    updates = [s for s in session.executed_statements if hasattr(s, "is_update") and s.is_update]
+    assert len(updates) == 1
+    update_stmt = updates[0]
+    assert update_stmt.table.name == "password_reset_tokens"
 
 
 # -- endpoints ---------------------------------------------------------------
