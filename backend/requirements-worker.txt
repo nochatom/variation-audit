@@ -1,0 +1,17 @@
+# Variation Audit — analysis worker + test suite.
+#
+# Everything the API needs, plus the multi-agent orchestration stack. Install
+# this (not requirements.txt) anywhere that actually runs agents:
+#   • the analysis worker (app/worker/, app/agents/worker.py)
+#   • CI, because the test suite imports app/agents/*
+#
+# Kept separate from requirements.txt so the serverless API bundle stays small
+# — google-adk and litellm pull in very large transitive trees (together they
+# pushed the deployed bundle to 308.92 MB, past the Python runtime's standard
+# limit, which broke the function at import). See requirements.txt's header.
+-r requirements.txt
+
+google-adk>=2.4,<3.0          # multi-agent orchestration scaffold (app/agents/). Pinned <3.0: 2.4
+                              # deprecates Sequential/ParallelAgent in favor of Workflow, which can't
+                              # yet be used as an LlmAgent sub-agent — see app/agents/orchestrator.py.
+litellm>=1.50                # provider-agnostic model layer for the ADK scaffold (Gemini/Claude/OpenAI)

@@ -6,8 +6,11 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
-COPY requirements.txt ./
-RUN pip install -r requirements.txt
+# requirements-worker.txt pulls in requirements.txt via -r, so this installs
+# the API deps plus the agent stack. One image runs both the API and the
+# worker (only the command differs), and the worker needs google-adk/litellm.
+COPY requirements.txt requirements-worker.txt ./
+RUN pip install -r requirements-worker.txt
 
 COPY . .
 RUN chmod +x docker-entrypoint.sh

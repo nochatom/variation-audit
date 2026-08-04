@@ -1,4 +1,16 @@
-# Variation Audit — product backend (FastAPI + worker)
+# Variation Audit — product API (FastAPI).
+#
+# API-ONLY on purpose. The multi-agent orchestration stack (google-adk,
+# litellm) lives in requirements-worker.txt instead, because it is enormous:
+# with it installed the serverless bundle reached 308.92 MB, past the Python
+# runtime's standard limit, so the platform stripped dependencies to fit and
+# the function then failed to import at all (FUNCTION_INVOCATION_FAILED on
+# every route, including ones that touch no database).
+#
+# The API never needs those packages at import time — app/agents/errors.py
+# imports litellm lazily inside a function, and nothing else on the request
+# path imports either at module scope. Anything that runs agents (the worker,
+# the test suite) installs requirements-worker.txt, which includes this file.
 fastapi>=0.115
 uvicorn[standard]>=0.32
 pydantic>=2.9
@@ -18,8 +30,4 @@ pypdf>=5.0                 # PDF text extraction (.3)
 reportlab>=4.2             # report PDF generation (.15)
 slowapi>=0.1.9              # per-IP rate limiting on every endpoint
 stripe>=10.0                # billing (.23) — Checkout, Billing Portal, webhooks
-google-adk>=2.4,<3.0          # multi-agent orchestration scaffold (app/agents/). Pinned <3.0: 2.4
-                              # deprecates Sequential/ParallelAgent in favor of Workflow, which can't
-                              # yet be used as an LlmAgent sub-agent — see app/agents/orchestrator.py.
-litellm>=1.50                # provider-agnostic model layer for the ADK scaffold (Gemini/Claude/OpenAI)
 posthog>=3.0.0              # analytics, error tracking, feature flags
