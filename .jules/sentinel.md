@@ -16,3 +16,8 @@ This journal contains only critical, unique security learnings from maintaining 
 **Vulnerability:** User enumeration via login timing attacks. If login queries for invalid/inactive/passwordless users return instantly while valid password-based login spends 90ms on bcrypt hashing, an attacker can determine registered emails.
 **Learning:** Returning early on missing, inactive, or passwordless users skips the expensive cryptographic verification, making login timing highly diagnostic of user existence.
 **Prevention:** Execute a dummy bcrypt verification against a pre-computed valid cost-10 hash whenever the user lookup fails, the user is inactive, or has no password hash, ensuring constant-time authentication across all branches.
+
+## 2026-08-04 - [Rate Limiting and Business Logic State Interaction]
+**Vulnerability:** Publicly accessible, token-addressed POST endpoints like `/invitations/{token}/accept` are vulnerable to brute-force and resource-abuse spamming if they lack proper rate-limiting protection.
+**Learning:** Adding slowapi rate limiters to state-mutating endpoints creates an interesting interaction: the first request succeeds (200), subsequent requests fail with business logic errors (410 Gone since the invitation is already used), and finally, the rate limiter triggers (429 Too Many Requests) preemptively before the endpoint business checks run.
+**Prevention:** Always decorate public, state-changing onboarding/auth-adjacent endpoints with `@limiter.limit(AUTH_RATE_LIMIT)` and ensure unit tests expect the status code transition flow (200 -> 410 -> 429) to properly verify rate limiter preemption.
