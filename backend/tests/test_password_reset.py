@@ -169,3 +169,49 @@ def test_reset_password_endpoint_success_204():
         "/auth/reset-password", json={"token": raw, "new_password": "newpassword123"}
     )
     assert resp.status_code == 204
+
+
+class _StatementRecordingSession(_MultiGetSession):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.statements = []
+
+    def execute(self, stmt):
+        self.statements.append(stmt)
+        return super().execute(stmt)
+
+
+def test_create_reset_token_invalidates_existing_tokens():
+    user = User(id=uuid.uuid4(), email="user@example.com", password_hash="hash", is_active=True)
+    session = _StatementRecordingSession(
+        get_by_class={User: user},
+        results=[FakeResult(scalar=user), FakeResult()],  # for user lookup + update
+    )
+
+    password_reset_service.create_reset_token(session, email="user@example.com", expire_minutes=60)
+
+    # 1st statement is SELECT user, 2nd is UPDATE to invalidate prior tokens
+    assert len(session.statements) >= 2
+    update_stmt = session.statements[1]
+
+    # Verify the update is targeted at the PasswordResetToken model
+    assert update_stmt.is_update
+    assert update_stmt.table.name == "password_reset_tokens"
+
+
+def test_reset_password_invalidates_all_other_active_tokens():
+    user_id = uuid.uuid4()
+    row = _make_token_row(user_id, secret="s3cr3t")
+    user = User(id=user_id, email="user@example.com", password_hash="oldhash", is_active=True)
+
+    session = _StatementRecordingSession(
+        get_by_class={PasswordResetToken: row, User: user},
+        results=[FakeResult(scalars=[])],  # revoke_all's active-token lookup
+    )
+    raw = password_reset_service._encode(row.id, "s3cr3t")
+    password_reset_service.reset_password(session, raw_token=raw, new_password="newpassword123")
+
+    # Verify that an update statement on PasswordResetToken was executed
+    update_stmts = [stmt for stmt in session.statements if stmt.is_update]
+    assert len(update_stmts) == 1
+    assert update_stmts[0].table.name == "password_reset_tokens"

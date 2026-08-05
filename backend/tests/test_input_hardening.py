@@ -342,3 +342,27 @@ def test_configured_limits_use_valid_grammar():
     for value in (s.rate_limit_default, s.rate_limit_auth,
                   s.rate_limit_uploads, s.rate_limit_analysis):
         parse(value)  # raises ValueError on bad grammar
+
+
+def test_accept_invitation_rate_limited_after_5_attempts():
+    limiter.reset()
+    try:
+        user = User(id=uuid.uuid4(), email="ca@firm.com", password_hash="x", is_active=True)
+        session = FakeSession()
+
+        app.dependency_overrides[get_db] = lambda: session
+        app.dependency_overrides[get_current_user] = lambda: user
+        client = TestClient(app)
+
+        # Send 6 POST requests. The first 5 will fail with 404/invalid invitation,
+        # but the 6th must be rate-limited (429).
+        statuses = []
+        for _ in range(6):
+            resp = client.post("/invitations/token_abc/accept")
+            statuses.append(resp.status_code)
+
+        assert statuses[:5] == [404, 404, 404, 404, 404]
+        assert statuses[5] == 429
+    finally:
+        limiter.reset()
+        app.dependency_overrides.clear()
