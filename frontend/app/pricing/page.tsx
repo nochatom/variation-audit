@@ -106,11 +106,16 @@ export default function PricingPage() {
               Start free on one project. Upgrade when the record shows it&apos;s worth it.
             </p>
 
-            <div className="mt-10 inline-flex items-center gap-1 rounded-pill border border-ip-line bg-ip-card p-1 text-[13px] font-semibold">
+            <div
+              role="group"
+              aria-label="Billing interval selection"
+              className="mt-10 inline-flex items-center gap-1 rounded-pill border border-ip-line bg-ip-card p-1 text-[13px] font-semibold"
+            >
               {/* Instant color-swap (not a sliding indicator): the two options
                   have very different widths, so a fixed 50% slider would
                   misalign. A crisp color change is the correct call here. */}
               <button
+                aria-pressed={interval === "monthly"}
                 className={`rounded-pill px-4 py-1.5 transition-colors duration-150 ease-out active:scale-[0.97] ${
                   interval === "monthly" ? "bg-ip-navy text-white" : "text-ip-ink-2 hover:text-ip-ink"
                 }`}
@@ -119,6 +124,7 @@ export default function PricingPage() {
                 Monthly
               </button>
               <button
+                aria-pressed={interval === "annual"}
                 className={`rounded-pill px-4 py-1.5 transition-colors duration-150 ease-out active:scale-[0.97] ${
                   interval === "annual" ? "bg-ip-navy text-white" : "text-ip-ink-2 hover:text-ip-ink"
                 }`}
