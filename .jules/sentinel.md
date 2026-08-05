@@ -16,3 +16,8 @@ This journal contains only critical, unique security learnings from maintaining 
 **Vulnerability:** User enumeration via login timing attacks. If login queries for invalid/inactive/passwordless users return instantly while valid password-based login spends 90ms on bcrypt hashing, an attacker can determine registered emails.
 **Learning:** Returning early on missing, inactive, or passwordless users skips the expensive cryptographic verification, making login timing highly diagnostic of user existence.
 **Prevention:** Execute a dummy bcrypt verification against a pre-computed valid cost-10 hash whenever the user lookup fails, the user is inactive, or has no password hash, ensuring constant-time authentication across all branches.
+
+## 2026-11-14 - [Strict Invitation Rate Limiting and Reset Token Rotation]
+**Vulnerability:** Lack of rate-limiting on sensitive onboarding/acceptance endpoints can lead to registration brute-forcing. Additionally, active/outstanding password reset tokens that survive subsequent requests or resets allow replay attacks and token hijacking.
+**Learning:** Any entry point into authentication or membership addition must be secured with the application-wide slowapi rate limiter, taking care to pass the requisite `request` and `response` parameters in the FastAPI signature. Password reset flows must aggressively rotate/invalidate older tokens at both token request time and password reset confirmation time.
+**Prevention:** Always include `Request` and `Response` arguments in handlers decorated with `@limiter.limit()`. Proactively run bulk update operations using SQLAlchemy's `update` to set `used_at` timestamps on all older, outstanding token rows.
