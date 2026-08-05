@@ -182,6 +182,28 @@ def test_logout_endpoint_is_rate_limited():
     limiter.reset()
 
 
+def test_accept_invitation_endpoint_is_rate_limited():
+    from app.rate_limit import limiter
+    from app.auth.deps import get_current_user, get_db
+
+    limiter.reset()
+    user = User(id=uuid.uuid4(), email="invitee@firm.com", password_hash="x", is_active=True)
+    session = FakeSession(results=[FakeResult(scalar=None)])
+
+    app.dependency_overrides[get_db] = lambda: session
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        client = TestClient(app)
+        statuses = []
+        for _ in range(10):
+            resp = client.post("/invitations/some-token/accept")
+            statuses.append(resp.status_code)
+        assert 429 in statuses, f"expected a 429 among {statuses} — accept_invitation has no rate limit?"
+    finally:
+        limiter.reset()
+        app.dependency_overrides.clear()
+
+
 # --------------------------------------------------------------------------
 # Cross-tenant IDOR — independent proof, not just manual review
 # --------------------------------------------------------------------------
