@@ -16,3 +16,8 @@ This journal contains only critical, unique security learnings from maintaining 
 **Vulnerability:** User enumeration via login timing attacks. If login queries for invalid/inactive/passwordless users return instantly while valid password-based login spends 90ms on bcrypt hashing, an attacker can determine registered emails.
 **Learning:** Returning early on missing, inactive, or passwordless users skips the expensive cryptographic verification, making login timing highly diagnostic of user existence.
 **Prevention:** Execute a dummy bcrypt verification against a pre-computed valid cost-10 hash whenever the user lookup fails, the user is inactive, or has no password hash, ensuring constant-time authentication across all branches.
+
+## 2026-11-18 - [Password Reset Token Invalidation]
+**Vulnerability:** Active outstanding password reset tokens remained valid and usable even after a user requested a new password reset or completed a password reset using another token.
+**Learning:** Opaque/hashed token schemes (like password reset or invitation flows) should guarantee single-use and limit the threat window by actively revoking all other outstanding tokens for the user upon request or successful reset.
+**Prevention:** Query and expire existing pending/active password reset tokens (`expires_at = now`) during both token creation and token consumption.

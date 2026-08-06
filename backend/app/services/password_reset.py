@@ -67,9 +67,23 @@ def create_reset_token(session: Session, *, email: str, expire_minutes: int) -> 
         session.commit()   # same commit round trip as the exists path
         return None
 
+    # SECURITY HARDENING: Invalidate any prior active/outstanding password reset
+    # tokens for this user. This limits the window of vulnerability by ensuring only the
+    # single most recently requested password reset token is active at any time.
+    now = _now()
+    prior_active_tokens = session.execute(
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.expires_at > now,
+        )
+    ).scalars().all()
+    for t in prior_active_tokens:
+        t.expires_at = now
+
     token = PasswordResetToken(
         id=uuid.uuid4(), user_id=user.id, token_hash=token_hash,
-        expires_at=_now() + timedelta(minutes=expire_minutes),
+        expires_at=now + timedelta(minutes=expire_minutes),
     )
     session.add(token)
     session.commit()
@@ -99,7 +113,23 @@ def reset_password(session: Session, *, raw_token: str, new_password: str) -> Us
         raise ResetTokenError("account no longer exists")
 
     user.password_hash = hash_password(new_password)
-    row.used_at = _now()
+    now = _now()
+    row.used_at = now
+
+    # SECURITY HARDENING: Invalidate any other active/outstanding password reset tokens
+    # for this user. A successful reset means no other pending tokens should be allowed
+    # to alter the password again.
+    other_active_tokens = session.execute(
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.id != row.id,
+            PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.expires_at > now,
+        )
+    ).scalars().all()
+    for t in other_active_tokens:
+        t.expires_at = now
+
     session.commit()
 
     refresh_tokens.revoke_all(session, user.id)
