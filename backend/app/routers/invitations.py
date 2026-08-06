@@ -199,7 +199,9 @@ def preview_invitation(request: Request, response: Response, token: str,
 
 
 @public_router.post("/{token}/accept", response_model=AcceptOut)
-def accept_invitation(token: str, user: User = Depends(get_current_user),
+@limiter.limit(AUTH_RATE_LIMIT)
+def accept_invitation(request: Request, response: Response, token: str,
+                      user: User = Depends(get_current_user),
                       session: Session = Depends(get_db)) -> AcceptOut:
     """Accept as an already-authenticated user (must be logged in as the
     invited email — see app/services/invitations.py:accept_for_existing_user)."""

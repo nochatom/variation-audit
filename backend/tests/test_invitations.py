@@ -532,6 +532,22 @@ def test_accept_invitation_endpoint_success():
     assert body["company_id"] == str(row.company_id)
 
 
+def test_accept_invitation_endpoint_is_rate_limited():
+    from app.rate_limit import limiter
+
+    limiter.reset()
+    row, raw = _fixture_invitation(email="invitee@firm.com")
+    user = _user("invitee@firm.com")
+    session = FakeSession(get_obj=row, results=[FakeResult(scalar=None)] * 15)
+    client = _client(session, user)
+    statuses = []
+    for _ in range(10):
+        resp = client.post(f"/invitations/{raw}/accept")
+        statuses.append(resp.status_code)
+    assert 429 in statuses, f"expected a 429 among {statuses} — accept_invitation has no rate limit?"
+    limiter.reset()
+
+
 def test_register_via_invitation_endpoint_success():
     row, raw = _fixture_invitation(email="newuser@firm.com")
     session = FakeSession(get_obj=row, results=[FakeResult(scalar=None)])
