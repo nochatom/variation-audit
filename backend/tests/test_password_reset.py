@@ -65,6 +65,19 @@ def test_create_reset_token_known_email_returns_raw_token():
     assert session.commits == 1
 
 
+def test_create_reset_token_invalidates_prior_active_tokens():
+    user = User(id=uuid.uuid4(), email="user@example.com", password_hash="hash", is_active=True)
+    prior_token = _make_token_row(user.id, secret="s3cr3t")
+    # Returns the User on first execute (user lookup), and the list of prior active tokens on second execute
+    session = FakeSession(results=[
+        FakeResult(scalar=user),
+        FakeResult(scalars=[prior_token]),
+    ])
+    token = password_reset_service.create_reset_token(session, email="user@example.com", expire_minutes=60)
+    assert token is not None
+    assert prior_token.expires_at <= datetime.now(timezone.utc)
+
+
 # -- reset_password ---------------------------------------------------------
 def _make_token_row(user_id, *, secret, used_at=None, expires_delta=timedelta(hours=1)):
     return PasswordResetToken(
@@ -121,6 +134,30 @@ def test_reset_password_success_updates_password_and_revokes_sessions():
     assert row.used_at is not None
     assert user.password_hash != "oldhash"
     assert verify_password("newpassword123", user.password_hash)
+
+
+def test_reset_password_invalidates_other_active_tokens():
+    user_id = uuid.uuid4()
+    row = _make_token_row(user_id, secret="s3cr3t")
+    other_active = _make_token_row(user_id, secret="other_secret")
+    user = User(id=user_id, email="user@example.com", password_hash="oldhash", is_active=True)
+
+    # We have two execute calls:
+    # 1) other_active_tokens query in reset_password
+    # 2) revoke_all query in refresh_tokens
+    session = _MultiGetSession(
+        get_by_class={PasswordResetToken: row, User: user},
+        results=[
+            FakeResult(scalars=[other_active]),
+            FakeResult(scalars=[]),
+        ],
+    )
+    raw = password_reset_service._encode(row.id, "s3cr3t")
+
+    password_reset_service.reset_password(session, raw_token=raw, new_password="newpassword123")
+
+    # The other token must now be expired/invalidated (expires_at <= _now())
+    assert other_active.expires_at <= datetime.now(timezone.utc)
 
 
 # -- endpoints ---------------------------------------------------------------
