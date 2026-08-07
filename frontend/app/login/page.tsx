@@ -136,11 +136,16 @@ function LoginForm() {
         </Link>
 
         <div className="ip-card-lg p-6">
-          <div className="mb-5 flex gap-1 rounded-md border border-ip-line bg-ip-card p-1 text-sm">
+          <div
+            role="group"
+            aria-label="Authentication mode"
+            className="mb-5 flex gap-1 rounded-md border border-ip-line bg-ip-card p-1 text-sm"
+          >
             {(["login", "signup"] as const).map((m) => (
               <button
                 key={m}
                 type="button"
+                aria-pressed={mode === m}
                 onClick={() => { setMode(m); setError(null); }}
                 className={`flex-1 rounded-sm py-1.5 font-semibold transition-colors duration-150 ease-out active:scale-[0.97] ${
                   mode === m ? "bg-ip-navy-fill text-white" : "text-ip-ink-2 hover:text-ip-ink"
