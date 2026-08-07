@@ -16,3 +16,8 @@ This journal contains only critical, unique security learnings from maintaining 
 **Vulnerability:** User enumeration via login timing attacks. If login queries for invalid/inactive/passwordless users return instantly while valid password-based login spends 90ms on bcrypt hashing, an attacker can determine registered emails.
 **Learning:** Returning early on missing, inactive, or passwordless users skips the expensive cryptographic verification, making login timing highly diagnostic of user existence.
 **Prevention:** Execute a dummy bcrypt verification against a pre-computed valid cost-10 hash whenever the user lookup fails, the user is inactive, or has no password hash, ensuring constant-time authentication across all branches.
+
+## 2026-11-20 - [FastAPI SlowAPI Response Parameter Enforcements]
+**Vulnerability:** Missing rate limits on sensitive endpoints (e.g. accepting invitations) allow brute-force or abuse.
+**Learning:** Adding SlowAPI's `@limiter.limit` decorator on FastAPI endpoints with header tracking enabled strictly requires declaring both `request: Request` and `response: Response` parameters in the handler. Omitting `response: Response` crashes with an unexpected ASGI exception: `Exception: parameter response must be an instance of starlette.responses.Response`.
+**Prevention:** Always declare both `request: Request` and `response: Response` in any endpoint signature decorated with `@limiter.limit`.
