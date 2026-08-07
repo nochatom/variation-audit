@@ -552,3 +552,20 @@ def test_register_via_invitation_endpoint_existing_email_409s():
         f"/invitations/{raw}/register", json={"password": "goodpassword1"},
     )
     assert resp.status_code == 409
+
+
+def test_accept_invitation_rate_limited():
+    from app.rate_limit import limiter
+    limiter.reset()
+    try:
+        row, raw = _fixture_invitation(email="invitee@firm.com")
+        user = _user("invitee@firm.com")
+        session = FakeSession(get_obj=row, results=[FakeResult(scalar=None) for _ in range(6)])
+        client = _client(session, user)
+        responses = [client.post(f"/invitations/{raw}/accept") for _ in range(6)]
+        statuses = [r.status_code for r in responses]
+        assert statuses[:5] == [200, 410, 410, 410, 410]
+        assert statuses[5] == 429
+        assert "retry-after" in responses[5].headers
+    finally:
+        limiter.reset()
