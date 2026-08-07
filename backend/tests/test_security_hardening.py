@@ -182,6 +182,31 @@ def test_logout_endpoint_is_rate_limited():
     limiter.reset()
 
 
+def test_accept_invitation_endpoint_is_rate_limited():
+    from app.rate_limit import limiter
+    from app.auth.deps import get_current_user, get_db
+
+    user = User(id=uuid.uuid4(), email="invitee@firm.com", password_hash="x", is_active=True)
+    session = FakeSession(get_obj=None)
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_db] = lambda: session
+
+    limiter.reset()
+    client = TestClient(app)
+    statuses = []
+    try:
+        # A standard token format to bypass decoding error but still fail on DB lookup (which is fine)
+        token = f"{uuid.uuid4()}.secretsecret"
+        for _ in range(15):
+            resp = client.post(f"/invitations/{token}/accept")
+            statuses.append(resp.status_code)
+        assert 429 in statuses, f"expected a 429 among {statuses} — accept invitation has no rate limit?"
+    finally:
+        app.dependency_overrides.clear()
+        limiter.reset()
+
+
 # --------------------------------------------------------------------------
 # Cross-tenant IDOR — independent proof, not just manual review
 # --------------------------------------------------------------------------
